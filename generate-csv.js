@@ -1,20 +1,12 @@
+import fs from 'fs';
 import TimeTables from './helpers/timetables.js';
+import categories from './categories.js';
 
 async function main() {
     const moodleSubjects = [];
 
     const year = 2025;
     const semester = 2;
-
-    const categories = {
-        ECA: 119,
-        FMC: 117,
-        INF: 115,
-        MCT: 116,
-        MEST: 692,
-        PED: 3249,
-        TSI: 120
-    }
 
     const tt = new TimeTables({
         year,
@@ -36,7 +28,7 @@ async function main() {
             const shortName = `CH_${className.replace(/[-,]/g, '_')}_${subjectObj.short.split(/\s*-\s*/)?.slice(1).join('')}_${year}.${semester}${group}`;
             const category = categories[c.name.split('-')[0]];
 
-            if (!moodleSubjects.map(ms => ms[0]).includes(fullName)) {
+            if (!moodleSubjects.map(ms => ms[0]).includes(fullName) && category) {
                 moodleSubjects.push([
                     fullName,
                     shortName,
@@ -46,7 +38,7 @@ async function main() {
         });
     });
     console.log(JSON.stringify(moodleSubjects.map(ms => ms.join(', ')), null, 2));
-    // fs.writeFileSync('classes.json', JSON.stringify(data));
+    fs.writeFileSync('moodle_classes.csv', moodleSubjects.map(ms => ms.join(', ')).join('\n'));
 }
 main().catch(console.error);
 // const header = `fullname, shortname, category`
