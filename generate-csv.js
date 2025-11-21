@@ -38,7 +38,7 @@ async function main() {
         });
     });
     console.log(JSON.stringify(moodleSubjects.map(ms => ms.join(', ')), null, 2));
-    fs.writeFileSync('moodle_classes.csv', moodleSubjects.map(ms => ms.join(', ')).join('\n'));
+    fs.writeFileSync('files/moodle_classes.csv', moodleSubjects.map(ms => ms.join(', ')).join('\n'));
 }
 main().catch(console.error);
 // const header = `fullname, shortname, category`
