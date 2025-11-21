@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TMET - Subject Matching</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script type="module" src="js/app.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>TMET Subject Matching</h1>
+            <div class="stats">
+                <span class="stat">Matched: <strong id="matched-count">0</strong></span>
+            </div>
+        </header>
+
+        <div class="match-section">
+            <div class="column">
+                <div class="column-header">
+                    <h2>Moodle Subjects</h2>
+                    <input type="text" id="moodle-search" placeholder="Search..." class="search-input">
+                </div>
+                <div id="moodle-list" class="subject-list"></div>
+            </div>
+
+            <div class="column-center">
+                <button id="match-btn" class="match-button" disabled>
+                    <span>→</span>
+                    <span>Match</span>
+                    <span>←</span>
+                </button>
+            </div>
+
+            <div class="column">
+                <div class="column-header">
+                    <h2>SUAP Subjects</h2>
+                    <input type="text" id="suap-search" placeholder="Search..." class="search-input">
+                </div>
+                <div id="suap-list" class="subject-list"></div>
+            </div>
+        </div>
+
+        <div class="matched-section">
+            <h2>Matched Subjects (<span id="matched-list-count">0</span>)</h2>
+            <div id="matched-list" class="matched-list"></div>
+        </div>
+    </div>
+</body>
+</html>

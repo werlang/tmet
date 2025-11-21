@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "production": "node app.js",
-    "development": "nodemon --inspect=0.0.0.0 app.js"
+    "development": "nodemon --inspect=0.0.0.0 app.js",
+    "ui": "node server.js"
   },
   "nodemonConfig": {
     "ignore": []
@@ -13,6 +14,7 @@
   "author": "Pablo Werlang",
   "license": "MIT",
   "dependencies": {
+    "express": "^5.1.0",
     "nodemon": "^3.1.10",
     "puppeteer-core": "^24.30.0",
     "xml2js": "^0.6.2"

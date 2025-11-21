@@ -19,7 +19,10 @@ TMET is a Node.js automation tool designed to bridge academic systems. It fetche
   - `moodle-config.js`: Maps class names to Moodle category IDs
   - `suap-config.js`: Selectors and URLs for SUAP scraping
 - **`public/`**: Web UI for manual matching (Express + vanilla JS)
-  - `index.html`, `style.css`, `index.js`: Split UI architecture
+  - `index.html`: Main UI entry point
+  - `js/app.js`: Main application logic (SubjectMatcher class)
+  - `js/toast.js`, `js/request.js`: Utility classes
+  - `css/style.css`, `css/toast.css`: Stylesheets
 - **`server.js`**: Express server for the matching UI
 - **`files/`**: Data files
   - `moodle_classes.csv`: Generated Moodle courses
