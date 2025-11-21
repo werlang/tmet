@@ -1,8 +1,9 @@
 import fs from 'fs';
-import TimeTables from './helpers/timetables.js';
-import moodleConfig from './config/moodle-config.js';
+import path from 'path';
+import TimeTables from '../helpers/timetables.js';
+import moodleConfig from '../config/moodle-config.js';
 
-async function main() {
+export default async function generateCSV() {
     const moodleSubjects = [];
 
     const year = 2025;
@@ -38,8 +39,12 @@ async function main() {
         });
     });
     console.log(JSON.stringify(moodleSubjects.map(ms => ms.join(', ')), null, 2));
-    fs.writeFileSync('files/moodle_classes.csv', moodleSubjects.map(ms => ms.join(', ')).join('\n'));
+    
+    const header = ['fullname', 'shortname', 'category'];
+    moodleSubjects.unshift(header);
+    const csv = moodleSubjects.map(ms => ms.join(', ')).join('\n');
+
+    fs.writeFileSync(path.resolve('files', 'moodle_classes.csv'), csv);
+
+    return csv;
 }
-main().catch(console.error);
-// const header = `fullname, shortname, category`
-// fs.writeFileSync('moodle.csv', [header, ...moodle].join('\n'));

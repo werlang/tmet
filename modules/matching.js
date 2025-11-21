@@ -1,10 +1,11 @@
 import fs from 'fs';
+import path from 'path';
 
 export default function match() {
 
-    const SUAPsubjects = JSON.parse(fs.readFileSync('files/suap_subjects.json', 'utf-8'));
+    const SUAPsubjects = JSON.parse(fs.readFileSync(path.resolve('files', 'suap_subjects.json'), 'utf-8'));
     
-    const moodleSubjects = fs.readFileSync('files/moodle_classes.csv', 'utf-8').split('\n').slice(1).map(line => line.split(',').map(item => item.trim())).map(item => ({
+    const moodleSubjects = fs.readFileSync(path.resolve('files', 'moodle_classes.csv'), 'utf-8').split('\n').slice(1).map(line => line.split(',').map(item => item.trim())).map(item => ({
         fullname: item[0],
         shortname: item[1],
         category: item[2],

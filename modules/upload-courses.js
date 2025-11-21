@@ -1,18 +1,19 @@
+import path from 'path';
 import fs from 'fs';
-import MoodleUploader from './helpers/moodle-uploader.js';
+import MoodleUploader from '../helpers/moodle-uploader.js';
 
 // Main execution
-async function main() {
+export default async function uploadCourses() {
     const uploader = new MoodleUploader(
         process.env.MOODLE_URL || 'https://apnp.ifsul.edu.br',
         process.env.MOODLE_TOKEN,
     );
 
-    if (!fs.existsSync('moodle_classes.csv')) {
+    if (!fs.existsSync(path.resolve('files', 'moodle_classes.csv'))) {
         console.error('Error: moodle_classes.csv file not found.');
         process.exit(1);
     }
-    const courses = fs.readFileSync('moodle_classes.csv', 'utf-8').split('\n').map(line => line.split(',').map(item => item.trim())).map(item => ({
+    const courses = fs.readFileSync(path.resolve('files', 'moodle_classes.csv'), 'utf-8').split('\n').map(line => line.split(',').map(item => item.trim())).map(item => ({
         fullname: item[0],
         shortname: item[1],
         category: item[2],
@@ -32,8 +33,6 @@ async function main() {
             console.log(`  - ${err.course}: ${err.error}`);
         });
     }
-}
 
-main().catch(err => {
-    console.error('Fatal error:', err);
-});
+    return results;
+}
