@@ -10,11 +10,27 @@ export default function match() {
         shortname: item[1],
         category: item[2],
     }));
+
+    let manualMatches = [];
+    const manualMatchesPath = path.resolve('files', 'manual_matches.json');
+    if (fs.existsSync(manualMatchesPath)) {
+        manualMatches = JSON.parse(fs.readFileSync(manualMatchesPath, 'utf-8'));
+    }
     
     let noMatch = [];
     
     // Try to match Moodle subjects with SUAP subjects
     moodleSubjects.forEach(msubject => {
+        const manualMatch = manualMatches.find(m => m.moodleFullname === msubject.fullname);
+        if (manualMatch) {
+            msubject.suapId = manualMatch.suapId;
+            const suapSubject = SUAPsubjects.find(s => s.id === manualMatch.suapId);
+            if (suapSubject) {
+                msubject.suapMatch = suapSubject;
+            }
+            return;
+        }
+
         // $1 = className (e.g., INF-1AT)
         // $2 = group (e.g., -G1) optional
         // $3 = secondary className (e.g., , INF-1BT) optional
@@ -35,13 +51,14 @@ export default function match() {
 
         if (match) {
             msubject.suapId = match.id;
+            msubject.suapMatch = match;
         }
         else {
             noMatch.push(msubject);
         }
     });
     
-    const matching = moodleSubjects.length - noMatch.length;
+    const matching = moodleSubjects.filter(m => m.suapId).length;
     
     console.log(noMatch);
     console.log(`Found ${matching} / ${moodleSubjects.length} matching subjects.`);
@@ -49,6 +66,7 @@ export default function match() {
     return {
         subjects: moodleSubjects,
         noMatch,
+        suapSubjects: SUAPsubjects
     }
     
 }
