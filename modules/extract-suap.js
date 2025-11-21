@@ -3,18 +3,24 @@ import fs from "fs";
 import SUAPScraper from "../helpers/scraper.js";
 import suapConfig from "../config/suap-config.js";
 
-export default async function extractSUAP() {
+export default async function extractSUAP(year, semester, selectedCourses) {
     await SUAPScraper.initialize();
     
-    const year = 2025;
-    const semester = 1;
+    // Use provided parameters or defaults
+    year = year || new Date().getFullYear();
+    semester = semester || (new Date().getMonth() < 6 ? 1 : 2);
     
     const courses = suapConfig.courses;
     const yearList = suapConfig.yearList;
     
+    // Filter courses if selectedCourses array is provided
+    const coursesToExtract = selectedCourses && selectedCourses.length > 0
+        ? Object.keys(courses).filter(key => selectedCourses.includes(key))
+        : Object.keys(courses);
+    
     const SUAPJson = [];
     
-    for (const courseName of Object.keys(courses)) {
+    for (const courseName of coursesToExtract) {
         const query = new URLSearchParams({
             ...suapConfig.bookSearch.url.query,
             ano_letivo: yearList[year],

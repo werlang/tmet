@@ -3,16 +3,13 @@ import path from 'path';
 import TimeTables from '../helpers/timetables.js';
 import moodleConfig from '../config/moodle-config.js';
 
-export default async function generateCSV() {
+export default async function generateCSV(year, semester, dateFrom, dateTo) {
     const moodleSubjects = [];
-
-    const year = 2025;
-    const semester = 2;
 
     const tt = new TimeTables({
         year,
-        // dateFrom: `2025-11-01`,
-        // dateTo: `2025-11-10`,
+        dateFrom,
+        dateTo,
     });
     const classes = await tt.getClasses();
     classes.forEach(c => {
