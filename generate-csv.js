@@ -1,6 +1,6 @@
 import fs from 'fs';
 import TimeTables from './helpers/timetables.js';
-import categories from './categories.js';
+import moodleConfig from './config/moodle-config.js';
 
 async function main() {
     const moodleSubjects = [];
@@ -26,7 +26,7 @@ async function main() {
             // "[2025.2] INF-2AT-G1 - Banco de Dados", CH_INF_2AT_BD_2025.2_G1, 115
             const fullName = `"[${year}.${semester}] ${className}${group.replace('_', '-')} - ${subjectObj.name.split('-').slice(1).join('-').trim()}"`;
             const shortName = `CH_${className.replace(/[-,]/g, '_')}_${subjectObj.short.split(/\s*-\s*/)?.slice(1).join('')}_${year}.${semester}${group}`;
-            const category = categories[c.name.split('-')[0]];
+            const category = moodleConfig.categories[c.name.split('-')[0]];
 
             if (!moodleSubjects.map(ms => ms[0]).includes(fullName) && category) {
                 moodleSubjects.push([
