@@ -5,16 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TMET - Subject Matching</title>
     <link rel="stylesheet" href="css/style.css">
-    <script type="module" src="js/app.js"></script>
+    <script type="module" src="js/index.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>TMET Subject Matching</h1>
+            <h1>TMET - Course Creation Pipeline</h1>
             <div class="stats">
                 <span class="stat">Matched: <strong id="matched-count">0</strong></span>
             </div>
         </header>
+
+        <div class="pipeline-section">
+            <h2>Step 1: Extract Timetables & Generate Moodle CSV</h2>
+            <div class="pipeline-content">
+                <div class="pipeline-inputs">
+                    <div class="input-group">
+                        <label for="tt-year-input">Year</label>
+                        <input type="number" id="tt-year-input" placeholder="Year" min="2020" max="2099">
+                    </div>
+                    <div class="input-group">
+                        <label for="tt-semester-input">Semester</label>
+                        <input type="number" id="tt-semester-input" placeholder="1 or 2" min="1" max="2">
+                    </div>
+                    <div class="input-group">
+                        <label for="date-from-input">Date From (optional)</label>
+                        <input type="date" id="date-from-input">
+                    </div>
+                    <div class="input-group">
+                        <label for="date-to-input">Date To (optional)</label>
+                        <input type="date" id="date-to-input">
+                    </div>
+                </div>
+                <button id="generate-csv-btn" class="pipeline-btn primary">Extract & Generate CSV</button>
+            </div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2>Step 2: Extract Course Data from SUAP</h2>
+            <div class="pipeline-content">
+                <div class="pipeline-inputs">
+                    <div class="input-group">
+                        <label for="suap-year-input">Year</label>
+                        <input type="number" id="suap-year-input" placeholder="Year" min="2020" max="2099">
+                    </div>
+                    <div class="input-group">
+                        <label for="suap-semester-input">Semester</label>
+                        <input type="number" id="suap-semester-input" placeholder="1 or 2" min="1" max="2">
+                    </div>
+                    <div class="input-group full-width">
+                        <label>Courses to Extract</label>
+                        <div class="checkbox-group" id="courses-checkboxes">
+                            <label><input type="checkbox" value="INF" checked> INF - Informática</label>
+                            <label><input type="checkbox" value="MCT" checked> MCT - Mecatrônica</label>
+                            <label><input type="checkbox" value="FMC" checked> FMC - Fabricação Mecânica</label>
+                            <label><input type="checkbox" value="TSI" checked> TSI - Sistemas para Internet</label>
+                            <label><input type="checkbox" value="ECA" checked> ECA - Eng. Controle e Automação</label>
+                            <label><input type="checkbox" value="PED" checked> PED - Pedagogia</label>
+                        </div>
+                    </div>
+                </div>
+                <button id="extract-suap-btn" class="pipeline-btn primary">Extract from SUAP</button>
+            </div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2>Step 3: Match Subjects</h2>
+            <div class="pipeline-content">
+                <p class="section-description">Manually match Moodle subjects with SUAP subjects below</p>
+            </div>
+        </div>
 
         <div class="match-section">
             <div class="column">
@@ -42,9 +102,20 @@
             </div>
         </div>
 
-        <div class="matched-section">
-            <h2>Matched Subjects (<span id="matched-list-count">0</span>)</h2>
-            <div id="matched-list" class="matched-list"></div>
+        <div class="matched-section pipeline-section">
+            <h3 id="matched-section-header" class="collapsible-header collapsed">
+                <span class="collapse-icon">▼</span>
+                Matched Subjects (<span id="matched-list-count">0</span>)
+            </h3>
+            <div id="matched-list" class="matched-list collapsed"></div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2>Step 4: Upload Courses to Moodle</h2>
+            <div class="pipeline-content">
+                <p class="section-description">Upload generated courses to Moodle via Web Service API</p>
+                <button id="upload-courses-btn" class="pipeline-btn primary">Upload to Moodle</button>
+            </div>
         </div>
     </div>
 </body>

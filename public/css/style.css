@@ -67,6 +67,122 @@ body {
     }
 }
 
+.pipeline-section {
+    background-color: var(--color-bg-surface);
+    padding: 24px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    margin-bottom: 24px;
+
+    h2 {
+        font-size: 1.5rem;
+        margin-bottom: 16px;
+        color: var(--color-text-primary);
+        border-bottom: 2px solid var(--color-border);
+        padding-bottom: 12px;
+    }
+
+    .pipeline-content {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .section-description {
+        color: var(--color-text-secondary);
+        font-size: 0.95rem;
+        margin: 0;
+    }
+
+    .pipeline-inputs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 8px;
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+
+            &.full-width {
+                grid-column: 1 / -1;
+            }
+
+            label {
+                font-weight: 600;
+                font-size: 0.9rem;
+                color: var(--color-text-secondary);
+            }
+
+            input {
+                padding: 10px 12px;
+                border: 1px solid var(--color-border);
+                border-radius: 6px;
+                font-size: 0.95rem;
+                transition: border-color 0.2s, box-shadow 0.2s;
+
+                &:focus {
+                    outline: none;
+                    border-color: var(--color-primary);
+                    box-shadow: 0 0 0 3px var(--color-primary-light);
+                }
+            }
+        }
+    }
+
+    .checkbox-group {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+        padding: 12px;
+        background-color: var(--color-bg-body);
+        border-radius: 6px;
+        border: 1px solid var(--color-border);
+
+        label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: normal;
+            cursor: pointer;
+            color: var(--color-text-primary);
+
+            input[type="checkbox"] {
+                width: 18px;
+                height: 18px;
+                cursor: pointer;
+            }
+        }
+    }
+
+    .pipeline-btn {
+        background-color: var(--color-primary);
+        color: white;
+        border: none;
+        padding: 12px 24px;
+        border-radius: 6px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        align-self: flex-start;
+
+        &:hover:not(:disabled) {
+            background-color: var(--color-primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        &:disabled {
+            background-color: var(--color-border);
+            cursor: wait;
+            opacity: 0.7;
+        }
+    }
+}
+
 .match-section {
     display: grid;
     grid-template-columns: 1fr auto 1fr;
@@ -208,7 +324,7 @@ body {
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
 
-    h2 {
+    h2, h3 {
         font-size: 1.25rem;
         margin-bottom: 16px;
         padding-bottom: 12px;
@@ -216,9 +332,41 @@ body {
         color: var(--color-text-primary);
     }
 
+    .collapsible-header {
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: color 0.2s;
+
+        &:hover {
+            color: var(--color-primary);
+        }
+
+        .collapse-icon {
+            transition: transform 0.3s ease;
+            font-size: 0.9em;
+        }
+
+        &.collapsed .collapse-icon {
+            transform: rotate(-90deg);
+        }
+    }
+
     .matched-list {
         display: grid;
         gap: 12px;
+        overflow-y: auto;
+        transition: max-height 0.3s ease, opacity 0.3s ease;
+        max-height: 1000px;
+        opacity: 1;
+
+        &.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+        }
 
         .matched-item {
             padding: 16px;
