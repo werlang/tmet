@@ -6,7 +6,7 @@ class SubjectMatcher {
     #suapSubjects = [];
     #matchedSubjects = [];
     #selectedMoodle = null;
-    #selectedSuap = null;
+    #selectedSuap = []; // Changed to array for multi-select
     #elements = {};
 
     constructor() {
@@ -28,6 +28,7 @@ class SubjectMatcher {
             generateCsvBtn: document.getElementById('generate-csv-btn'),
             extractSuapBtn: document.getElementById('extract-suap-btn'),
             uploadCoursesBtn: document.getElementById('upload-courses-btn'),
+            aiMatchBtn: document.getElementById('ai-match-btn'),
             ttYearInput: document.getElementById('tt-year-input'),
             ttSemesterInput: document.getElementById('tt-semester-input'),
             dateFromInput: document.getElementById('date-from-input'),
@@ -36,6 +37,11 @@ class SubjectMatcher {
             suapSemesterInput: document.getElementById('suap-semester-input'),
             coursesCheckboxes: document.getElementById('courses-checkboxes'),
             matchedSectionHeader: document.getElementById('matched-section-header'),
+            aiMatchModal: document.getElementById('ai-match-modal'),
+            aiSuggestionsList: document.getElementById('ai-suggestions-list'),
+            modalCloseBtn: document.getElementById('modal-close-btn'),
+            modalCancelBtn: document.getElementById('modal-cancel-btn'),
+            modalApproveBtn: document.getElementById('modal-approve-btn'),
         };
     }
 
@@ -46,7 +52,11 @@ class SubjectMatcher {
         this.#elements.generateCsvBtn.addEventListener('click', () => this.#generateCSV());
         this.#elements.extractSuapBtn.addEventListener('click', () => this.#extractSUAP());
         this.#elements.uploadCoursesBtn.addEventListener('click', () => this.#uploadCourses());
+        this.#elements.aiMatchBtn.addEventListener('click', () => this.#performAIMatching());
         this.#elements.matchedSectionHeader.addEventListener('click', () => this.#toggleMatchedList());
+        this.#elements.modalCloseBtn.addEventListener('click', () => this.#closeModal());
+        this.#elements.modalCancelBtn.addEventListener('click', () => this.#closeModal());
+        this.#elements.modalApproveBtn.addEventListener('click', () => this.#applyAIMatches());
         
         // Set default values for year and semester
         this.#setDefaultDateValues();
@@ -189,7 +199,20 @@ class SubjectMatcher {
         div.className = 'matched-item';
         
         const moodleName = subject.fullname.replace(/"/g, '');
-        const suapName = subject.suapMatch ? subject.suapMatch.fullname : `ID: ${subject.suapId}`;
+        
+        // Handle multiple SUAP matches
+        let suapContent = '';
+        if (Array.isArray(subject.suapId)) {
+            // Multiple matches
+            suapContent = subject.suapId.map(id => {
+                const suapSubject = subject.suapMatch?.find(s => s.id === id);
+                return suapSubject ? suapSubject.fullname : `ID: ${id}`;
+            }).map(name => `<div class="suap-match-item">${this.#escapeHtml(name)}</div>`).join('');
+        } else {
+            // Single match (legacy support)
+            const suapName = subject.suapMatch ? subject.suapMatch.fullname : `ID: ${subject.suapId}`;
+            suapContent = `<div class="suap-match-item">${this.#escapeHtml(suapName)}</div>`;
+        }
         
         div.innerHTML = `
             <div class="matched-source">
@@ -198,8 +221,8 @@ class SubjectMatcher {
             </div>
             <div class="matched-arrow">↔</div>
             <div class="matched-target">
-                <div class="label">SUAP</div>
-                <div class="name">${this.#escapeHtml(suapName)}</div>
+                <div class="label">SUAP ${Array.isArray(subject.suapId) && subject.suapId.length > 1 ? `(${subject.suapId.length})` : ''}</div>
+                <div class="suap-matches">${suapContent}</div>
             </div>
         `;
         
@@ -216,10 +239,18 @@ class SubjectMatcher {
     }
 
     #selectSuap(element, subject) {
-        this.#clearSelection('#suap-list');
+        // Toggle selection for multi-select
+        const isSelected = element.classList.contains('selected');
         
-        element.classList.add('selected');
-        this.#selectedSuap = subject.id;
+        if (isSelected) {
+            // Deselect
+            element.classList.remove('selected');
+            this.#selectedSuap = this.#selectedSuap.filter(id => id !== subject.id);
+        } else {
+            // Select
+            element.classList.add('selected');
+            this.#selectedSuap.push(subject.id);
+        }
         
         this.#updateMatchButton();
     }
@@ -231,21 +262,23 @@ class SubjectMatcher {
     }
 
     #updateMatchButton() {
-        this.#elements.matchBtn.disabled = !(this.#selectedMoodle && this.#selectedSuap);
+        this.#elements.matchBtn.disabled = !(this.#selectedMoodle && this.#selectedSuap.length > 0);
     }
 
     async #performMatch() {
-        if (!this.#selectedMoodle || !this.#selectedSuap) return;
+        if (!this.#selectedMoodle || this.#selectedSuap.length === 0) return;
+        
+        const matchCount = this.#selectedSuap.length;
         
         try {
             await Request.post('/api/match', {
                 moodleFullname: this.#selectedMoodle, 
-                suapId: this.#selectedSuap
+                suapIds: this.#selectedSuap
             });
             
             this.#selectedMoodle = null;
-            this.#selectedSuap = null;
-            Toast.success('Match saved successfully.');
+            this.#selectedSuap = [];
+            Toast.success(`Match saved successfully (1 Moodle → ${matchCount} SUAP).`);
             await this.#loadData();
         } catch (error) {
             console.error('Match error:', error);
@@ -357,6 +390,198 @@ class SubjectMatcher {
         } finally {
             this.#elements.uploadCoursesBtn.disabled = false;
             this.#elements.uploadCoursesBtn.textContent = 'Upload to Moodle';
+        }
+    }
+
+    async #performAIMatching() {
+        if (this.#moodleSubjects.length === 0) {
+            Toast.error('No unmatched Moodle subjects available for AI matching');
+            return;
+        }
+
+        if (this.#suapSubjects.length === 0) {
+            Toast.error('No unmatched SUAP subjects available for AI matching');
+            return;
+        }
+
+        this.#elements.aiMatchBtn.disabled = true;
+        this.#elements.aiMatchBtn.textContent = '🤖 Starting...';
+        
+        try {
+            // Start the AI matching job
+            const result = await Request.post('/api/ai-match', {
+                moodleSubjects: this.#moodleSubjects,
+                suapSubjects: this.#suapSubjects
+            });
+            
+            if (!result.success || !result.jobId) {
+                throw new Error('Failed to start AI matching job');
+            }
+
+            // Poll for job completion
+            this.#pollAIMatchingJob(result.jobId);
+
+        } catch (error) {
+            console.error('AI matching error:', error);
+            Toast.error('Error during AI matching: ' + error.message);
+            this.#elements.aiMatchBtn.disabled = false;
+            this.#elements.aiMatchBtn.textContent = '🤖 AI-Powered Matching';
+        }
+    }
+
+    async #pollAIMatchingJob(jobId) {
+        const pollInterval = 1000; // Poll every 1 second
+        const maxAttempts = 600; // Max 10 minutes of polling
+        let attempts = 0;
+
+        const poll = async () => {
+            try {
+                attempts++;
+                const status = await Request.get(`/api/ai-match/${jobId}`);
+
+                if (!status.success) {
+                    throw new Error('Failed to fetch job status');
+                }
+
+                // Update button with progress
+                if (status.progress !== undefined) {
+                    this.#elements.aiMatchBtn.textContent = `🤖 ${status.progress}%${status.message ? ' - ' + status.message : ''}`;
+                }
+
+                if (status.status === 'completed') {
+                    // Job completed successfully
+                    this.#elements.aiMatchBtn.disabled = false;
+                    this.#elements.aiMatchBtn.textContent = '🤖 AI-Powered Matching';
+
+                    if (!status.matches || status.matches.length === 0) {
+                        Toast.info('AI could not find confident matches for the remaining subjects');
+                        return;
+                    }
+
+                    this.#showAIMatchModal(status.matches);
+                    return;
+                }
+
+                if (status.status === 'failed') {
+                    // Job failed
+                    throw new Error(status.error || 'AI matching job failed');
+                }
+
+                // Job still processing, continue polling
+                if (attempts >= maxAttempts) {
+                    throw new Error('AI matching timed out');
+                }
+
+                setTimeout(poll, pollInterval);
+
+            } catch (error) {
+                console.error('Polling error:', error);
+                Toast.error('Error checking AI matching status: ' + error.message);
+                this.#elements.aiMatchBtn.disabled = false;
+                this.#elements.aiMatchBtn.textContent = '🤖 AI-Powered Matching';
+            }
+        };
+
+        // Start polling
+        poll();
+    }
+
+    #showAIMatchModal(matches) {
+        this.#elements.aiSuggestionsList.innerHTML = '';
+        
+        matches.forEach((match, index) => {
+            const item = this.#createAISuggestionItem(match, index);
+            this.#elements.aiSuggestionsList.appendChild(item);
+        });
+        
+        this.#elements.aiMatchModal.classList.add('show');
+    }
+
+    #createAISuggestionItem(match, index) {
+        const div = document.createElement('div');
+        div.className = 'ai-suggestion-item';
+        
+        // Store match data on the element for later retrieval
+        div._matchData = match;
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = true;
+        checkbox.id = `ai-match-${index}`;
+        checkbox.className = 'ai-match-checkbox';
+        
+        const label = document.createElement('label');
+        label.htmlFor = `ai-match-${index}`;
+        label.className = 'ai-match-label';
+        
+        const moodleName = match.moodleFullname.replace(/"/g, '');
+        const suapNames = match.suapIds.map(id => {
+            const suap = this.#suapSubjects.find(s => s.id === id);
+            return suap ? suap.fullname : `ID: ${id}`;
+        }).join(' + ');
+        
+        label.innerHTML = `
+            <div class="match-pair">
+                <div class="match-source">
+                    <strong>Moodle:</strong> ${this.#escapeHtml(moodleName)}
+                </div>
+                <div class="match-arrow">→</div>
+                <div class="match-target">
+                    <strong>SUAP:</strong> ${this.#escapeHtml(suapNames)}
+                </div>
+            </div>
+            ${match.reason ? `<div class="match-reason"><em>Reason:</em> ${this.#escapeHtml(match.reason)}</div>` : ''}
+        `;
+        
+        div.appendChild(checkbox);
+        div.appendChild(label);
+        
+        return div;
+    }
+
+    #closeModal() {
+        this.#elements.aiMatchModal.classList.remove('show');
+    }
+
+    async #applyAIMatches() {
+        const checkboxes = this.#elements.aiSuggestionsList.querySelectorAll('.ai-match-checkbox:checked');
+        const matches = [];
+        
+        checkboxes.forEach((checkbox) => {
+            const suggestionItem = checkbox.closest('.ai-suggestion-item');
+            const matchData = suggestionItem._matchData;
+            if (matchData) {
+                matches.push(matchData);
+            }
+        });
+        
+        if (matches.length === 0) {
+            Toast.info('No matches selected');
+            this.#closeModal();
+            return;
+        }
+
+        this.#elements.modalApproveBtn.disabled = true;
+        this.#elements.modalApproveBtn.textContent = 'Applying...';
+        
+        try {
+            // Apply each match
+            for (const match of matches) {
+                await Request.post('/api/match', {
+                    moodleFullname: match.moodleFullname,
+                    suapIds: match.suapIds
+                });
+            }
+            
+            Toast.success(`Successfully applied ${matches.length} AI-suggested match(es)`);
+            this.#closeModal();
+            await this.#loadData();
+        } catch (error) {
+            console.error('Error applying AI matches:', error);
+            Toast.error('Error applying matches: ' + error.message);
+        } finally {
+            this.#elements.modalApproveBtn.disabled = false;
+            this.#elements.modalApproveBtn.textContent = 'Apply Selected Matches';
         }
     }
 }

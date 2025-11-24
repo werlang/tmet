@@ -72,7 +72,8 @@
         <div class="pipeline-section">
             <h2>Step 3: Match Subjects</h2>
             <div class="pipeline-content">
-                <p class="section-description">Manually match Moodle subjects with SUAP subjects below</p>
+                <p class="section-description">Select 1 Moodle subject and 1 or more SUAP subjects to match (1-to-N matching supported)</p>
+                <button id="ai-match-btn" class="pipeline-btn primary">🤖 AI-Powered Matching</button>
             </div>
         </div>
 
@@ -96,6 +97,7 @@
             <div class="column">
                 <div class="column-header">
                     <h2>SUAP Subjects</h2>
+                    <div class="multi-select-hint">Click to select multiple</div>
                     <input type="text" id="suap-search" placeholder="Search..." class="search-input">
                 </div>
                 <div id="suap-list" class="subject-list"></div>
@@ -115,6 +117,24 @@
             <div class="pipeline-content">
                 <p class="section-description">Upload generated courses to Moodle via Web Service API</p>
                 <button id="upload-courses-btn" class="pipeline-btn primary">Upload to Moodle</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Match Approval Modal -->
+    <div id="ai-match-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>AI Matching Suggestions</h2>
+                <button id="modal-close-btn" class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-description">Review and approve AI-suggested matches below. You can deselect matches you don't want to apply.</p>
+                <div id="ai-suggestions-list" class="ai-suggestions-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button id="modal-cancel-btn" class="btn-secondary">Cancel</button>
+                <button id="modal-approve-btn" class="btn-primary">Apply Selected Matches</button>
             </div>
         </div>
     </div>

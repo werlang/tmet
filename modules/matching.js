@@ -23,10 +23,18 @@ export default function match() {
     moodleSubjects.forEach(msubject => {
         const manualMatch = manualMatches.find(m => m.moodleFullname === msubject.fullname);
         if (manualMatch) {
-            msubject.suapId = manualMatch.suapId;
-            const suapSubject = SUAPsubjects.find(s => s.id === manualMatch.suapId);
-            if (suapSubject) {
-                msubject.suapMatch = suapSubject;
+            msubject.suapId = manualMatch.suapId; // Can be string or array
+            
+            // Handle both single and multiple matches
+            if (Array.isArray(manualMatch.suapId)) {
+                msubject.suapMatch = manualMatch.suapId.map(id => 
+                    SUAPsubjects.find(s => s.id === id)
+                ).filter(s => s); // Remove undefined
+            } else {
+                const suapSubject = SUAPsubjects.find(s => s.id === manualMatch.suapId);
+                if (suapSubject) {
+                    msubject.suapMatch = suapSubject;
+                }
             }
             return;
         }
