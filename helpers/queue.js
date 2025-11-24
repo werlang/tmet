@@ -1,12 +1,13 @@
+import { randomUUID } from 'crypto';
+
 /**
  * JobQueue - Manages asynchronous job tracking and execution
  * Provides in-memory job status tracking with auto-cleanup
  */
 export default class JobQueue {
-    #jobs = [];
     #cleanupTimeout = 5 * 60 * 1000; // 5 minutes default
-    #runningJobs = [];
-    #maxConcurrentJobs = 1;
+    #jobs = [];
+    #maxConcurrentJobs = process.env.MAX_CONCURRENT_JOBS || 1;
 
     constructor(cleanupTimeout = 5 * 60 * 1000) {
         this.#cleanupTimeout = cleanupTimeout;
@@ -17,10 +18,10 @@ export default class JobQueue {
      * @returns {string} The generated job ID
      */
     createJob(callback) {
-        const jobId = createUUID();
+        const jobId = randomUUID();
         this.#jobs.push({
             id: jobId,
-            status: 'in queue',
+            status: 'queued',
             startedAt: new Date().toISOString(),
             callback,
         });
@@ -67,33 +68,15 @@ export default class JobQueue {
     }
 
     /**
-     * Mark job as failed with error
-     * @param {string} jobId - The job ID
-     * @param {Error|string} error - Error object or message
-     */
-    failJob(jobId, error) {
-        const errorMessage = error instanceof Error ? error.message : error;
-        this.updateJob(jobId, {
-            status: 'failed',
-            message: errorMessage,
-            error: errorMessage,
-            failedAt: new Date().toISOString(),
-        });
-        this.#scheduleCleanup(jobId);
-    }
-
-
-
-    /**
      * Queue a job for execution
      * @param {Function} jobFunction - Async function to execute
      * @param {Function} progressCallback - Optional callback for progress updates (jobId) => void
      * @returns {string} The job ID
      */
-    async queue(jobFunction) {
+    queue(jobFunction) {
         const jobId = this.createJob(jobFunction);
-        
-        if (this.#runningJobs.length < this.#maxConcurrentJobs) {
+        const runningJobs = this.#jobs.filter(job => job.status === 'running').length;
+        if (runningJobs < this.#maxConcurrentJobs) {
             this.processJob();
         }
 
@@ -106,28 +89,25 @@ export default class JobQueue {
      */
     async processJob() {
         try {
-
-            if (this.#runningJobs.length >= this.#maxConcurrentJobs) return;
+            const runningJobs = this.#jobs.filter(job => job.status === 'running').length;
+            if (runningJobs >= this.#maxConcurrentJobs) return;
             
             // find first job in queue
-            const nextJob = this.#jobs.find(job => !this.#runningJobs.includes(job.id));
+            const nextJob = this.#jobs.find(job => job.status === 'queued');
             if (!nextJob) return;
 
             const { id, callback } = nextJob;
-            this.#runningJobs.push(id);
-            this.updateJob(id, { status: 'in progress', startedAt: new Date().toISOString() });
+            this.updateJob(id, { status: 'running', startedAt: new Date().toISOString() });
 
             console.log(`[${id}] Job started`);
 
+            // execute job
             const result = await callback(id, (progressData) => {
                 this.updateJob(id, { ...progressData });
             });
 
             console.log(`[${id}] Job completed`);
             this.completeJob(id, { results: result });
-
-            // Remove from running jobs
-            this.#runningJobs = this.#runningJobs.filter(id => id !== id);
 
             // Process next job if any
             this.processJob();
@@ -146,7 +126,7 @@ export default class JobQueue {
         const job = this.getJob(jobId);
         if (!job) return;
         setTimeout(() => {
-            this.#jobs = this.#jobs.filter(j => j.id !== jobId);
+            this.#jobs = this.#jobs.filter(job => job.id !== jobId);
             console.log(`[${jobId}] Job cleaned up from memory`);
         }, this.#cleanupTimeout);
     }
@@ -163,6 +143,6 @@ export default class JobQueue {
      * Clear all jobs (for testing)
      */
     clearAll() {
-        this.#jobs.clear();
+        this.#jobs = [];
     }
 }

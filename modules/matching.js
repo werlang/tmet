@@ -68,7 +68,7 @@ export default function match() {
     
     const matching = moodleSubjects.filter(m => m.suapId).length;
     
-    console.log(noMatch);
+    // console.log(noMatch);
     console.log(`Found ${matching} / ${moodleSubjects.length} matching subjects.`);
 
     return {
