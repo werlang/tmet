@@ -4,9 +4,8 @@
   "description": "Timetables-Moodle Export Tool",
   "type": "module",
   "scripts": {
-    "production": "node app.js",
-    "development": "nodemon --inspect=0.0.0.0 app.js",
-    "ui": "node server.js"
+    "production": "node server.js",
+    "development": "nodemon server.js"
   },
   "nodemonConfig": {
     "ignore": []
@@ -16,7 +15,6 @@
   "dependencies": {
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
-    "puppeteer-core": "^24.30.0",
-    "xml2js": "^0.6.2"
+    "puppeteer-core": "^24.30.0"
   }
 }
