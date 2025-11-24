@@ -6,12 +6,13 @@ import generateCSV from './modules/generate-csv.js';
 import extractSUAP from './modules/extract-suap.js';
 import uploadCourses from './modules/upload-courses.js';
 import DeepSeek from './helpers/deepseek.js';
+import Queue from './helpers/queue.js';
 
 const app = express();
 const port = 3000;
 
-// In-memory job tracking for AI matching
-const aiMatchingJobs = new Map();
+// Job queue for AI matching
+const aiMatchingQueue = new Queue();
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -126,19 +127,12 @@ app.post('/api/ai-match', async (req, res) => {
             });
         }
 
-        // Generate job ID
-        const jobId = `ai-match-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-        
-        // Initialize job status
-        aiMatchingJobs.set(jobId, {
-            status: 'in queue',
-            startedAt: new Date().toISOString(),
+        console.log(`Starting AI matching for ${moodleSubjects.length} Moodle subjects and ${suapSubjects.length} SUAP subjects...`);
+
+        // Start async job
+        const jobId = aiMatchingQueue.queue(async (jobId, updateProgress) => {
+            return await processAIMatching(jobId, moodleSubjects, suapSubjects, updateProgress);
         });
-
-        console.log(`[${jobId}] Starting AI matching for ${moodleSubjects.length} Moodle subjects and ${suapSubjects.length} SUAP subjects...`);
-
-        // Start async processing
-        processAIMatching(jobId, moodleSubjects, suapSubjects);
 
         // Return job ID immediately
         res.json({ 
@@ -159,7 +153,7 @@ app.post('/api/ai-match', async (req, res) => {
 // Get AI matching job status
 app.get('/api/ai-match/:jobId', (req, res) => {
     const { jobId } = req.params;
-    const job = aiMatchingJobs.get(jobId);
+    const job = aiMatchingQueue.getJob(jobId);
     
     if (!job) {
         return res.status(404).json({ 
@@ -175,18 +169,16 @@ app.get('/api/ai-match/:jobId', (req, res) => {
 });
 
 // Async function to process AI matching
-async function processAIMatching(jobId, moodleSubjects, suapSubjects) {
-    try {
-        const deepseek = new DeepSeek();
-        
-        // Update progress
-        aiMatchingJobs.set(jobId, {
-            ...aiMatchingJobs.get(jobId),
-            message: 'Preparing AI prompt...'
-        });
-        
-        // Build the prompt for AI matching
-        const systemPrompt = `You are an expert at matching academic course subjects between two different systems. 
+async function processAIMatching(jobId, moodleSubjects, suapSubjects, updateProgress) {
+    const deepseek = new DeepSeek();
+    
+    // Update progress
+    updateProgress({
+        message: 'Preparing AI prompt...'
+    });
+    
+    // Build the prompt for AI matching
+    const systemPrompt = `You are an expert at matching academic course subjects between two different systems. 
 Your task is to find the best matches between Moodle subjects and SUAP subjects based on course names, codes, and context.
 
 Rules:
@@ -207,7 +199,7 @@ Respond ONLY with a valid JSONL, where each line is a JSON object in this format
 
 If you cannot find any confident matches, respond with null.`;
 
-        const userMessage = `Find matches between these Moodle and SUAP subjects:
+    const userMessage = `Find matches between these Moodle and SUAP subjects:
 
 MOODLE SUBJECTS:
 ${moodleSubjects.map(m => `- "${m.fullname}" (shortname: ${m.shortname}, category: ${m.category})`).join('\n')}
@@ -215,61 +207,44 @@ ${moodleSubjects.map(m => `- "${m.fullname}" (shortname: ${m.shortname}, categor
 SUAP SUBJECTS:
 ${suapSubjects.map(s => `- ID: ${s.id}, Name: "${s.fullname}" (Subject: ${s.subjectName}, Class: ${s.className})`).join('\n')}`;
 
-        // Update progress
-        aiMatchingJobs.set(jobId, {
-            ...aiMatchingJobs.get(jobId),
-            message: 'Analyzing subjects with AI...'
-        });
+    // Update progress
+    updateProgress({
+        message: 'Analyzing subjects with AI...'
+    });
 
-        const response = await deepseek.chat(userMessage, systemPrompt, {
-            temperature: 0.3,
-            maxTokens: 4096,
-        });
-        console.log(response);
+    const response = await deepseek.chat(userMessage, systemPrompt, {
+        temperature: 0.3,
+        maxTokens: 4096,
+    });
+    console.log(response);
 
-        // Update progress
-        aiMatchingJobs.set(jobId, {
-            ...aiMatchingJobs.get(jobId),
-            message: 'Parsing AI response...'
-        });
+    // Update progress
+    updateProgress({
+        message: 'Parsing AI response...'
+    });
 
-        // Parse the AI response
-        let matches = [];
-        try {
-            const jsonMatch = response.match(/\{[\s\S]*?\}/g);
-            if (jsonMatch) {
-                matches = jsonMatch.map(line => JSON.parse(line));
-            } else {
-                console.warn(`[${jobId}] AI response did not contain valid JSON array`);
-            }
-        } catch (parseError) {
-            console.error(`[${jobId}] Failed to parse AI response:`, parseError);
-            throw new Error('AI returned invalid response format');
+    // Parse the AI response
+    let matches = [];
+    try {
+        const jsonMatch = response.match(/\{[\s\S]*?\}/g);
+        if (jsonMatch) {
+            matches = jsonMatch.map(line => JSON.parse(line));
+        } else {
+            console.warn(`[${jobId}] AI response did not contain valid JSON array`);
         }
-
-        const filteredMatches = matches.filter(m => m.confidence > 0.8);
-        console.log(`[${jobId}] AI suggested ${filteredMatches.length} high-confidence matches`);
-
-        // Job completed successfully
-        aiMatchingJobs.set(jobId, {
-            status: 'completed',
-            message: 'AI matching completed',
-            matches: filteredMatches,
-            completedAt: new Date().toISOString(),
-        });
-
-        // Auto-cleanup after 5 minutes
-        setTimeout(() => aiMatchingJobs.delete(jobId), 5 * 60 * 1000);
-
-    } catch (error) {
-        console.error(`[${jobId}] AI matching error:`, error);
-        aiMatchingJobs.set(jobId, {
-            status: 'failed',
-            message: error.message,
-            error: error.message,
-            failedAt: new Date().toISOString(),
-        });
+    } catch (parseError) {
+        console.error(`[${jobId}] Failed to parse AI response:`, parseError);
+        throw new Error('AI returned invalid response format');
     }
+
+    const filteredMatches = matches.filter(m => m.confidence > 0.8);
+    console.log(`[${jobId}] AI suggested ${filteredMatches.length} high-confidence matches`);
+
+    // Return results
+    return {
+        matches: filteredMatches,
+        message: 'AI matching completed'
+    };
 }
 
 app.listen(port, () => {
