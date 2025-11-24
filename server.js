@@ -193,7 +193,7 @@ Rules:
 1. Match based on similar subject names, considering abbreviations and synonyms
 2. Consider class codes (like ECA, INF, TSI) when matching
 3. A single Moodle subject can match multiple SUAP subjects (1-to-N matching)
-4.  
+4. Moodle subjects can have groups (like G1, G2) that should be considered when matching. SUAP subjects with same name and classes but different ids are assumed G1 to the lower id and G2 to the higher id
 5. Only suggest matches you are confident about (>80% confidence)
 6. Provide a brief reason for each match
 
