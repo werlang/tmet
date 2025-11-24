@@ -5,7 +5,7 @@ export default function match() {
 
     const SUAPsubjects = JSON.parse(fs.readFileSync(path.resolve('files', 'suap_subjects.json'), 'utf-8'));
     
-    const moodleSubjects = fs.readFileSync(path.resolve('files', 'moodle_classes.csv'), 'utf-8').split('\n').slice(1).map(line => line.split(',').map(item => item.trim())).map(item => ({
+    const moodleSubjects = fs.readFileSync(path.resolve('files', 'moodle_classes.csv'), 'utf-8').split('\n').slice(1).map(line => line?.match(/"(.+)", (.+), (\d+)/).slice(1)).map(item => ({
         fullname: item[0],
         shortname: item[1],
         category: item[2],
@@ -43,7 +43,7 @@ export default function match() {
         // $2 = group (e.g., -G1) optional
         // $3 = secondary className (e.g., , INF-1BT) optional
         // $4 = subjectName (e.g., Banco de Dados)
-        const regex = new RegExp(/"\[.+\] ([A-Z]{3}-\d{1,2}[AB][MTN])(-G[12])?(,.+)? - (.+)"/);
+        const regex = new RegExp(/\[.+\] ([A-Z]{3}-\d{1,2}[AB][MTN])(-G[12])?(,.+)? - (.+)/);
         const moodleName = msubject.fullname.match(regex);
         if (!moodleName) return false;
         msubject.className = moodleName[1];
@@ -65,7 +65,7 @@ export default function match() {
             noMatch.push(msubject);
         }
     });
-    
+
     const matching = moodleSubjects.filter(m => m.suapId).length;
     
     // console.log(noMatch);
