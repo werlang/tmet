@@ -665,6 +665,40 @@ body {
                     font-size: 0.95rem;
                 }
 
+                .match-target {
+                    .suap-matches {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 8px;
+                        margin-top: 4px;
+
+                        .suap-match-item {
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: 8px;
+                            padding: 6px 10px;
+                            background-color: var(--color-success-light);
+                            border-radius: 4px;
+                            font-size: 0.9rem;
+
+                            .suap-id {
+                                color: var(--color-text-muted);
+                                font-family: monospace;
+                                font-size: 0.85rem;
+                            }
+
+                            .suap-class {
+                                font-weight: 600;
+                                color: var(--color-primary);
+                            }
+
+                            .suap-name {
+                                color: var(--color-text-primary);
+                            }
+                        }
+                    }
+                }
+
                 .match-arrow {
                     font-size: 1.5rem;
                     color: var(--color-primary);

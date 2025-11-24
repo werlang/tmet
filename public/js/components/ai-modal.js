@@ -11,6 +11,7 @@ export class AIMatchModal {
     #elements = {};
     #pendingMatches = [];
     #onComplete = null;
+    #suapSubjects = [];
 
     constructor(elements) {
         this.#elements = elements;
@@ -42,6 +43,9 @@ export class AIMatchModal {
             Toast.error('No unmatched SUAP subjects available for AI matching');
             return;
         }
+
+        // Store SUAP subjects for lookup during display
+        this.#suapSubjects = suapSubjects;
 
         try {
             const result = await Matching.startAIMatching(moodleSubjects, suapSubjects);
@@ -140,7 +144,19 @@ export class AIMatchModal {
         label.className = 'ai-match-label';
         
         const moodleName = match.moodleFullname.replace(/"/g, '');
-        const suapNames = match.suapIds.map(id => `ID: ${id}`).join(' + ');
+        
+        // Look up SUAP subject details
+        const suapDetails = match.suapIds.map(id => {
+            const subject = this.#suapSubjects.find(s => s.id === id);
+            if (subject) {
+                return `<div class="suap-match-item">
+                    <span class="suap-id">ID: ${escapeHtml(id)}</span>
+                    <span class="suap-class">${escapeHtml(subject.className)}</span>
+                    <span class="suap-name">${escapeHtml(subject.subjectName)}</span>
+                </div>`;
+            }
+            return `<div class="suap-match-item"><span class="suap-id">ID: ${escapeHtml(id)}</span></div>`;
+        }).join('');
         
         label.innerHTML = `
             <div class="match-pair">
@@ -149,7 +165,8 @@ export class AIMatchModal {
                 </div>
                 <div class="match-arrow">→</div>
                 <div class="match-target">
-                    <strong>SUAP:</strong> ${escapeHtml(suapNames)}
+                    <strong>SUAP:</strong>
+                    <div class="suap-matches">${suapDetails}</div>
                 </div>
             </div>
             ${match.reason ? `<div class="match-reason"><em>Reason:</em> ${escapeHtml(match.reason)}</div>` : ''}
