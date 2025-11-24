@@ -1,19 +1,21 @@
-export default class DeepSeek {
-    #url = 'https://api.deepseek.com/chat/completions';
+import config from '../config/chat-assist.js';
+
+export default class ChatAssist {
+    #url = config.url;
     #apiKey;
     #model;
     #conversationHistory = [];
 
-    constructor(model = 'deepseek-chat') {
-        this.#apiKey = process.env.DEEPSEEK_API_KEY;
+    constructor(model = config.model) {
+        this.#apiKey = process.env.CHAT_ASSIST_API_KEY;
         if (!this.#apiKey) {
-            throw new Error('DEEPSEEK_API_KEY environment variable is required');
+            throw new Error('API_KEY environment variable is required');
         }
         this.#model = model;
     }
 
     /**
-     * Send a chat completion request to DeepSeek API
+     * Send a chat completion request to API
      * @param {string} userMessage - The user's message
      * @param {string} systemPrompt - Optional system prompt to guide the AI
      * @param {Object} options - Additional options
@@ -24,8 +26,8 @@ export default class DeepSeek {
      */
     async chat(userMessage, systemPrompt = 'You are a helpful assistant.', options = {}) {
         const {
-            temperature = 1.0,
-            maxTokens = 2048,
+            temperature = config.temperature,
+            maxTokens = config.maxTokens,
             keepHistory = false,
         } = options;
 
@@ -36,7 +38,7 @@ export default class DeepSeek {
                 model: this.#model,
                 messages,
                 temperature,
-                // max_tokens: maxTokens,
+                max_tokens: maxTokens,
                 stream: false,
             };
 
@@ -56,7 +58,7 @@ export default class DeepSeek {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
                 throw new Error(
-                    `DeepSeek API error (${response.status}): ${errorData.error?.message || response.statusText}`
+                    `API error (${response.status}): ${errorData.error?.message || response.statusText}`
                 );
             }
 
@@ -64,7 +66,7 @@ export default class DeepSeek {
             const assistantMessage = data.choices?.[0]?.message?.content;
 
             if (!assistantMessage) {
-                throw new Error('No response content from DeepSeek API');
+                throw new Error('No response content from API');
             }
 
             // Update conversation history if keeping history
@@ -78,7 +80,7 @@ export default class DeepSeek {
             return assistantMessage;
 
         } catch (error) {
-            console.error('DeepSeek API error:', error.message);
+            console.error('API error:', error.message);
             throw error;
         }
     }

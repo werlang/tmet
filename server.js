@@ -5,8 +5,9 @@ import match from './modules/matching.js';
 import generateCSV from './modules/generate-csv.js';
 import extractSUAP from './modules/extract-suap.js';
 import uploadCourses from './modules/upload-courses.js';
-import DeepSeek from './helpers/deepseek.js';
+import ChatAssist from './helpers/chat-assist.js';
 import Queue from './helpers/queue.js';
+import chatConfig from './config/chat-assist.js';
 
 const app = express();
 const port = 3000;
@@ -170,7 +171,7 @@ app.get('/api/ai-match/:jobId', (req, res) => {
 
 // Async function to process AI matching
 async function processAIMatching(jobId, moodleSubjects, suapSubjects, updateProgress) {
-    const deepseek = new DeepSeek();
+    const chatAssist = new ChatAssist();
     
     // Update progress
     updateProgress({
@@ -178,26 +179,7 @@ async function processAIMatching(jobId, moodleSubjects, suapSubjects, updateProg
     });
     
     // Build the prompt for AI matching
-    const systemPrompt = `You are an expert at matching academic course subjects between two different systems. 
-Your task is to find the best matches between Moodle subjects and SUAP subjects based on course names, codes, and context.
-
-Rules:
-1. Match based on similar subject names, considering abbreviations and synonyms
-2. Consider class codes (like ECA, INF, TSI) when matching
-3. A single Moodle subject can match multiple SUAP subjects (1-to-N matching)
-4. Moodle subjects can have groups (like G1, G2) that should be considered when matching. SUAP subjects with same name and classes but different ids are assumed G1 to the lower id and G2 to the higher id
-5. Only suggest matches you are confident about (>80% confidence)
-6. Provide a brief reason for each match
-
-Respond ONLY with a valid JSONL, where each line is a JSON object in this format:
-{
-  "moodleFullname": "exact moodle fullname from input",
-  "suapIds": ["suap_id_1", "suap_id_2"],
-  "confidence": 0.0 to 1.0,
-  "reason": "Brief explanation"
-}
-
-If you cannot find any confident matches, respond with null.`;
+    const systemPrompt = chatConfig.systemPrompt;
 
     const userMessage = `Find matches between these Moodle and SUAP subjects:
 
@@ -212,7 +194,7 @@ ${suapSubjects.map(s => `- ID: ${s.id}, Name: "${s.fullname}" (Subject: ${s.subj
         message: 'Analyzing subjects with AI...'
     });
 
-    const response = await deepseek.chat(userMessage, systemPrompt, {
+    const response = await chatAssist.chat(userMessage, systemPrompt, {
         temperature: 0.3,
         maxTokens: 4096,
     });
