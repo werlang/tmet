@@ -67,13 +67,13 @@ export class AIMatchModal {
                 const status = await Matching.getAIMatchingStatus(jobId);
 
                 if (status.status === 'completed') {
-                    if (!status.matches || status.matches.length === 0) {
+                    if (!status?.results?.matches || status.results.matches.length === 0) {
                         Toast.info('AI could not find confident matches for the remaining subjects');
                         onComplete();
                         return;
                     }
 
-                    this.show(status.matches, onComplete);
+                    this.show(status.results.matches, onComplete);
                     return;
                 }
 
