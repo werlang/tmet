@@ -3,7 +3,9 @@ import fs from 'fs';
 import MoodleUploader from '../helpers/moodle-uploader.js';
 
 // Main execution
-export default async function uploadCourses() {
+export default async function uploadCourses(progressCallback = null) {
+    if (progressCallback) progressCallback('Initializing Moodle uploader');
+    
     const uploader = new MoodleUploader(
         process.env.MOODLE_URL || 'https://apnp.ifsul.edu.br',
         process.env.MOODLE_TOKEN,
@@ -19,9 +21,11 @@ export default async function uploadCourses() {
         category: item[2],
     }));
 
+    if (progressCallback) progressCallback(`Uploading ${courses.length} courses to Moodle`);
+
     // Upload via API
     console.log('\n=== Uploading via Moodle Web Service API ===\n');
-    const results = await uploader.uploadCourses(courses);
+    const results = await uploader.uploadCourses(courses, progressCallback);
     
     console.log('\n=== Upload Summary ===');
     console.log(`✓ Successfully created: ${results.success.length}`);

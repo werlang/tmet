@@ -10,8 +10,9 @@ export default class MoodleUploader {
     /**
      * Upload courses via Moodle Web Service API
      * @param {Array} courses - Array of course objects with fullname, shortname, categoryid
+     * @param {Function} progressCallback - Optional callback for progress updates
      */
-    async uploadCourses(courses) {
+    async uploadCourses(courses, progressCallback = null) {
         const results = {
             success: [],
             errors: []
@@ -19,7 +20,13 @@ export default class MoodleUploader {
 
         console.log(`Uploading ${courses.length} courses to Moodle...`);
 
-        for (const course of courses) {
+        for (let i = 0; i < courses.length; i++) {
+            const course = courses[i];
+            
+            if (progressCallback) {
+                progressCallback(`Uploading course ${i + 1}/${courses.length}: ${course.shortname}`);
+            }
+            
             try {
                 const response = await this.createCourse(course);
                 results.success.push(response);

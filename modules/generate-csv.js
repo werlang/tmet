@@ -3,8 +3,10 @@ import path from 'path';
 import TimeTables from '../helpers/timetables.js';
 import moodleConfig from '../config/moodle-config.js';
 
-export default async function generateCSV(year, semester, dateFrom, dateTo) {
+export default async function generateCSV(year, semester, dateFrom, dateTo, progressCallback = null) {
     const moodleSubjects = [];
+
+    if (progressCallback) progressCallback('Fetching classes from EduPage API');
 
     const tt = new TimeTables({
         year,
@@ -12,6 +14,9 @@ export default async function generateCSV(year, semester, dateFrom, dateTo) {
         dateTo,
     });
     const classes = await tt.getClasses();
+    
+    if (progressCallback) progressCallback(`Processing ${classes.length} classes and subjects`);
+    
     classes.forEach(c => {
         c.subjects?.forEach(s => {
             const subjectObj = s.subject;
@@ -37,11 +42,15 @@ export default async function generateCSV(year, semester, dateFrom, dateTo) {
     });
     console.log(JSON.stringify(moodleSubjects.map(ms => ms.join(', ')), null, 2));
     
+    if (progressCallback) progressCallback(`Generating CSV file with ${moodleSubjects.length} subjects`);
+    
     const header = ['fullname', 'shortname', 'category'];
     moodleSubjects.unshift(header);
     const csv = moodleSubjects.map(ms => ms.join(', ')).join('\n');
 
     fs.writeFileSync(path.resolve('files', 'moodle_classes.csv'), csv);
+    
+    if (progressCallback) progressCallback('CSV file saved successfully');
 
     return csv;
 }

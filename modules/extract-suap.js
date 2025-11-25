@@ -3,7 +3,9 @@ import fs from "fs";
 import SUAPScraper from "../helpers/scraper.js";
 import suapConfig from "../config/suap-config.js";
 
-export default async function extractSUAP(year, semester, selectedCourses) {
+export default async function extractSUAP(year, semester, selectedCourses, progressCallback = null) {
+    if (progressCallback) progressCallback('Initializing browser automation');
+    
     await SUAPScraper.initialize();
     
     // Use provided parameters or defaults
@@ -18,9 +20,15 @@ export default async function extractSUAP(year, semester, selectedCourses) {
         ? Object.keys(courses).filter(key => selectedCourses.includes(key))
         : Object.keys(courses);
     
+    if (progressCallback) progressCallback(`Extracting data from ${coursesToExtract.length} courses`);
+    
     const SUAPJson = [];
     
-    for (const courseName of coursesToExtract) {
+    for (let i = 0; i < coursesToExtract.length; i++) {
+        const courseName = coursesToExtract[i];
+        
+        if (progressCallback) progressCallback(`Extracting course ${i + 1}/${coursesToExtract.length}: ${courseName}`);
+        
         const query = new URLSearchParams({
             ...suapConfig.bookSearch.url.query,
             ano_letivo: yearList[year],
@@ -65,6 +73,8 @@ export default async function extractSUAP(year, semester, selectedCourses) {
     
         SUAPJson.push(...SUAPsubjects);
     }
+    
+    if (progressCallback) progressCallback(`Saving ${SUAPJson.length} subjects to file`);
     
     fs.writeFileSync(path.join('files', 'suap_subjects.json'), JSON.stringify(SUAPJson, null, 2));
 

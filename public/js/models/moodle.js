@@ -19,13 +19,25 @@ export default class Moodle {
      * @param {number} params.semester - Semester number
      * @param {string} params.dateFrom - Start date
      * @param {string} params.dateTo - End date
+     * @param {Function} progressCallback - Optional callback for progress updates
      * @returns {Promise<Object>} Result object
      */
-    async generateCSV(params) {
+    async generateCSV(params, progressCallback) {
         try {
             const result = await Request.post('/api/moodle/csv', params);
-            Toast.success(result.message || 'Timetables extracted and CSV generated successfully');
-            return result;
+            
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            // Poll for completion
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/jobs',
+                'CSV generation',
+                progressCallback
+            );
+
         } catch (error) {
             console.error('Generate CSV error:', error);
             Toast.error('Error generating CSV: ' + error.message);
@@ -35,21 +47,78 @@ export default class Moodle {
 
     /**
      * Upload courses to Moodle
+     * @param {Function} progressCallback - Optional callback for progress updates
      * @returns {Promise<Object>} Result object
      */
-    async uploadCourses() {
+    async uploadCourses(progressCallback) {
         try {
             const result = await Request.post('/api/moodle/courses');
-            const summary = result.results 
-                ? `Created: ${result.results.success.length}, Failed: ${result.results.errors.length}`
-                : 'Courses uploaded';
-            Toast.success(result.message + '. ' + summary);
-            return result;
+            
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            // Poll for completion
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/jobs',
+                'Course upload',
+                progressCallback
+            );
+
         } catch (error) {
             console.error('Upload courses error:', error);
             Toast.error('Error uploading courses: ' + error.message);
             throw error;
         }
+    }
+
+    /**
+     * Poll job status until completion
+     * @param {string} jobId - Job ID to poll
+     * @param {string} endpoint - Status endpoint path
+     * @param {string} operationName - Human-readable operation name
+     * @param {Function} progressCallback - Optional callback for progress updates
+     * @returns {Promise<Object>} Job results
+     */
+    async #pollJobStatus(jobId, endpoint, operationName, progressCallback) {
+        const pollInterval = 1000; // 1 second
+        const maxAttempts = 600; // 10 minutes
+        let attempts = 0;
+
+        return new Promise((resolve, reject) => {
+            const poll = async () => {
+                try {
+                    attempts++;
+                    const status = await Request.get(`${endpoint}/${jobId}`);
+
+                    if (progressCallback && status.message) {
+                        progressCallback(status.message);
+                    }
+
+                    if (status.status === 'completed') {
+                        resolve(status.results || {});
+                        return;
+                    }
+
+                    if (status.status === 'failed') {
+                        throw new Error(status.error || `${operationName} failed`);
+                    }
+
+                    // Still processing
+                    if (attempts >= maxAttempts) {
+                        throw new Error(`${operationName} timed out`);
+                    }
+
+                    setTimeout(poll, pollInterval);
+
+                } catch (error) {
+                    reject(error);
+                }
+            };
+
+            poll();
+        });
     }
 
     /**

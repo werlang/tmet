@@ -44,13 +44,15 @@ router.post('/extract', async (req, res) => {
 // Async function to process SUAP extraction
 async function processExtractSUAP(jobId, params, updateProgress) {
     updateProgress({
-        message: 'Extracting SUAP data...'
+        message: 'Starting SUAP extraction...'
     });
 
     console.log(`[${jobId}] Starting SUAP extraction with params:`, params);
     
     const suap = new SUAP();
-    await suap.extractSubjects(params);
+    await suap.extractSubjects(params, (message) => {
+        updateProgress({ message });
+    });
 
     console.log(`[${jobId}] SUAP extraction completed`);
 
