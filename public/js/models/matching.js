@@ -14,7 +14,7 @@ export default class Matching {
      */
     static async saveMatch(moodleFullname, suapIds) {
         try {
-            const result = await Request.post('/api/match', {
+            const result = await Request.post('/api/matches', {
                 moodleFullname,
                 suapIds
             });
@@ -35,7 +35,7 @@ export default class Matching {
      */
     static async startAIMatching(moodleSubjects, suapSubjects) {
         try {
-            const result = await Request.post('/api/ai-match', {
+            const result = await Request.post('/api/ai/match', {
                 moodleSubjects,
                 suapSubjects
             });
@@ -59,7 +59,7 @@ export default class Matching {
      */
     static async getAIMatchingStatus(jobId) {
         try {
-            const status = await Request.get(`/api/ai-match/${jobId}`);
+            const status = await Request.get(`/api/jobs/${jobId}`);
             
             if (!status.success) {
                 throw new Error('Failed to fetch job status');

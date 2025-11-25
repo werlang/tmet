@@ -23,7 +23,7 @@ export default class Moodle {
      */
     async generateCSV(params) {
         try {
-            const result = await Request.post('/api/generate-csv', params);
+            const result = await Request.post('/api/moodle/csv', params);
             Toast.success(result.message || 'Timetables extracted and CSV generated successfully');
             return result;
         } catch (error) {
@@ -39,7 +39,7 @@ export default class Moodle {
      */
     async uploadCourses() {
         try {
-            const result = await Request.post('/api/upload-courses');
+            const result = await Request.post('/api/moodle/courses');
             const summary = result.results 
                 ? `Created: ${result.results.success.length}, Failed: ${result.results.errors.length}`
                 : 'Courses uploaded';
@@ -58,7 +58,7 @@ export default class Moodle {
      */
     async loadSubjects() {
         try {
-            const data = await Request.get('/api/data');
+            const data = await Request.get('/api/matches');
             this.#subjects = data.noMatch || [];
             this.#matchedSubjects = data.subjects?.filter(s => s.suapId) || [];
         } catch (error) {

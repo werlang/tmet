@@ -22,7 +22,7 @@ export default class SUAP {
      */
     async extractSubjects(params, progressCallback) {
         try {
-            const result = await Request.post('/api/extract-suap', params);
+            const result = await Request.post('/api/suap/extract', params);
             
             if (!result.jobId) {
                 throw new Error('No job ID returned from server');
@@ -31,7 +31,7 @@ export default class SUAP {
             // Poll for completion
             return await this.#pollJobStatus(
                 result.jobId,
-                '/api/extract-suap',
+                '/api/jobs',
                 'SUAP extraction',
                 progressCallback
             );
@@ -98,7 +98,7 @@ export default class SUAP {
      */
     async loadSubjects() {
         try {
-            const data = await Request.get('/api/data');
+            const data = await Request.get('/api/matches');
             const allSubjects = data.subjects || [];
             const suapSubjects = data.suapSubjects || [];
             
