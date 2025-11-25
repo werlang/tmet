@@ -25,34 +25,55 @@ export default class Moodle {
      * @returns {Promise<string>} CSV content
      */
     async generateCSV({ year, semester, dateFrom, dateTo }) {
-        const timetables = new TimeTables();
-        
-        // Fetch data from EduPage
-        const classes = await timetables.getClasses(year, semester, dateFrom, dateTo);
-        const subjects = await timetables.getSubjects();
-        const teachers = await timetables.getTeachers();
+        const moodleSubjects = [];
 
-        // Build CSV
-        const csvLines = ['shortname,fullname,category'];
-        
-        for (const cls of classes) {
-            const subject = subjects.find(s => s.id === cls.subjectId);
-            const teacher = teachers.find(t => t.id === cls.teacherId);
-            
-            if (!subject) continue;
+        const tt = new TimeTables({
+            year,
+            dateFrom,
+            dateTo,
+        });
 
-            const category = this.#getCategoryForClass(cls.name);
-            const shortname = this.#buildShortname(cls, subject, year, semester);
-            const fullname = this.#buildFullname(cls, subject, year, semester);
+        const classes = await tt.getClasses();
 
-            csvLines.push(`${shortname},${fullname},${category}`);
+        for (const c of classes) {
+            c.subjects?.forEach(s => {
+                const subjectObj = s.subject;
+
+                // Determine group suffix
+                const group = s.groupnames.includes('Grupo 1') 
+                    ? '_G1' 
+                    : s.groupnames.includes('Grupo 2') 
+                        ? '_G2' 
+                        : '';
+
+                // Build class name (handles multiple classes)
+                const className = s.classids.length > 1 
+                    ? classes.filter(cl => s.classids.includes(cl.id)).map(cl => cl.name).join(',')
+                    : c.name;
+
+                // Build fullname and shortname
+                // "[2025.2] TSI-2AN - Desenvolvimento Back-end I", CH_TSI_2AN_DBE1_2025.2, 120
+                const fullName = `"[${year}.${semester}] ${className}${group.replace('_', '-')} - ${subjectObj.name.split('-').slice(1).join('-').trim()}"`;
+                const shortName = `CH_${className.replace(/[-,]/g, '_')}_${subjectObj.short.split(/\s*-\s*/)?.slice(1).join('')}_${year}.${semester}${group}`;
+                const category = moodleConfig.categories[c.name.split('-')[0]];
+
+                // Avoid duplicates and ensure category exists
+                if (!moodleSubjects.map(ms => ms[0]).includes(fullName) && category) {
+                    moodleSubjects.push([fullName, shortName, category]);
+                }
+            });
         }
 
-        const csv = csvLines.join('\n');
-        
+        console.log(`Generated ${moodleSubjects.length} Moodle subjects.`);
+
+        // Build CSV with header
+        const header = ['fullname', 'shortname', 'category'];
+        moodleSubjects.unshift(header);
+        const csv = moodleSubjects.map(ms => ms.join(', ')).join('\n');
+
         // Save to file
         fs.writeFileSync(this.#csvPath, csv);
-        
+
         return csv;
     }
 
@@ -75,39 +96,6 @@ export default class Moodle {
     }
 
     /**
-     * Get category ID for class name
-     * @private
-     */
-    #getCategoryForClass(className) {
-        for (const [prefix, categoryId] of Object.entries(moodleConfig.categories)) {
-            if (className.startsWith(prefix)) {
-                return categoryId;
-            }
-        }
-        return moodleConfig.categories.default || 1;
-    }
-
-    /**
-     * Build course shortname
-     * @private
-     */
-    #buildShortname(cls, subject, year, semester) {
-        const classShort = cls.name.replace(/[^A-Z0-9]/g, '_');
-        const subjectShort = subject.shortname || subject.name.substring(0, 6);
-        const group = cls.group || 'G1';
-        
-        return `CH_${classShort}_${subjectShort}_${year}.${semester}_${group}`;
-    }
-
-    /**
-     * Build course fullname
-     * @private
-     */
-    #buildFullname(cls, subject, year, semester) {
-        return `[${year}.${semester}] ${cls.name} - ${subject.name}`;
-    }
-
-    /**
      * Parse CSV content to course objects
      * @private
      */
@@ -116,12 +104,13 @@ export default class Moodle {
         
         // Skip header
         return lines.slice(1).map(line => {
-            const [shortname, fullname, category] = line.split(',');
+            const match = line.match(/"(.+)", (.+), (\d+)/);
+            if (!match) return null;
             return {
-                shortname: shortname?.trim(),
-                fullname: fullname?.trim(),
-                categoryid: parseInt(category?.trim()) || 1
+                fullname: match[1],
+                shortname: match[2],
+                categoryid: parseInt(match[3]) || 1
             };
-        }).filter(c => c.shortname && c.fullname);
+        }).filter(c => c !== null);
     }
 }
