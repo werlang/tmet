@@ -1,7 +1,50 @@
 import express from 'express';
 import SUAP from '../models/SUAP.js';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = express.Router();
+
+/**
+ * GET /suap/students-data
+ * Get all scraped students data from file
+ */
+router.get('/students-data', async (req, res) => {
+    try {
+        const filePath = path.join(__dirname, '..', 'files', 'suap_students.json');
+        
+        try {
+            const fileContent = await fs.readFile(filePath, 'utf8');
+            const data = JSON.parse(fileContent);
+            
+            res.json({
+                success: true,
+                data
+            });
+        } catch (error) {
+            // File doesn't exist or is invalid - return empty data
+            if (error.code === 'ENOENT') {
+                res.json({
+                    success: true,
+                    data: {}
+                });
+            } else {
+                throw error;
+            }
+        }
+
+    } catch (error) {
+        console.error('Error reading students data:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
 
 /**
  * POST /suap/extract
@@ -77,6 +120,47 @@ router.get('/subjects/:id/students', async (req, res) => {
     }
 });
 
+/**
+ * POST /suap/extract-students
+ * Extract students from multiple SUAP subjects (long-running operation, returns job ID)
+ */
+router.post('/extract-students', async (req, res) => {
+    try {
+        const { subjectIds } = req.body;
+
+        if (!subjectIds || !Array.isArray(subjectIds) || subjectIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'Array of subject IDs is required'
+            });
+        }
+
+        console.log(`Starting student extraction job for ${subjectIds.length} subjects...`);
+
+        const jobQueue = req.app.locals.jobQueue;
+
+        // Start async job
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
+            return await processExtractStudents(jobId, subjectIds, updateProgress);
+        });
+
+        // Return job ID immediately
+        res.status(202).json({
+            success: true,
+            jobId,
+            message: 'Student extraction job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+
+    } catch (error) {
+        console.error('Student extraction error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Async function to process SUAP extraction
 async function processExtractSUAP(jobId, params, updateProgress) {
     updateProgress({
@@ -95,6 +179,76 @@ async function processExtractSUAP(jobId, params, updateProgress) {
     return {
         message: 'SUAP data extracted successfully',
         file: 'files/suap_subjects.json'
+    };
+}
+
+// Async function to process student extraction
+async function processExtractStudents(jobId, subjectIds, updateProgress) {
+    console.log(`[${jobId}] Starting student extraction for ${subjectIds.length} subjects`);
+
+    const suap = new SUAP();
+    const results = {};
+    let completed = 0;
+
+    for (let i = 0; i < subjectIds.length; i++) {
+        const subjectId = subjectIds[i];
+        
+        try {
+            updateProgress({
+                message: `Subject ${i + 1}/${subjectIds.length}: Starting subject ${subjectId}...`,
+                current: completed,
+                total: subjectIds.length,
+                subjectId,
+                subjectIndex: i + 1
+            });
+
+            // Pass progress callback to scrapeStudents
+            const students = await suap.scrapeStudents(subjectId, (studentProgress) => {
+                updateProgress({
+                    message: `Subject ${i + 1}/${subjectIds.length}: ${studentProgress}`,
+                    current: completed,
+                    total: subjectIds.length,
+                    subjectId,
+                    subjectIndex: i + 1,
+                    studentProgress
+                });
+            });
+            
+            results[subjectId] = students;
+            completed++;
+
+            console.log(`[${jobId}] Completed ${completed}/${subjectIds.length} - Subject ${subjectId}: ${students.length} students`);
+
+            updateProgress({
+                message: `Subject ${i + 1}/${subjectIds.length}: Completed - ${students.length} students scraped`,
+                current: completed,
+                total: subjectIds.length,
+                subjectId,
+                subjectIndex: i + 1
+            });
+
+        } catch (error) {
+            console.error(`[${jobId}] Error scraping subject ${subjectId}:`, error);
+            results[subjectId] = { error: error.message };
+            completed++;
+
+            updateProgress({
+                message: `Subject ${i + 1}/${subjectIds.length}: Error - ${error.message}`,
+                current: completed,
+                total: subjectIds.length,
+                subjectId,
+                subjectIndex: i + 1,
+                error: error.message
+            });
+        }
+    }
+
+    console.log(`[${jobId}] Student extraction completed`);
+
+    return {
+        message: `Student extraction completed: ${completed}/${subjectIds.length} subjects processed`,
+        results,
+        file: 'files/suap_students.json'
     };
 }
 

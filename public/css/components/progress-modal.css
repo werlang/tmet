@@ -82,6 +82,8 @@
     margin-bottom: 14px;
     min-height: 24px;
     line-height: 1.5;
+    white-space: pre-line;
+    word-break: break-word;
 }
 
 /* Elapsed time */

@@ -2,10 +2,12 @@ import Toast from './components/toast.js';
 import { SubjectListUI } from './components/subject-list.js';
 import { AIMatchModal } from './components/ai-modal.js';
 import ProgressModal from './components/progress-modal.js';
+import StudentsModal from './components/students-modal.js';
 import { getDefaultYearSemester } from './helpers/date.js';
 import Moodle from './models/moodle.js';
 import SUAP from './models/suap.js';
 import Matching from './models/matching.js';
+import Request from './helpers/request.js';
 
 /**
  * Subject Matcher Application
@@ -18,6 +20,9 @@ class SubjectMatcherApp {
     #ui;
     #modal;
     #progressModal;
+    #studentsModal;
+    #selectedSubjectIds = new Set();
+    #studentsData = {};
 
     constructor() {
         this.#cacheElements();
@@ -56,6 +61,11 @@ class SubjectMatcherApp {
             modalCloseBtn: document.getElementById('modal-close-btn'),
             modalCancelBtn: document.getElementById('modal-cancel-btn'),
             modalApproveBtn: document.getElementById('modal-approve-btn'),
+            studentsSubjectList: document.getElementById('students-subject-list'),
+            extractStudentsBtn: document.getElementById('extract-students-btn'),
+            selectAllStudentsBtn: document.getElementById('select-all-students-btn'),
+            selectNotScrapedBtn: document.getElementById('select-not-scraped-btn'),
+            deselectAllStudentsBtn: document.getElementById('deselect-all-students-btn'),
         };
     }
 
@@ -68,6 +78,7 @@ class SubjectMatcherApp {
         this.#ui = new SubjectListUI(this.#elements);
         this.#modal = new AIMatchModal(this.#elements);
         this.#progressModal = new ProgressModal();
+        this.#studentsModal = new StudentsModal();
     }
 
     /**
@@ -82,6 +93,10 @@ class SubjectMatcherApp {
         this.#elements.uploadCoursesBtn.addEventListener('click', () => this.#uploadCourses());
         this.#elements.aiMatchBtn.addEventListener('click', () => this.#performAIMatching());
         this.#elements.matchedSectionHeader.addEventListener('click', () => this.#ui.toggleMatchedList());
+        this.#elements.extractStudentsBtn.addEventListener('click', () => this.#extractStudents());
+        this.#elements.selectAllStudentsBtn.addEventListener('click', () => this.#selectAllSubjects());
+        this.#elements.selectNotScrapedBtn.addEventListener('click', () => this.#selectNotScraped());
+        this.#elements.deselectAllStudentsBtn.addEventListener('click', () => this.#deselectAllSubjects());
         
         this.#setDefaultDateValues();
     }
@@ -116,7 +131,8 @@ class SubjectMatcherApp {
     async #loadData() {
         await Promise.all([
             this.#moodle.loadSubjects(),
-            this.#suap.loadSubjects()
+            this.#suap.loadSubjects(),
+            this.#loadStudentsData()
         ]);
         this.#updateUI();
     }
@@ -131,6 +147,7 @@ class SubjectMatcherApp {
         this.#handleMoodleSearch(this.#elements.moodleSearch.value);
         this.#handleSuapSearch(this.#elements.suapSearch.value);
         this.#ui.renderMatchedList(this.#moodle.getMatchedSubjects());
+        this.#renderStudentsSubjectList();
     }
 
     /**
@@ -430,6 +447,272 @@ class SubjectMatcherApp {
             '🤖 AI-Powered Matching'
         );
         await this.#loadData();
+    }
+
+    /**
+     * Load students data from file
+     */
+    async #loadStudentsData() {
+        try {
+            const response = await Request.get('/api/suap/students-data');
+            this.#studentsData = response.data || {};
+        } catch (error) {
+            console.error('Error loading students data:', error);
+            this.#studentsData = {};
+        }
+    }
+
+    /**
+     * Render students subject list
+     */
+    #renderStudentsSubjectList() {
+        const matchedSubjects = this.#suap.getMatchedSubjects();
+        const container = this.#elements.studentsSubjectList;
+        
+        container.innerHTML = '';
+        
+        if (matchedSubjects.length === 0) {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'students-empty-state';
+            emptyState.innerHTML = '<p><strong>No matched subjects yet</strong></p><p>Match subjects first in Step 3 before extracting students</p>';
+            container.appendChild(emptyState);
+            return;
+        }
+        
+        matchedSubjects.forEach(subject => {
+            const card = this.#createStudentSubjectCard(subject);
+            container.appendChild(card);
+        });
+    }
+
+    /**
+     * Create a subject card for student extraction
+     * @param {Object} subject - SUAP subject
+     */
+    #createStudentSubjectCard(subject) {
+        const hasStudents = !!this.#studentsData[subject.id];
+        const studentCount = hasStudents ? this.#studentsData[subject.id].length : 0;
+        const isSelected = this.#selectedSubjectIds.has(subject.id);
+        
+        const card = document.createElement('div');
+        card.className = 'student-subject-card';
+        if (hasStudents) card.classList.add('has-students');
+        if (isSelected) card.classList.add('selected');
+        
+        const header = document.createElement('div');
+        header.className = 'student-subject-header';
+        
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'student-subject-checkbox';
+        checkbox.checked = isSelected;
+        checkbox.addEventListener('change', (e) => {
+            e.stopPropagation();
+            this.#toggleSubjectSelection(subject.id, e.target.checked);
+        });
+        
+        const name = document.createElement('div');
+        name.className = 'student-subject-name';
+        name.textContent = subject.fullname || subject.name;
+        
+        header.appendChild(checkbox);
+        header.appendChild(name);
+        
+        const footer = document.createElement('div');
+        footer.className = 'student-subject-footer';
+        
+        const badge = document.createElement('span');
+        badge.className = hasStudents ? 'student-count-badge' : 'student-count-badge no-students';
+        badge.textContent = hasStudents ? `${studentCount} students` : 'Not scraped';
+        
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'view-students-btn';
+        viewBtn.textContent = 'View';
+        viewBtn.disabled = !hasStudents;
+        viewBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (hasStudents) {
+                this.#viewStudents(subject);
+            }
+        });
+        
+        footer.appendChild(badge);
+        footer.appendChild(viewBtn);
+        
+        card.appendChild(header);
+        card.appendChild(footer);
+        
+        // Click card to toggle selection
+        card.addEventListener('click', () => {
+            checkbox.checked = !checkbox.checked;
+            this.#toggleSubjectSelection(subject.id, checkbox.checked);
+        });
+        
+        return card;
+    }
+
+    /**
+     * Toggle subject selection
+     * @param {string} subjectId - Subject ID
+     * @param {boolean} selected - Selected state
+     */
+    #toggleSubjectSelection(subjectId, selected) {
+        if (selected) {
+            this.#selectedSubjectIds.add(subjectId);
+        } else {
+            this.#selectedSubjectIds.delete(subjectId);
+        }
+        this.#updateExtractStudentsButton();
+        this.#renderStudentsSubjectList();
+    }
+
+    /**
+     * Update extract students button state
+     */
+    #updateExtractStudentsButton() {
+        this.#elements.extractStudentsBtn.disabled = this.#selectedSubjectIds.size === 0;
+    }
+
+    /**
+     * Select all subjects
+     */
+    #selectAllSubjects() {
+        const matchedSubjects = this.#suap.getMatchedSubjects();
+        matchedSubjects.forEach(subject => {
+            this.#selectedSubjectIds.add(subject.id);
+        });
+        this.#updateExtractStudentsButton();
+        this.#renderStudentsSubjectList();
+    }
+
+    /**
+     * Select subjects that haven't been scraped yet
+     */
+    #selectNotScraped() {
+        const matchedSubjects = this.#suap.getMatchedSubjects();
+        matchedSubjects.forEach(subject => {
+            if (!this.#studentsData[subject.id]) {
+                this.#selectedSubjectIds.add(subject.id);
+            }
+        });
+        this.#updateExtractStudentsButton();
+        this.#renderStudentsSubjectList();
+    }
+
+    /**
+     * Deselect all subjects
+     */
+    #deselectAllSubjects() {
+        this.#selectedSubjectIds.clear();
+        this.#updateExtractStudentsButton();
+        this.#renderStudentsSubjectList();
+    }
+
+    /**
+     * View students for a subject
+     * @param {Object} subject - SUAP subject
+     */
+    #viewStudents(subject) {
+        const students = this.#studentsData[subject.id] || [];
+        this.#studentsModal.show(subject, students);
+    }
+
+    /**
+     * Extract students from selected subjects
+     */
+    async #extractStudents() {
+        if (this.#selectedSubjectIds.size === 0) return;
+        
+        this.#ui.updateButton(
+            this.#elements.extractStudentsBtn,
+            true,
+            'Extracting...'
+        );
+        
+        this.#progressModal.show({
+            title: 'Extracting Students',
+            message: 'Starting student extraction',
+            warning: 'This process involves web scraping and may take several minutes.'
+        });
+        
+        try {
+            const subjectIds = Array.from(this.#selectedSubjectIds);
+            
+            // Start extraction job
+            const response = await Request.post('/api/suap/extract-students', { subjectIds });
+            
+            if (!response.success || !response.jobId) {
+                throw new Error(response.error || 'Failed to start extraction job');
+            }
+            
+            // Poll for job completion
+            const result = await this.#pollJobStatus(response.jobId, (status) => {
+                const current = status.progress?.current || 0;
+                const total = status.progress?.total || subjectIds.length;
+                const message = status.message || 'Processing...';
+                
+                // Format progress message with completion count
+                const progressText = `${message}\n\nCompleted: ${current}/${total} subjects`;
+                
+                this.#progressModal.updateStatus(progressText);
+            });
+            
+            this.#progressModal.hide();
+            
+            // Reload students data
+            await this.#loadStudentsData();
+            this.#selectedSubjectIds.clear();
+            this.#renderStudentsSubjectList();
+            this.#updateExtractStudentsButton();
+            
+            Toast.success(result.message || 'Students extracted successfully');
+        } catch (error) {
+            this.#progressModal.hide();
+            console.error('Student extraction error:', error);
+            Toast.error(error.message || 'Failed to extract students');
+        } finally {
+            this.#ui.updateButton(
+                this.#elements.extractStudentsBtn,
+                false,
+                'Extract Students'
+            );
+        }
+    }
+
+    /**
+     * Poll job status until completion
+     * @param {string} jobId - Job ID
+     * @param {Function} onProgress - Progress callback
+     */
+    async #pollJobStatus(jobId, onProgress) {
+        const pollInterval = 1000; // 1 second
+        const maxAttempts = 600; // 10 minutes max
+        let attempts = 0;
+        
+        while (attempts < maxAttempts) {
+            try {
+                const status = await Request.get(`/api/jobs/${jobId}`);
+                
+                if (onProgress && status.progress) {
+                    onProgress(status);
+                }
+                
+                if (status.status === 'completed') {
+                    return status.result;
+                }
+                
+                if (status.status === 'failed') {
+                    throw new Error(status.error || 'Job failed');
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, pollInterval));
+                attempts++;
+            } catch (error) {
+                throw error;
+            }
+        }
+        
+        throw new Error('Job polling timeout');
     }
 }
 

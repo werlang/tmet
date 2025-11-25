@@ -112,8 +112,24 @@
             <div id="matched-list" class="matched-list collapsed"></div>
         </div>
 
+        <div class="pipeline-section students-section">
+            <h2>Step 4: Extract Students from Matched Subjects</h2>
+            <div class="pipeline-content">
+                <p class="section-description">Select subjects to scrape student enrollment data from SUAP</p>
+                <div class="students-controls">
+                    <div class="selection-buttons">
+                        <button id="select-all-students-btn" class="btn-secondary small">Select All</button>
+                        <button id="select-not-scraped-btn" class="btn-secondary small">Select Not Scraped</button>
+                        <button id="deselect-all-students-btn" class="btn-secondary small">Deselect All</button>
+                    </div>
+                    <button id="extract-students-btn" class="pipeline-btn primary" disabled>Extract Students</button>
+                </div>
+                <div id="students-subject-list" class="students-subject-list"></div>
+            </div>
+        </div>
+
         <div class="pipeline-section">
-            <h2>Step 4: Upload Courses to Moodle</h2>
+            <h2>Step 5: Upload Courses to Moodle</h2>
             <div class="pipeline-content">
                 <p class="section-description">Upload generated courses to Moodle via Web Service API</p>
                 <button id="upload-courses-btn" class="pipeline-btn primary">Upload to Moodle</button>

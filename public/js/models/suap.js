@@ -8,6 +8,7 @@ import Request from '../helpers/request.js';
  */
 export default class SUAP {
     #subjects = [];
+    #matchedSubjects = [];
 
     constructor() {}
 
@@ -101,11 +102,26 @@ export default class SUAP {
             const allSubjects = data.subjects || [];
             const suapSubjects = data.suapSubjects || [];
             
-            // Filter out SUAP subjects that are already matched
-            const matchedIds = new Set(
-                allSubjects.filter(s => s.suapId).map(s => s.suapId)
-            );
+            // Collect matched SUAP IDs and build matched subjects list
+            const matchedIds = new Set();
+            this.#matchedSubjects = [];
             
+            allSubjects.forEach(subject => {
+                if (subject.suapId) {
+                    // Handle both single ID and array of IDs
+                    const ids = Array.isArray(subject.suapId) ? subject.suapId : [subject.suapId];
+                    ids.forEach(id => {
+                        matchedIds.add(id);
+                        // Find the SUAP subject and add to matched list
+                        const suapSubject = suapSubjects.find(s => s.id === id);
+                        if (suapSubject && !this.#matchedSubjects.find(s => s.id === id)) {
+                            this.#matchedSubjects.push(suapSubject);
+                        }
+                    });
+                }
+            });
+            
+            // Filter out SUAP subjects that are already matched for unmatched list
             this.#subjects = suapSubjects.filter(s => !matchedIds.has(s.id));
         } catch (error) {
             console.error('SUAP data loading error:', error);
@@ -120,6 +136,14 @@ export default class SUAP {
      */
     getUnmatchedSubjects() {
         return this.#subjects;
+    }
+
+    /**
+     * Get matched SUAP subjects
+     * @returns {Array}
+     */
+    getMatchedSubjects() {
+        return this.#matchedSubjects;
     }
 
     /**

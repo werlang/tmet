@@ -13,11 +13,13 @@
 @import "./components/progress-modal.css";
 @import "./components/pipeline.css";
 @import "./components/subject-list.css";
+@import "./components/students-modal.css";
 
 /* Section Styles */
 @import "./sections/matched-section.css";
 @import "./sections/match-section.css";
 @import "./sections/ai-suggestion.css";
+@import "./sections/students-section.css";
 
 
 .container {
