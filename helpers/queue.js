@@ -102,19 +102,19 @@ export default class JobQueue {
      * @private
      */
     async processJob() {
+        const runningJobs = this.#jobs.filter(job => job.status === 'running').length;
+        if (runningJobs >= this.#maxConcurrentJobs) return;
+        
+        // find first job in queue
+        const nextJob = this.#jobs.find(job => job.status === 'queued');
+        if (!nextJob) return;
+
+        const { id, callback } = nextJob;
+        this.updateJob(id, { status: 'running', startedAt: new Date().toISOString() });
+
+        console.log(`[${id}] Job started`);
+
         try {
-            const runningJobs = this.#jobs.filter(job => job.status === 'running').length;
-            if (runningJobs >= this.#maxConcurrentJobs) return;
-            
-            // find first job in queue
-            const nextJob = this.#jobs.find(job => job.status === 'queued');
-            if (!nextJob) return;
-
-            const { id, callback } = nextJob;
-            this.updateJob(id, { status: 'running', startedAt: new Date().toISOString() });
-
-            console.log(`[${id}] Job started`);
-
             // execute job
             const result = await callback(id, (progressData) => {
                 this.updateJob(id, { ...progressData });
