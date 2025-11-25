@@ -66,21 +66,32 @@ ${suapList}`;
     }
 
     /**
-     * Parse AI response to extract matches
+     * Parse AI response to extract matches (JSONL format - one JSON per line)
      * @private
      */
     #parseResponse(response) {
         const matches = [];
 
         try {
-            const jsonMatches = response.match(/\{[\s\S]*?\}/g);
-            if (jsonMatches) {
-                for (const match of jsonMatches) {
-                    try {
-                        matches.push(JSON.parse(match));
-                    } catch (e) {
-                        console.warn('Failed to parse match:', match);
+            // Handle 'null' response (no confident matches)
+            if (response.trim().toLowerCase() === 'null') {
+                return matches;
+            }
+
+            // Parse JSONL format (one JSON object per line)
+            const lines = response.trim().split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (!trimmedLine || trimmedLine.toLowerCase() === 'null') continue;
+
+                try {
+                    const parsed = JSON.parse(trimmedLine);
+                    // Validate expected structure
+                    if (parsed.moodleFullname && parsed.suapIds && typeof parsed.confidence === 'number') {
+                        matches.push(parsed);
                     }
+                } catch (e) {
+                    console.warn('Failed to parse JSONL line:', trimmedLine);
                 }
             }
         } catch (error) {
