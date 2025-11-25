@@ -1,6 +1,7 @@
 import Toast from './components/toast.js';
 import { SubjectListUI } from './components/subject-list.js';
 import { AIMatchModal } from './components/ai-modal.js';
+import ProgressModal from './components/progress-modal.js';
 import { getDefaultYearSemester } from './helpers/date.js';
 import Moodle from './models/moodle.js';
 import SUAP from './models/suap.js';
@@ -16,6 +17,7 @@ class SubjectMatcherApp {
     #suap;
     #ui;
     #modal;
+    #progressModal;
 
     constructor() {
         this.#cacheElements();
@@ -65,6 +67,7 @@ class SubjectMatcherApp {
         this.#suap = new SUAP();
         this.#ui = new SubjectListUI(this.#elements);
         this.#modal = new AIMatchModal(this.#elements);
+        this.#progressModal = new ProgressModal();
     }
 
     /**
@@ -220,11 +223,30 @@ class SubjectMatcherApp {
             'Extracting & Generating...'
         );
         
+        this.#progressModal.show({
+            title: 'Generating Moodle CSV',
+            message: 'Fetching timetable data from EduPage'
+        });
+        
         try {
             const payload = this.#collectTimetableParams();
-            await this.#moodle.generateCSV(payload);
+            
+            const result = await this.#moodle.generateCSV(payload, (message) => {
+                this.#progressModal.updateStatus(message);
+                this.#ui.updateButton(
+                    this.#elements.generateCsvBtn,
+                    true,
+                    message
+                );
+            });
+            
+            this.#progressModal.updateStatus('Reloading data');
             await this.#loadData();
+            
+            this.#progressModal.hide();
+            Toast.success(result.message || 'CSV generated successfully');
         } catch (error) {
+            this.#progressModal.hide();
             // Error already handled in Moodle
         } finally {
             this.#ui.updateButton(
@@ -271,17 +293,30 @@ class SubjectMatcherApp {
             'Extracting...'
         );
         
+        this.#progressModal.show({
+            title: 'Extracting SUAP Data',
+            message: 'Launching browser automation',
+            warning: 'This process involves web scraping and may take a few minutes depending on the number of courses selected.'
+        });
+        
         try {
             const payload = this.#collectSuapParams();
-            await this.#suap.extractSubjects(payload, (message) => {
+            const result = await this.#suap.extractSubjects(payload, (message) => {
+                this.#progressModal.updateStatus(message);
                 this.#ui.updateButton(
                     this.#elements.extractSuapBtn,
                     true,
                     message
                 );
             });
+            
+            this.#progressModal.updateStatus('Reloading data');
             await this.#loadData();
+            
+            this.#progressModal.hide();
+            Toast.success(result.message || 'SUAP data extracted successfully');
         } catch (error) {
+            this.#progressModal.hide();
             // Error already handled in SUAP
         } finally {
             this.#ui.updateButton(
@@ -328,9 +363,28 @@ class SubjectMatcherApp {
             'Uploading...'
         );
         
+        this.#progressModal.show({
+            title: 'Uploading Courses to Moodle',
+            message: 'Preparing course data'
+        });
+        
         try {
-            await this.#moodle.uploadCourses();
+            const result = await this.#moodle.uploadCourses((message) => {
+                this.#progressModal.updateStatus(message);
+                this.#ui.updateButton(
+                    this.#elements.uploadCoursesBtn,
+                    true,
+                    message
+                );
+            });
+            
+            this.#progressModal.hide();
+            const summary = result.results 
+                ? `Created: ${result.results.success.length}, Failed: ${result.results.errors.length}`
+                : '';
+            Toast.success((result.message || 'Courses uploaded successfully') + (summary ? '. ' + summary : ''));
         } catch (error) {
+            this.#progressModal.hide();
             // Error already handled in Moodle
         } finally {
             this.#ui.updateButton(

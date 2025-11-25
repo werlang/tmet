@@ -67,7 +67,6 @@ export default class SUAP {
                     }
 
                     if (status.status === 'completed') {
-                        Toast.success(status.results?.message || `${operationName} completed successfully`);
                         resolve(status.results || {});
                         return;
                     }

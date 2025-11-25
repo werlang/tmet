@@ -1,6 +1,7 @@
 import { escapeHtml } from '../helpers/text.js';
 import Matching from '../models/matching.js';
 import Toast from './toast.js';
+import ProgressModal from './progress-modal.js';
 
 /**
  * AI Match Modal Component
@@ -12,9 +13,11 @@ export class AIMatchModal {
     #pendingMatches = [];
     #onComplete = null;
     #suapSubjects = [];
+    #progressModal = null;
 
     constructor(elements) {
         this.#elements = elements;
+        this.#progressModal = new ProgressModal();
         this.#attachEventListeners();
     }
 
@@ -47,10 +50,19 @@ export class AIMatchModal {
         // Store SUAP subjects for lookup during display
         this.#suapSubjects = suapSubjects;
 
+        // Show progress modal
+        this.#progressModal.show({
+            title: 'AI Matching in Progress',
+            message: 'Sending subjects to AI model',
+            warning: 'This process may take several minutes. Please be patient while the AI analyzes the subjects and generates match suggestions.'
+        });
+
         try {
             const result = await Matching.startAIMatching(moodleSubjects, suapSubjects);
+            this.#progressModal.updateStatus('AI processing matches');
             await this.#pollJobStatus(result.jobId, onComplete);
         } catch (error) {
+            this.#progressModal.hide();
             // Error already handled in Matching
         }
     }
@@ -68,9 +80,17 @@ export class AIMatchModal {
         const poll = async () => {
             try {
                 attempts++;
+                
+                // Update progress status periodically
+                if (attempts % 5 === 0) {
+                    this.#progressModal.updateStatus(`Analyzing subjects (attempt ${attempts})`);
+                }
+
                 const status = await Matching.getAIMatchingStatus(jobId);
 
                 if (status.status === 'completed') {
+                    this.#progressModal.hide();
+                    
                     if (!status?.results?.matches || status.results.matches.length === 0) {
                         Toast.info('AI could not find confident matches for the remaining subjects');
                         onComplete();
@@ -82,17 +102,20 @@ export class AIMatchModal {
                 }
 
                 if (status.status === 'failed') {
+                    this.#progressModal.hide();
                     throw new Error(status.error || 'AI matching job failed');
                 }
 
                 // Still processing
                 if (attempts >= maxAttempts) {
+                    this.#progressModal.hide();
                     throw new Error('AI matching timed out');
                 }
 
                 setTimeout(poll, pollInterval);
 
             } catch (error) {
+                this.#progressModal.hide();
                 onComplete();
                 throw error;
             }
