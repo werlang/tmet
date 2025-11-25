@@ -68,6 +68,20 @@ export default class JobQueue {
     }
 
     /**
+     * Mark job as failed with error
+     * @param {string} jobId - The job ID
+     * @param {Error} error - Error object
+     */
+    failJob(jobId, error) {
+        this.updateJob(jobId, {
+            status: 'failed',
+            error: error.message,
+            failedAt: new Date().toISOString(),
+        });
+        this.#scheduleCleanup(jobId);
+    }
+
+    /**
      * Queue a job for execution
      * @param {Function} jobFunction - Async function to execute
      * @param {Function} progressCallback - Optional callback for progress updates (jobId) => void
@@ -113,8 +127,8 @@ export default class JobQueue {
             this.processJob();
 
         } catch (error) {
-            console.error(`[${jobId}] Job failed:`, error);
-            this.failJob(jobId, error);
+            console.error(`[${id}] Job failed:`, error);
+            this.failJob(id, error);
         }
     }
 
