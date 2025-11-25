@@ -22,100 +22,72 @@ export default class SUAP {
      * @param {string[]} options.courses - Course codes to extract
      * @returns {Promise<Array>} Extracted subjects
      */
-    async extractSubjects({ year, semester, courses }) {
-        const scraper = new SUAPScraper();
-        const subjects = [];
+    async extractSubjects({ year, semester, courses: selectedCourses }) {
+        await SUAPScraper.initialize();
 
-        try {
-            await scraper.launch();
+        // Use provided parameters or defaults
+        year = year || new Date().getFullYear();
+        semester = semester || (new Date().getMonth() < 6 ? 1 : 2);
 
-            // Navigate to SUAP course book
-            const url = suapConfig.buildURL(year, semester);
-            await scraper.goto(url);
+        const courses = suapConfig.courses;
+        const yearList = suapConfig.yearList;
 
-            // Login if needed
-            if (await scraper.hasElement(suapConfig.selectors.loginForm)) {
-                await this.#login(scraper);
-            }
+        // Filter courses if selectedCourses array is provided
+        const coursesToExtract = selectedCourses && selectedCourses.length > 0
+            ? Object.keys(courses).filter(key => selectedCourses.includes(key))
+            : Object.keys(courses);
 
-            // Extract subjects for each course
-            const coursesToExtract = courses && courses.length > 0 
-                ? courses 
-                : suapConfig.defaultCourses;
+        const SUAPJson = [];
 
-            for (const courseCode of coursesToExtract) {
-                const courseSubjects = await this.#extractCourse(scraper, courseCode, year, semester);
-                subjects.push(...courseSubjects);
-            }
+        for (const courseName of coursesToExtract) {
+            const query = new URLSearchParams({
+                ...suapConfig.bookSearch.url.query,
+                ano_letivo: yearList[year],
+                periodo_letivo__exact: semester,
+                turma__curso_campus: courses[courseName],
+                tab: 'tab_any_data',
+                all: 'true',
+            }).toString();
+            const url = `${suapConfig.baseUrl}/${suapConfig.bookSearch.url.base}/?${query}`;
+            await SUAPScraper.goto(url, suapConfig.bookSearch.ready);
 
-        } finally {
-            await scraper.close();
-        }
-
-        // Save to file
-        this.#saveSubjects(subjects);
-
-        return subjects;
-    }
-
-    /**
-     * Login to SUAP
-     * @private
-     */
-    async #login(scraper) {
-        const username = process.env.SUAP_USERNAME;
-        const password = process.env.SUAP_PASSWORD;
-
-        if (!username || !password) {
-            throw new Error('SUAP credentials not configured');
-        }
-
-        await scraper.type(suapConfig.selectors.usernameInput, username);
-        await scraper.type(suapConfig.selectors.passwordInput, password);
-        await scraper.click(suapConfig.selectors.loginButton);
-        await scraper.waitForNavigation();
-    }
-
-    /**
-     * Extract subjects for a specific course
-     * @private
-     */
-    async #extractCourse(scraper, courseCode, year, semester) {
-        const subjects = [];
-
-        // Select course
-        await scraper.select(suapConfig.selectors.courseSelect, courseCode);
-        await scraper.waitFor(1000); // Wait for page update
-
-        // Get all subject rows
-        const rows = await scraper.querySelectorAll(suapConfig.selectors.subjectRow);
-
-        for (const row of rows) {
-            const id = await scraper.getAttribute(row, 'data-id');
-            const subjectName = await scraper.textContent(row, suapConfig.selectors.subjectName);
-            const className = await scraper.textContent(row, suapConfig.selectors.className);
-
-            if (id && subjectName && className) {
-                subjects.push({
-                    id,
-                    subjectName: subjectName.trim(),
-                    className: className.trim(),
-                    fullname: `${className.trim()} - ${subjectName.trim()}`,
-                    courseCode,
-                    year,
-                    semester
+            console.log(`Extracting data for course ${courseName}...`);
+            const SUAPsubjects = await SUAPScraper.evaluate((template) => {
+                const rows = [];
+                document.querySelectorAll(template.rows).forEach((tr) => {
+                    rows.push({
+                        id: template.data.id(tr),
+                        name: template.data.name(tr),
+                        class: template.data.class(tr),
+                    });
                 });
-            }
+                return rows;
+            }, suapConfig.bookSearch);
+
+            SUAPsubjects.forEach((subject) => {
+                // Banco de Dados, remove extra spaces
+                const subjectName = subject.name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+                // INF-1AT
+                subject.className = `${courseName}-${subject.class.split('.')?.[1]}A${subject.class.at(-1)}`;
+                // INF-1AT - Banco de Dados
+                subject.fullname = `${subject.className} - ${subjectName}`;
+                subject.subjectName = subjectName;
+                subject.group = false;
+            });
+
+            // Search for duplicates: same fullname, different id: assign groups G1 and G2
+            SUAPsubjects.forEach((subject) => {
+                const duplicate = SUAPsubjects.find(s => s.fullname === subject.fullname && s !== subject);
+                if (duplicate) {
+                    subject.group = parseInt(duplicate.id) > parseInt(subject.id) ? 'G1' : 'G2';
+                }
+            });
+
+            SUAPJson.push(...SUAPsubjects);
         }
 
-        return subjects;
-    }
+        fs.writeFileSync(this.#dataPath, JSON.stringify(SUAPJson, null, 2));
 
-    /**
-     * Save subjects to file
-     * @private
-     */
-    #saveSubjects(subjects) {
-        fs.writeFileSync(this.#dataPath, JSON.stringify(subjects, null, 2));
+        return SUAPJson;
     }
 }
