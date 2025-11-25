@@ -1,6 +1,5 @@
 import express from 'express';
-import generateCSV from '../modules/generate-csv.js';
-import uploadCourses from '../modules/upload-courses.js';
+import Moodle from '../models/Moodle.js';
 
 const router = express.Router();
 
@@ -11,12 +10,15 @@ const router = express.Router();
 router.post('/csv', async (req, res) => {
     try {
         console.log('Starting Moodle CSV generation...');
-        const csv = await generateCSV(
-            req.body.year || new Date().getFullYear(),
-            req.body.semester || (new Date().getMonth() < 6 ? 1 : 2),
-            req.body.dateFrom || undefined,
-            req.body.dateTo || undefined
-        );
+        
+        const moodle = new Moodle();
+        await moodle.generateCSV({
+            year: req.body.year || new Date().getFullYear(),
+            semester: req.body.semester || (new Date().getMonth() < 6 ? 1 : 2),
+            dateFrom: req.body.dateFrom,
+            dateTo: req.body.dateTo
+        });
+        
         res.json({ 
             success: true, 
             message: 'Moodle CSV generated successfully',
@@ -38,7 +40,10 @@ router.post('/csv', async (req, res) => {
 router.post('/courses', async (req, res) => {
     try {
         console.log('Starting Moodle course upload...');
-        const results = await uploadCourses();
+        
+        const moodle = new Moodle();
+        const results = await moodle.uploadCourses();
+        
         res.json({ 
             success: true, 
             message: 'Courses uploaded successfully',

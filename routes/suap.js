@@ -1,5 +1,5 @@
 import express from 'express';
-import extractSUAP from '../modules/extract-suap.js';
+import SUAP from '../models/SUAP.js';
 
 const router = express.Router();
 
@@ -49,11 +49,8 @@ async function processExtractSUAP(jobId, params, updateProgress) {
 
     console.log(`[${jobId}] Starting SUAP extraction with params:`, params);
     
-    await extractSUAP(
-        params.year,
-        params.semester,
-        params.courses
-    );
+    const suap = new SUAP();
+    await suap.extractSubjects(params);
 
     console.log(`[${jobId}] SUAP extraction completed`);
 

@@ -1,6 +1,5 @@
 import express from 'express';
-import ChatAssist from '../helpers/chat-assist.js';
-import chatConfig from '../config/chat-assist.js';
+import AIMatch from '../models/AIMatch.js';
 
 const router = express.Router();
 
@@ -47,60 +46,15 @@ router.post('/match', async (req, res) => {
 
 // Async function to process AI matching
 async function processAIMatching(jobId, moodleSubjects, suapSubjects, updateProgress) {
-    const chatAssist = new ChatAssist();
+    console.log(`[${jobId}] Starting AI matching`);
     
-    // Update progress
-    updateProgress({
-        message: 'Preparing AI prompt...'
-    });
-    
-    // Build the prompt for AI matching
-    const systemPrompt = chatConfig.systemPrompt;
+    const aiMatch = new AIMatch();
+    const matches = await aiMatch.findMatches(moodleSubjects, suapSubjects, updateProgress);
 
-    const userMessage = `Find matches between these Moodle and SUAP subjects:
+    console.log(`[${jobId}] AI suggested ${matches.length} high-confidence matches`);
 
-MOODLE SUBJECTS:
-${moodleSubjects.map(m => `- "${m.fullname}" (shortname: ${m.shortname}, category: ${m.category})`).join('\n')}
-
-SUAP SUBJECTS:
-${suapSubjects.map(s => `- ID: ${s.id}, Name: "${s.fullname}" (Subject: ${s.subjectName}, Class: ${s.className})`).join('\n')}`;
-
-    // Update progress
-    updateProgress({
-        message: 'Analyzing subjects with AI...'
-    });
-
-    const response = await chatAssist.chat(userMessage, systemPrompt, {
-        temperature: 0.3,
-        maxTokens: 4096,
-    });
-    console.log(response);
-
-    // Update progress
-    updateProgress({
-        message: 'Parsing AI response...'
-    });
-
-    // Parse the AI response
-    let matches = [];
-    try {
-        const jsonMatch = response.match(/\{[\s\S]*?\}/g);
-        if (jsonMatch) {
-            matches = jsonMatch.map(line => JSON.parse(line));
-        } else {
-            console.warn(`[${jobId}] AI response did not contain valid JSON array`);
-        }
-    } catch (parseError) {
-        console.error(`[${jobId}] Failed to parse AI response:`, parseError);
-        throw new Error('AI returned invalid response format');
-    }
-
-    const filteredMatches = matches.filter(m => m.confidence > 0.8);
-    console.log(`[${jobId}] AI suggested ${filteredMatches.length} high-confidence matches`);
-
-    // Return results
     return {
-        matches: filteredMatches,
+        matches,
         message: 'AI matching completed'
     };
 }

@@ -1,7 +1,5 @@
 import express from 'express';
-import path from 'path';
-import fs from 'fs';
-import match from '../modules/matching.js';
+import Match from '../models/Match.js';
 
 const router = express.Router();
 
@@ -11,7 +9,8 @@ const router = express.Router();
  */
 router.get('/', (req, res) => {
     try {
-        const data = match();
+        const match = new Match();
+        const data = match.getAll();
         res.json(data);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -32,32 +31,23 @@ router.post('/', (req, res) => {
         });
     }
 
-    const manualMatchesPath = path.resolve('files', 'manual_matches.json');
+    // Support both single suapId (legacy) and array suapIds
+    const suapId = Array.isArray(suapIds) ? suapIds : req.body.suapId;
     
-    let manualMatches = [];
-    if (fs.existsSync(manualMatchesPath)) {
-        manualMatches = JSON.parse(fs.readFileSync(manualMatchesPath, 'utf-8'));
-    }
-
-    // Remove existing match for this moodle subject if any
-    manualMatches = manualMatches.filter(m => m.moodleFullname !== moodleFullname);
-    
-    // Add new match - support both single suapId (legacy) and array suapIds
-    if (Array.isArray(suapIds)) {
-        manualMatches.push({ moodleFullname, suapId: suapIds });
-    } else if (req.body.suapId) {
-        // Legacy support for single suapId
-        manualMatches.push({ moodleFullname, suapId: req.body.suapId });
-    } else {
+    if (!suapId) {
         return res.status(400).json({ 
             success: false, 
             error: 'suapIds array or suapId required' 
         });
     }
 
-    fs.writeFileSync(manualMatchesPath, JSON.stringify(manualMatches, null, 2));
-    
-    res.status(201).json({ success: true });
+    try {
+        const match = new Match();
+        match.create(moodleFullname, suapId);
+        res.status(201).json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 export default router;
