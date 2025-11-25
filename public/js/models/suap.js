@@ -17,18 +17,79 @@ export default class SUAP {
      * @param {number} params.year - Year for SUAP extraction
      * @param {number} params.semester - Semester number
      * @param {string[]} params.courses - Selected courses to extract
+     * @param {Function} progressCallback - Optional callback for progress updates
      * @returns {Promise<Object>} Result object
      */
-    async extractSubjects(params) {
+    async extractSubjects(params, progressCallback) {
         try {
             const result = await Request.post('/api/extract-suap', params);
-            Toast.success(result.message || 'SUAP data extracted successfully');
-            return result;
+            
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            // Poll for completion
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/extract-suap',
+                'SUAP extraction',
+                progressCallback
+            );
+
         } catch (error) {
             console.error('Extract SUAP error:', error);
             Toast.error('Error extracting SUAP: ' + error.message);
             throw error;
         }
+    }
+
+    /**
+     * Poll job status until completion
+     * @param {string} jobId - Job ID to poll
+     * @param {string} endpoint - Status endpoint path
+     * @param {string} operationName - Human-readable operation name
+     * @param {Function} progressCallback - Optional callback for progress updates
+     * @returns {Promise<Object>} Job results
+     */
+    async #pollJobStatus(jobId, endpoint, operationName, progressCallback) {
+        const pollInterval = 1000; // 1 second
+        const maxAttempts = 600; // 10 minutes
+        let attempts = 0;
+
+        return new Promise((resolve, reject) => {
+            const poll = async () => {
+                try {
+                    attempts++;
+                    const status = await Request.get(`${endpoint}/${jobId}`);
+
+                    if (progressCallback && status.message) {
+                        progressCallback(status.message);
+                    }
+
+                    if (status.status === 'completed') {
+                        Toast.success(status.results?.message || `${operationName} completed successfully`);
+                        resolve(status.results || {});
+                        return;
+                    }
+
+                    if (status.status === 'failed') {
+                        throw new Error(status.error || `${operationName} failed`);
+                    }
+
+                    // Still processing
+                    if (attempts >= maxAttempts) {
+                        throw new Error(`${operationName} timed out`);
+                    }
+
+                    setTimeout(poll, pollInterval);
+
+                } catch (error) {
+                    reject(error);
+                }
+            };
+
+            poll();
+        });
     }
 
     /**

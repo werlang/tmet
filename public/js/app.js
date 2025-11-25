@@ -273,7 +273,13 @@ class SubjectMatcherApp {
         
         try {
             const payload = this.#collectSuapParams();
-            await this.#suap.extractSubjects(payload);
+            await this.#suap.extractSubjects(payload, (message) => {
+                this.#ui.updateButton(
+                    this.#elements.extractSuapBtn,
+                    true,
+                    message
+                );
+            });
             await this.#loadData();
         } catch (error) {
             // Error already handled in SUAP

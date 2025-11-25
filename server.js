@@ -12,8 +12,8 @@ import chatConfig from './config/chat-assist.js';
 const app = express();
 const port = 3000;
 
-// Job queue for AI matching
-const aiMatchingQueue = new Queue();
+// Single job queue for all operations
+const jobQueue = new Queue();
 
 app.use(express.json());
 app.use(express.static('public'));
@@ -79,19 +79,28 @@ app.post('/api/generate-csv', async (req, res) => {
 
 app.post('/api/extract-suap', async (req, res) => {
     try {
-        console.log('Starting SUAP extraction...');
-        await extractSUAP(
-            req.body.year || new Date().getFullYear(),
-            req.body.semester || (new Date().getMonth() < 6 ? 1 : 2),
-            req.body.courses || undefined
-        );
-        res.json({ 
-            success: true, 
-            message: 'SUAP data extracted successfully',
-            file: 'files/suap_subjects.json'
+        const params = {
+            year: req.body.year || new Date().getFullYear(),
+            semester: req.body.semester || (new Date().getMonth() < 6 ? 1 : 2),
+            courses: req.body.courses || undefined
+        };
+
+        console.log('Starting SUAP extraction job...');
+
+        // Start async job
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
+            return await processExtractSUAP(jobId, params, updateProgress);
         });
+
+        // Return job ID immediately
+        res.json({ 
+            success: true,
+            jobId,
+            message: 'SUAP extraction job started'
+        });
+
     } catch (error) {
-        console.error('Error extracting SUAP:', error);
+        console.error('SUAP extraction error:', error);
         res.status(500).json({ 
             success: false, 
             error: error.message 
@@ -131,7 +140,7 @@ app.post('/api/ai-match', async (req, res) => {
         console.log(`Starting AI matching for ${moodleSubjects.length} Moodle subjects and ${suapSubjects.length} SUAP subjects...`);
 
         // Start async job
-        const jobId = aiMatchingQueue.queue(async (jobId, updateProgress) => {
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
             return await processAIMatching(jobId, moodleSubjects, suapSubjects, updateProgress);
         });
 
@@ -154,7 +163,25 @@ app.post('/api/ai-match', async (req, res) => {
 // Get AI matching job status
 app.get('/api/ai-match/:jobId', (req, res) => {
     const { jobId } = req.params;
-    const job = aiMatchingQueue.getJob(jobId);
+    const job = jobQueue.getJob(jobId);
+    
+    if (!job) {
+        return res.status(404).json({ 
+            success: false, 
+            error: 'Job not found' 
+        });
+    }
+    
+    res.json({ 
+        success: true, 
+        ...job 
+    });
+});
+
+// Get extract-suap job status
+app.get('/api/extract-suap/:jobId', (req, res) => {
+    const { jobId } = req.params;
+    const job = jobQueue.getJob(jobId);
     
     if (!job) {
         return res.status(404).json({ 
@@ -226,6 +253,28 @@ ${suapSubjects.map(s => `- ID: ${s.id}, Name: "${s.fullname}" (Subject: ${s.subj
     return {
         matches: filteredMatches,
         message: 'AI matching completed'
+    };
+}
+
+// Async function to process SUAP extraction
+async function processExtractSUAP(jobId, params, updateProgress) {
+    updateProgress({
+        message: 'Extracting SUAP data...'
+    });
+
+    console.log(`[${jobId}] Starting SUAP extraction with params:`, params);
+    
+    await extractSUAP(
+        params.year,
+        params.semester,
+        params.courses
+    );
+
+    console.log(`[${jobId}] SUAP extraction completed`);
+
+    return {
+        message: 'SUAP data extracted successfully',
+        file: 'files/suap_subjects.json'
     };
 }
 
