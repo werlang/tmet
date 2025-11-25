@@ -4,3 +4,4 @@
 *.csv
 samples/*
 files/*
+coverage/*

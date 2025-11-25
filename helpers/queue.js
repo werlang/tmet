@@ -8,6 +8,7 @@ export default class JobQueue {
     #cleanupTimeout = 5 * 60 * 1000; // 5 minutes default
     #jobs = [];
     #maxConcurrentJobs = process.env.MAX_CONCURRENT_JOBS || 1;
+    #cleanupTimers = new Map(); // Track cleanup timers for cancellation
 
     constructor(cleanupTimeout = 5 * 60 * 1000) {
         this.#cleanupTimeout = cleanupTimeout;
@@ -139,10 +140,14 @@ export default class JobQueue {
     #scheduleCleanup(jobId) {
         const job = this.getJob(jobId);
         if (!job) return;
-        setTimeout(() => {
+        
+        const timerId = setTimeout(() => {
             this.#jobs = this.#jobs.filter(job => job.id !== jobId);
+            this.#cleanupTimers.delete(jobId);
             console.log(`[${jobId}] Job cleaned up from memory`);
         }, this.#cleanupTimeout);
+        
+        this.#cleanupTimers.set(jobId, timerId);
     }
 
     /**
@@ -157,6 +162,11 @@ export default class JobQueue {
      * Clear all jobs (for testing)
      */
     clearAll() {
+        // Cancel all pending cleanup timers
+        for (const timerId of this.#cleanupTimers.values()) {
+            clearTimeout(timerId);
+        }
+        this.#cleanupTimers.clear();
         this.#jobs = [];
     }
 }
