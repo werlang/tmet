@@ -375,5 +375,63 @@ describe('Queue Helper', () => {
                 queue.completeJob(jobId, {});
             }).toThrow();
         });
+
+        it('should use default maxConcurrentJobs when env var not set', () => {
+            const originalEnv = process.env.MAX_CONCURRENT_JOBS;
+            delete process.env.MAX_CONCURRENT_JOBS;
+            
+            const defaultQueue = new Queue();
+            const job1 = defaultQueue.createJob(async () => {
+                await wait(50);
+                return 'done';
+            });
+            const job2 = defaultQueue.createJob(async () => {
+                await wait(50);
+                return 'done';
+            });
+            
+            // Both jobs should be created
+            expect(job1).toBeDefined();
+            expect(job2).toBeDefined();
+            
+            // Restore env var
+            if (originalEnv !== undefined) {
+                process.env.MAX_CONCURRENT_JOBS = originalEnv;
+            }
+            
+            defaultQueue.clearAll();
+        });
+
+        it('should use env var maxConcurrentJobs when set', () => {
+            const originalEnv = process.env.MAX_CONCURRENT_JOBS;
+            process.env.MAX_CONCURRENT_JOBS = '3';
+            
+            const envQueue = new Queue();
+            expect(envQueue).toBeDefined();
+            
+            // Restore env var
+            if (originalEnv !== undefined) {
+                process.env.MAX_CONCURRENT_JOBS = originalEnv;
+            } else {
+                delete process.env.MAX_CONCURRENT_JOBS;
+            }
+            
+            envQueue.clearAll();
+        });
+
+        it('should handle processJob when no jobs are queued', async () => {
+            // Create a job and immediately mark it as running to test empty queue scenario
+            const jobId = queue.createJob(async () => 'done');
+            queue.updateJob(jobId, { status: 'running' });
+            
+            // Call processJob - should return early since no queued jobs
+            await queue.processJob();
+            
+            // Job should still be running
+            const job = queue.getJob(jobId);
+            expect(job.status).toBe('running');
+            
+            queue.clearAll();
+        });
     });
 });

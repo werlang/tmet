@@ -193,4 +193,210 @@ describe('SUAP Model Logic', () => {
             expect(year).toBe(2024);
         });
     });
+
+    describe('Edge cases', () => {
+        it('should handle special characters in subject names', () => {
+            const name = 'TEC.1234 - C++ & Algoritmos - Ensino Médio [120.00 h/160.00 Aulas]';
+            const subjectName = name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+            
+            expect(subjectName).toBe('C++ & Algoritmos');
+        });
+
+        it('should handle unicode in subject names', () => {
+            const name = 'MAT.1234 - Cálculo & Álgebra - Superior [60.00 h/80.00 Aulas]';
+            const subjectName = name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+            
+            expect(subjectName).toBe('Cálculo & Álgebra');
+        });
+
+        it('should handle emoji in subject names', () => {
+            const name = 'TEC.1234 - Programming 🚀 - Ensino Médio [120.00 h/160.00 Aulas]';
+            const subjectName = name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+            
+            expect(subjectName).toBe('Programming 🚀');
+        });
+
+        it('should handle malformed class format with missing parts', () => {
+            const classStr = '20251.2'; // Incomplete format
+            const yearInCourse = classStr.split('.')?.[1];
+            const shift = classStr.at(-1);
+            
+            expect(yearInCourse).toBe('2');
+            expect(shift).toBe('2'); // Last character of string
+        });
+
+        it('should handle class format with different separators', () => {
+            const classStr = '20251.3.CH.TSI.90.1T';
+            const parts = classStr.split('.');
+            
+            expect(parts.length).toBe(6);
+            expect(parts[1]).toBe('3'); // Year in course
+            expect(classStr.at(-1)).toBe('T'); // Shift
+        });
+
+        it('should handle very long subject names', () => {
+            const longSubject = 'A'.repeat(300);
+            const name = `TEC.1234 - ${longSubject} - Ensino Médio [120.00 h/160.00 Aulas]`;
+            const subjectName = name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+            
+            expect(subjectName).toBe(longSubject);
+        });
+
+        it('should handle multiple consecutive spaces in name', () => {
+            const name = 'TEC.1234 -    Banco     de      Dados    - Ensino [120.00 h]';
+            const subjectName = name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+            
+            expect(subjectName).toBe('Banco de Dados');
+        });
+
+        it('should handle name with tabs and newlines', () => {
+            const name = 'TEC.1234 - Banco\t\tde\n\nDados - Ensino [120.00 h]';
+            const subjectName = name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+            
+            expect(subjectName).toBe('Banco de Dados');
+        });
+
+        it('should handle name with only one hyphen', () => {
+            const name = 'TEC.1234';
+            const subjectName = name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+            
+            expect(subjectName).toBeUndefined();
+        });
+
+        it('should handle name with multiple hyphens', () => {
+            const name = 'TEC.1234 - Sub - Part - Detail - Extra';
+            const subjectName = name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+            
+            expect(subjectName).toBe('Sub');
+        });
+
+        it('should handle empty string class format', () => {
+            const classStr = '';
+            const yearInCourse = classStr.split('.')?.[1];
+            const shift = classStr.at(-1);
+            
+            expect(yearInCourse).toBeUndefined();
+            expect(shift).toBeUndefined();
+        });
+
+        it('should handle duplicate detection with 3+ duplicates', () => {
+            const subjects = [
+                { id: '100', fullname: 'INF-1AT - Test', group: false },
+                { id: '200', fullname: 'INF-1AT - Test', group: false },
+                { id: '300', fullname: 'INF-1AT - Test', group: false }
+            ];
+            
+            // First pass assigns groups to first two
+            subjects.forEach((subject) => {
+                const duplicate = subjects.find(s => s.fullname === subject.fullname && s !== subject);
+                if (duplicate) {
+                    subject.group = parseInt(duplicate.id) > parseInt(subject.id) ? 'G1' : 'G2';
+                }
+            });
+            
+            // With this logic, each finds a duplicate and assigns based on comparison
+            // First (100) finds 200, assigns G1
+            // Second (200) finds 100, assigns G2
+            // Third (300) finds 100, assigns G2
+            expect(subjects[0].group).toBe('G1');
+            expect(subjects[1].group).toBe('G2');
+            expect(subjects[2].group).toBe('G2');
+        });
+
+        it('should handle numeric string IDs in group comparison', () => {
+            const subjects = [
+                { id: '00100', fullname: 'Test', group: false },
+                { id: '00200', fullname: 'Test', group: false }
+            ];
+            
+            subjects.forEach((subject) => {
+                const duplicate = subjects.find(s => s.fullname === subject.fullname && s !== subject);
+                if (duplicate) {
+                    subject.group = parseInt(duplicate.id) > parseInt(subject.id) ? 'G1' : 'G2';
+                }
+            });
+            
+            expect(subjects[0].group).toBe('G1');
+            expect(subjects[1].group).toBe('G2');
+        });
+
+        it('should handle course filter with non-existent courses', () => {
+            const allCourses = { 'INF': 1, 'ECA': 2 };
+            const selectedCourses = ['INF', 'NONEXISTENT'];
+            
+            const coursesToExtract = selectedCourses && selectedCourses.length > 0
+                ? Object.keys(allCourses).filter(key => selectedCourses.includes(key))
+                : Object.keys(allCourses);
+            
+            expect(coursesToExtract).toEqual(['INF']);
+        });
+
+        it('should handle semester 0 or negative', () => {
+            const semester = 0;
+            const defaultSemester = semester || (new Date().getMonth() < 6 ? 1 : 2);
+            
+            // 0 is falsy, so default applies
+            expect([1, 2]).toContain(defaultSemester);
+        });
+
+        it('should handle year 0', () => {
+            const year = 0;
+            const defaultYear = year || new Date().getFullYear();
+            
+            // 0 is falsy, so default applies
+            expect(defaultYear).toBe(new Date().getFullYear());
+        });
+
+        it('should handle fullname construction with empty parts', () => {
+            const className = '';
+            const subjectName = '';
+            const fullname = `${className} - ${subjectName}`;
+            
+            expect(fullname).toBe(' - ');
+        });
+
+        it('should handle URL params with special characters', () => {
+            const params = {
+                test: 'value&with=special',
+                another: 'test space'
+            };
+            
+            const query = new URLSearchParams(params).toString();
+            
+            expect(query).toContain('test=value%26with%3Dspecial');
+            expect(query).toContain('another=test+space');
+        });
+
+        it('should handle shift character at different positions', () => {
+            const testCases = [
+                { classStr: 'T', expected: 'T' },
+                { classStr: 'abcT', expected: 'T' },
+                { classStr: 'T123', expected: '3' }
+            ];
+            
+            testCases.forEach(({ classStr, expected }) => {
+                const shift = classStr.at(-1);
+                expect(shift).toBe(expected);
+            });
+        });
+
+        it('should handle falsy selectedCourses values', () => {
+            const allCourses = { 'INF': 1, 'ECA': 2 };
+            
+            const testCases = [
+                { selectedCourses: null, expectedLength: 2 },
+                { selectedCourses: undefined, expectedLength: 2 },
+                { selectedCourses: false, expectedLength: 2 },
+                { selectedCourses: [], expectedLength: 2 } // Empty array has length 0, falsy
+            ];
+            
+            testCases.forEach(({ selectedCourses, expectedLength }) => {
+                const coursesToExtract = selectedCourses && selectedCourses.length > 0
+                    ? Object.keys(allCourses).filter(key => selectedCourses.includes(key))
+                    : Object.keys(allCourses);
+                
+                expect(coursesToExtract.length).toBe(expectedLength);
+            });
+        });
+    });
 });

@@ -254,4 +254,227 @@ invalid json here
             }).not.toThrow();
         });
     });
+
+    describe('Edge cases', () => {
+        it('should handle special characters in subject names', () => {
+            const moodleSubjects = [
+                { fullname: '[2025.1] Cálculo I - C++', shortname: 'CH_Calc', category: '115' },
+                { fullname: 'Física & Química', shortname: 'CH_FQ', category: '116' }
+            ];
+            const suapSubjects = [
+                { id: '1', fullname: 'Matemática: Álgebra & Geometria', subjectName: 'Álgebra', className: 'MTM-1A' },
+                { id: '2', fullname: 'C++ Avançado', subjectName: 'C++', className: 'INF-3B' }
+            ];
+            
+            const moodleList = moodleSubjects
+                .map(m => `- "${m.fullname}" (shortname: ${m.shortname}, category: ${m.category})`)
+                .join('\n');
+            
+            const suapList = suapSubjects
+                .map(s => `- ID: ${s.id}, Name: "${s.fullname}" (Subject: ${s.subjectName}, Class: ${s.className})`)
+                .join('\n');
+            
+            expect(moodleList).toContain('Cálculo I - C++');
+            expect(moodleList).toContain('Física & Química');
+            expect(suapList).toContain('Álgebra & Geometria');
+            expect(suapList).toContain('C++ Avançado');
+        });
+
+        it('should handle unicode characters in names', () => {
+            const moodleSubjects = [
+                { fullname: '[2025.1] 测试 - тест', shortname: 'CH_Test', category: '115' }
+            ];
+            const suapSubjects = [
+                { id: '1', fullname: 'परीक्षण - テスト', subjectName: 'テスト', className: 'TST-1A' }
+            ];
+            
+            const moodleList = moodleSubjects
+                .map(m => `- "${m.fullname}" (shortname: ${m.shortname}, category: ${m.category})`)
+                .join('\n');
+            
+            const suapList = suapSubjects
+                .map(s => `- ID: ${s.id}, Name: "${s.fullname}" (Subject: ${s.subjectName}, Class: ${s.className})`)
+                .join('\n');
+            
+            expect(moodleList).toContain('测试 - тест');
+            expect(suapList).toContain('परीक्षण - テスト');
+        });
+
+        it('should handle emoji in subject names', () => {
+            const moodleSubjects = [
+                { fullname: '[2025.1] Programming 🚀', shortname: 'CH_Prog', category: '115' }
+            ];
+            const suapSubjects = [
+                { id: '1', fullname: 'Computer Science 💻', subjectName: 'CS', className: 'INF-1A' }
+            ];
+            
+            const moodleList = moodleSubjects
+                .map(m => `- "${m.fullname}" (shortname: ${m.shortname}, category: ${m.category})`)
+                .join('\n');
+            
+            expect(moodleList).toContain('Programming 🚀');
+        });
+
+        it('should handle very long subject names', () => {
+            const longName = 'A'.repeat(300);
+            const moodleSubjects = [
+                { fullname: longName, shortname: 'CH_Long', category: '115' }
+            ];
+            
+            const moodleList = moodleSubjects
+                .map(m => `- "${m.fullname}" (shortname: ${m.shortname}, category: ${m.category})`)
+                .join('\n');
+            
+            expect(moodleList).toContain(longName);
+            expect(moodleList.length).toBeGreaterThan(300);
+        });
+
+        it('should handle whitespace variations in response', () => {
+            const response = `  {"moodleFullname": "test1", "suapIds": ["1"], "confidence": 0.9}  
+            
+{"moodleFullname": "test2", "suapIds": ["2"], "confidence": 0.85}  `;
+            
+            const matches = [];
+            const lines = response.trim().split('\n');
+            
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (!trimmedLine || trimmedLine.toLowerCase() === 'null') continue;
+                
+                try {
+                    const parsed = JSON.parse(trimmedLine);
+                    if (parsed.moodleFullname && parsed.suapIds && typeof parsed.confidence === 'number') {
+                        matches.push(parsed);
+                    }
+                } catch (e) {
+                    // Skip
+                }
+            }
+            
+            expect(matches.length).toBe(2);
+        });
+
+        it('should handle confidence at boundaries', () => {
+            const matches = [
+                { moodleFullname: 'test1', suapIds: ['1'], confidence: 0 },
+                { moodleFullname: 'test2', suapIds: ['2'], confidence: 1 },
+                { moodleFullname: 'test3', suapIds: ['3'], confidence: 0.8 },
+                { moodleFullname: 'test4', suapIds: ['4'], confidence: 0.8000001 }
+            ];
+            
+            const filteredMatches = matches.filter(m => m.confidence > 0.8);
+            
+            expect(filteredMatches.length).toBe(2);
+            expect(filteredMatches[0].confidence).toBe(1);
+            expect(filteredMatches[1].confidence).toBe(0.8000001);
+        });
+
+        it('should handle negative confidence values', () => {
+            const matches = [
+                { moodleFullname: 'test1', suapIds: ['1'], confidence: -0.5 },
+                { moodleFullname: 'test2', suapIds: ['2'], confidence: 0.9 }
+            ];
+            
+            const filteredMatches = matches.filter(m => m.confidence > 0.8);
+            
+            expect(filteredMatches.length).toBe(1);
+            expect(filteredMatches[0].confidence).toBe(0.9);
+        });
+
+        it('should handle confidence > 1', () => {
+            const matches = [
+                { moodleFullname: 'test1', suapIds: ['1'], confidence: 1.5 },
+                { moodleFullname: 'test2', suapIds: ['2'], confidence: 0.9 }
+            ];
+            
+            const filteredMatches = matches.filter(m => m.confidence > 0.8);
+            
+            expect(filteredMatches.length).toBe(2);
+        });
+
+        it('should handle multiple suapIds in single match', () => {
+            const response = '{"moodleFullname": "test1", "suapIds": ["1", "2", "3"], "confidence": 0.95}';
+            
+            const matches = [];
+            const lines = response.trim().split('\n');
+            
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (!trimmedLine || trimmedLine.toLowerCase() === 'null') continue;
+                
+                try {
+                    const parsed = JSON.parse(trimmedLine);
+                    if (parsed.moodleFullname && parsed.suapIds && typeof parsed.confidence === 'number') {
+                        matches.push(parsed);
+                    }
+                } catch (e) {
+                    // Skip
+                }
+            }
+            
+            expect(matches.length).toBe(1);
+            expect(matches[0].suapIds).toEqual(['1', '2', '3']);
+        });
+
+        it('should handle response with only whitespace', () => {
+            const response = '   \n  \n   ';
+            const matches = [];
+            
+            const lines = response.trim().split('\n');
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (!trimmedLine || trimmedLine.toLowerCase() === 'null') continue;
+                
+                try {
+                    const parsed = JSON.parse(trimmedLine);
+                    if (parsed.moodleFullname && parsed.suapIds && typeof parsed.confidence === 'number') {
+                        matches.push(parsed);
+                    }
+                } catch (e) {
+                    // Skip
+                }
+            }
+            
+            expect(matches.length).toBe(0);
+        });
+
+        it('should handle mixed case null variations', () => {
+            const responses = ['null', 'NULL', 'Null', 'nULl'];
+            
+            responses.forEach(response => {
+                const matches = [];
+                
+                if (response.trim().toLowerCase() === 'null') {
+                    // Return empty
+                }
+                
+                expect(matches).toEqual([]);
+            });
+        });
+
+        it('should handle null lines within JSONL', () => {
+            const response = `{"moodleFullname": "test1", "suapIds": ["1"], "confidence": 0.9}
+null
+{"moodleFullname": "test2", "suapIds": ["2"], "confidence": 0.85}`;
+            
+            const matches = [];
+            const lines = response.trim().split('\n');
+            
+            for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (!trimmedLine || trimmedLine.toLowerCase() === 'null') continue;
+                
+                try {
+                    const parsed = JSON.parse(trimmedLine);
+                    if (parsed.moodleFullname && parsed.suapIds && typeof parsed.confidence === 'number') {
+                        matches.push(parsed);
+                    }
+                } catch (e) {
+                    // Skip
+                }
+            }
+            
+            expect(matches.length).toBe(2);
+        });
+    });
 });

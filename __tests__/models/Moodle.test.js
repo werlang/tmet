@@ -226,4 +226,197 @@ describe('Moodle Model Logic', () => {
             expect(errorResult.error).toBe('Duplicate entry');
         });
     });
+
+    describe('Edge cases', () => {
+        it('should handle special characters in subject names', () => {
+            const subjectName = 'C++ & Algoritmos';
+            const fullName = `"[2025.1] INF-2AT - ${subjectName}"`;
+            
+            expect(fullName).toContain('C++ & Algoritmos');
+        });
+
+        it('should handle unicode in subject names', () => {
+            const subjectName = 'Cálculo & Álgebra';
+            const fullName = `"[2025.1] MTM-1AN - ${subjectName}"`;
+            
+            expect(fullName).toContain('Cálculo & Álgebra');
+        });
+
+        it('should handle emoji in subject names', () => {
+            const subjectName = 'Programming 🚀';
+            const fullName = `"[2025.1] INF-1AT - ${subjectName}"`;
+            
+            expect(fullName).toContain('Programming 🚀');
+        });
+
+        it('should handle very long class names', () => {
+            const className = 'A'.repeat(100);
+            const shortName = `CH_${className.replace(/[-,]/g, '_')}_BD_2025.1`;
+            
+            expect(shortName).toContain('A'.repeat(100));
+        });
+
+        it('should handle multiple hyphens in subject name', () => {
+            const fullSubjectName = 'TEC - Sub - Topic - Detail';
+            const subjectName = fullSubjectName.split('-').slice(1).join('-').trim();
+            
+            expect(subjectName).toBe('Sub - Topic - Detail');
+        });
+
+        it('should handle multiple spaces in shortname split', () => {
+            const fullShort = 'TEC   -   BD';
+            const shortName = fullShort.split(/\s*-\s*/)?.slice(1).join('');
+            
+            expect(shortName).toBe('BD');
+        });
+
+        it('should handle comma in multi-class replacement', () => {
+            const className = 'INF-1AT,ECA-2AN,TSI-3BM';
+            const shortClassName = className.replace(/[-,]/g, '_');
+            
+            expect(shortClassName).toBe('INF_1AT_ECA_2AN_TSI_3BM');
+        });
+
+        it('should handle empty groupnames array', () => {
+            const groupnames = [];
+            const group = groupnames.includes('Grupo 1') ? '_G1' : 
+                          groupnames.includes('Grupo 2') ? '_G2' : '';
+            
+            expect(group).toBe('');
+        });
+
+        it('should handle both Grupo 1 and Grupo 2 in array (Grupo 1 takes precedence)', () => {
+            const groupnames = ['Grupo 1', 'Grupo 2'];
+            const group = groupnames.includes('Grupo 1') ? '_G1' : 
+                          groupnames.includes('Grupo 2') ? '_G2' : '';
+            
+            expect(group).toBe('_G1');
+        });
+
+        it('should handle year with 4 digits', () => {
+            const year = 2025;
+            const semester = 2;
+            const fullName = `"[${year}.${semester}] INF-1AT - Test"`;
+            
+            expect(fullName).toBe('"[2025.2] INF-1AT - Test"');
+        });
+
+        it('should handle semester boundary values', () => {
+            const testCases = [
+                { semester: 1, expected: '"[2025.1] INF-1AT - Test"' },
+                { semester: 2, expected: '"[2025.2] INF-1AT - Test"' }
+            ];
+            
+            testCases.forEach(({ semester, expected }) => {
+                const fullName = `"[2025.${semester}] INF-1AT - Test"`;
+                expect(fullName).toBe(expected);
+            });
+        });
+
+        it('should handle category value of 0', () => {
+            const moodleConfig = { categories: { 'ROOT': 0 } };
+            const className = 'ROOT-1A';
+            const prefix = className.split('-')[0];
+            const category = moodleConfig.categories[prefix];
+            
+            expect(category).toBe(0);
+        });
+
+        it('should handle missing category gracefully', () => {
+            const moodleConfig = { categories: { 'INF': 115 } };
+            const className = 'UNKNOWN-1A';
+            const prefix = className.split('-')[0];
+            const category = moodleConfig.categories[prefix];
+            
+            // Should not be added to subjects if category is undefined
+            expect(category).toBeUndefined();
+            
+            const shouldAdd = category !== undefined;
+            expect(shouldAdd).toBe(false);
+        });
+
+        it('should handle single classid in array', () => {
+            const classes = [{ id: '1', name: 'INF-1AT' }];
+            const subject = { classids: ['1'] };
+            
+            const className = subject.classids.length > 1 
+                ? classes.filter(cl => subject.classids.includes(cl.id)).map(cl => cl.name).join(',')
+                : classes[0].name;
+            
+            expect(className).toBe('INF-1AT');
+        });
+
+        it('should handle three or more classes in multi-class subject', () => {
+            const classes = [
+                { id: '1', name: 'INF-1AT' },
+                { id: '2', name: 'ECA-2AN' },
+                { id: '3', name: 'TSI-3BM' }
+            ];
+            const subject = { classids: ['1', '2', '3'] };
+            
+            const className = subject.classids.length > 1 
+                ? classes.filter(cl => subject.classids.includes(cl.id)).map(cl => cl.name).join(',')
+                : 'INF-1AT';
+            
+            expect(className).toBe('INF-1AT,ECA-2AN,TSI-3BM');
+        });
+
+        it('should handle whitespace in CSV values', () => {
+            const csv = 'fullname,  shortname  , category\n"[2025.1] Test",  CH_Test  , 115';
+            const lines = csv.split('\n');
+            const dataLine = lines[1].split(',').map(item => item.trim());
+            
+            expect(dataLine[0]).toBe('"[2025.1] Test"');
+            expect(dataLine[1]).toBe('CH_Test');
+            expect(dataLine[2]).toBe('115');
+        });
+
+        it('should handle empty CSV content', () => {
+            const csv = '';
+            const lines = csv.split('\n');
+            
+            expect(lines.length).toBe(1);
+            expect(lines[0]).toBe('');
+        });
+
+        it('should handle CSV with only header', () => {
+            const csv = 'fullname, shortname, category';
+            const lines = csv.split('\n');
+            const dataRows = lines.slice(1);
+            
+            expect(dataRows.length).toBe(0);
+        });
+
+        it('should handle duplicate detection with exact match', () => {
+            const fullname1 = '"[2025.1] INF-1AT - Test"';
+            const fullname2 = '"[2025.1] INF-1AT - Test"';
+            const fullname3 = '"[2025.1] INF-2AT - Test"';
+            
+            const subjects = [fullname1, fullname2, fullname3];
+            const unique = [...new Set(subjects)];
+            
+            expect(unique.length).toBe(2);
+        });
+
+        it('should handle subject with no hyphen in shortname', () => {
+            const fullShort = 'TESTBD';
+            const shortName = fullShort.split(/\s*-\s*/)?.slice(1).join('');
+            
+            // When there's no hyphen, slice(1) returns empty
+            expect(shortName).toBe('');
+        });
+
+        it('should handle group replacement edge cases', () => {
+            const testCases = [
+                { group: '', expected: '' },
+                { group: '_G1', expected: '-G1' },
+                { group: '_G2', expected: '-G2' }
+            ];
+            
+            testCases.forEach(({ group, expected }) => {
+                const replaced = group.replace('_', '-');
+                expect(replaced).toBe(expected);
+            });
+        });
+    });
 });
