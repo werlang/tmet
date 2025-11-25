@@ -34,4 +34,19 @@ export default {
     yearList: {
         2025: 72,
     },
+    subjectDetail: {
+        url: 'edu/diario',
+        tab: 'notas_faltas',
+        ready: '#table_notas',
+        students: {
+            rows: '#table_notas tbody tr',
+        }
+    },
+    studentProfile: {
+        url: 'edu/aluno',
+        ready: '.definition-list',
+        email: {
+            label: 'E-mail Acadêmico',
+        }
+    },
 }
