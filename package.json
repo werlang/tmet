@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "production": "node server.js",
-    "development": "nodemon server.js"
+    "development": "nodemon server.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
   },
   "nodemonConfig": {
     "ignore": []
@@ -16,5 +19,9 @@
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
     "puppeteer-core": "^24.30.0"
+  },
+  "devDependencies": {
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4"
   }
 }
