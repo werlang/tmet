@@ -10,6 +10,7 @@
 @import "./components/header.css";
 @import "./components/toast.css";
 @import "./components/modal.css";
+@import "./components/progress-modal.css";
 @import "./components/pipeline.css";
 @import "./components/subject-list.css";
 

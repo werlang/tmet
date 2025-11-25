@@ -1,0 +1,167 @@
+/**
+ * Progress Modal Component Styles
+ * Styles for progress feedback modal during long-running tasks
+ */
+
+/* Modal overlay */
+.progress-modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(2px);
+}
+
+.progress-modal.show {
+    display: block;
+}
+
+/* Modal content container - centered */
+.progress-modal-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    padding: 48px 40px;
+    text-align: center;
+    min-width: 420px;
+    max-width: 520px;
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+/* Spinner container */
+.progress-spinner {
+    margin-bottom: 28px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 80px;
+}
+
+/* TMET Spinner - unique class to avoid conflicts */
+.progress-modal .tmet-spinner {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    position: relative;
+    display: inline-block;
+}
+
+.progress-modal .tmet-spinner-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    border: 6px solid transparent;
+    border-top-color: #339af0;
+    border-right-color: #339af0;
+    border-bottom-color: #74c0fc;
+    animation: tmetSpinRotate 0.9s linear infinite;
+    box-sizing: border-box;
+}
+
+/* Title */
+.progress-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 16px;
+    letter-spacing: -0.02em;
+}
+
+/* Status message */
+.progress-status {
+    font-size: 1rem;
+    color: #495057;
+    margin-bottom: 14px;
+    min-height: 24px;
+    line-height: 1.5;
+}
+
+/* Elapsed time */
+.progress-elapsed {
+    font-size: 0.875rem;
+    color: #868e96;
+    margin-bottom: 16px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Warning box */
+.progress-warning {
+    display: none;
+    background: linear-gradient(135deg, #fff9e6 0%, #fff3cd 100%);
+    border: 1px solid #ffc107;
+    border-left: 4px solid #ff9800;
+    color: #856404;
+    padding: 14px 18px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    margin-top: 24px;
+    text-align: left;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.15);
+}
+
+.progress-warning::before {
+    content: '⚠️ ';
+    margin-right: 8px;
+    font-size: 1.1em;
+}
+
+/* Keyframe animations */
+@keyframes tmetSpinRotate {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* Responsive design */
+@media (max-width: 600px) {
+    .progress-modal-content {
+        min-width: unset;
+        width: 90%;
+        padding: 30px 20px;
+    }
+
+    .progress-spinner {
+        height: 60px;
+    }
+
+    .progress-modal .tmet-spinner {
+        width: 50px;
+        height: 50px;
+    }
+
+    .progress-modal .tmet-spinner-inner {
+        border-width: 5px;
+    }
+
+    .progress-title {
+        font-size: 1.25rem;
+    }
+
+    .progress-status {
+        font-size: 0.9rem;
+    }
+}
