@@ -41,6 +41,42 @@ router.post('/extract', async (req, res) => {
     }
 });
 
+/**
+ * GET /suap/subjects/:id/students
+ * Get students enrolled in a specific SUAP subject
+ */
+router.get('/subjects/:id/students', async (req, res) => {
+    try {
+        const subjectId = req.params.id;
+
+        if (!subjectId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Subject ID is required'
+            });
+        }
+
+        console.log(`Fetching students for subject ${subjectId}...`);
+
+        const suap = new SUAP();
+        const students = await suap.scrapeStudents(subjectId);
+
+        res.json({
+            success: true,
+            subjectId,
+            count: students.length,
+            students
+        });
+
+    } catch (error) {
+        console.error('Error fetching students:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
 // Async function to process SUAP extraction
 async function processExtractSUAP(jobId, params, updateProgress) {
     updateProgress({
