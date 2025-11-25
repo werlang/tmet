@@ -1,0 +1,74 @@
+/**
+ * Subject List Component Styles
+ * Styles for displaying and interacting with Moodle/SUAP subject lists
+ */
+
+.subject-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 12px;
+
+    .subject-item {
+        padding: 14px;
+        border: 2px solid transparent;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        background-color: var(--color-bg-body);
+
+        &:hover {
+            border-color: var(--color-primary);
+            background-color: var(--color-primary-light);
+        }
+
+        &.selected {
+            border-color: var(--color-primary);
+            background-color: var(--color-primary-light);
+            box-shadow: 0 2px 4px rgba(51, 154, 240, 0.2);
+            position: relative;
+            
+            &::after {
+                content: '✓';
+                position: absolute;
+                top: 8px;
+                right: 8px;
+                background-color: var(--color-primary);
+                color: white;
+                width: 24px;
+                height: 24px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 14px;
+            }
+        }
+
+        &.hidden {
+            display: none;
+        }
+
+        .subject-title {
+            font-weight: 600;
+            color: var(--color-text-primary);
+            margin-bottom: 6px;
+            font-size: 0.95rem;
+        }
+
+        .subject-details {
+            font-size: 0.85rem;
+            color: var(--color-text-muted);
+        }
+    }
+
+    &:empty::after {
+        content: 'No subjects available';
+        display: block;
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--color-text-muted);
+        font-style: italic;
+    }
+}

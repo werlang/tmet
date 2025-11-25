@@ -1,0 +1,126 @@
+/**
+ * Matched Section Styles
+ * Styles for displaying matched Moodle-SUAP subject pairs
+ */
+
+.matched-section {
+    background-color: var(--color-bg-surface);
+    padding: 24px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+
+    h2, h3 {
+        font-size: 1.25rem;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid var(--color-border);
+        color: var(--color-text-primary);
+    }
+
+    .collapsible-header {
+        cursor: pointer;
+        user-select: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: color 0.2s;
+
+        &:hover {
+            color: var(--color-primary);
+        }
+
+        .collapse-icon {
+            transition: transform 0.3s ease;
+            font-size: 0.9em;
+        }
+
+        &.collapsed .collapse-icon {
+            transform: rotate(-90deg);
+        }
+    }
+
+    .matched-list {
+        display: grid;
+        gap: 12px;
+        overflow-y: auto;
+        transition: max-height 0.3s ease, opacity 0.3s ease;
+        max-height: 1000px;
+        opacity: 1;
+
+        &.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin-top: 0;
+        }
+
+        .matched-item {
+            padding: 16px;
+            border-left: 4px solid var(--color-success);
+            background-color: var(--color-success-light);
+            border-radius: 6px;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 16px;
+            align-items: center;
+
+            .matched-source,
+            .matched-target {
+                .label {
+                    font-size: 0.8rem;
+                    color: var(--color-text-muted);
+                    text-transform: uppercase;
+                    font-weight: 600;
+                    margin-bottom: 4px;
+                }
+
+                .name {
+                    font-weight: 600;
+                    color: var(--color-text-primary);
+                }
+                
+                .suap-matches {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 6px;
+                }
+                
+                .suap-match-item {
+                    font-weight: 600;
+                    color: var(--color-text-primary);
+                    padding: 4px 0;
+                    
+                    &:not(:last-child) {
+                        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+                    }
+                }
+            }
+
+            .matched-arrow {
+                font-size: 1.5rem;
+                color: var(--color-success);
+                text-align: center;
+            }
+        }
+
+        &:empty::after {
+            content: 'No matched subjects yet';
+            display: block;
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--color-text-muted);
+            font-style: italic;
+        }
+    }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 1200px) {
+    .matched-section .matched-list .matched-item {
+        grid-template-columns: 1fr;
+        gap: 8px;
+
+        .matched-arrow {
+            transform: rotate(90deg);
+        }
+    }
+}
