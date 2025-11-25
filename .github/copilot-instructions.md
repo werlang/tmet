@@ -1,68 +1,85 @@
 # TMET (Timetables-Moodle Export Tool) Copilot Instructions
 
 ## Project Overview
-TMET is a Node.js automation tool designed to bridge academic systems. It fetches timetable data from EduPage/ASc Timetables and scrapes course data from SUAP to generate Moodle-compatible CSV files for bulk course creation. Includes a web UI for manual subject matching and REST API for complete automation.
+TMET is a Node.js automation tool that bridges academic systems. It fetches timetable data from EduPage API, scrapes course data from SUAP web interface, and generates Moodle-compatible CSV files for bulk course creation. Features a web UI for manual/AI-assisted subject matching and REST API for complete automation.
 
 ## Architecture & Core Components
 
 ### Directory Structure
-- **`modules/`**: Core business logic and executable tasks
-  - `generate-csv.js`: Transforms timetable data into Moodle CSV format
-  - `extract-suap.js`: Scrapes subject/class data from SUAP
-  - `matching.js`: Matches Moodle subjects to SUAP subjects (supports manual overrides)
-  - `upload-courses.js`: Handles Moodle course uploads via web service API
-- **`helpers/`**: Reusable utility classes and services
-  - `timetables.js`: Client for the EduPage API (fetches classes, subjects, teachers)
-  - `scraper.js`: Puppeteer wrapper for browser automation (connects to `browserless/chrome`)
+- **`modules/`**: Core business logic - each is an executable task (via CLI or API)
+  - `generate-csv.js`: Transforms EduPage timetable data → Moodle CSV format
+  - `extract-suap.js`: Scrapes subject/class data from SUAP web interface
+  - `matching.js`: Matches Moodle subjects ↔ SUAP subjects (manual overrides via `files/manual_matches.json`)
+  - `upload-courses.js`: Creates courses in Moodle via web service API
+- **`helpers/`**: Reusable utility classes (never executed directly)
+  - `timetables.js`: EduPage API client (classes, subjects, teachers)
+  - `scraper.js`: Puppeteer wrapper connecting to `browserless/chrome` Docker service
   - `moodle-uploader.js`: Moodle web service API client
+  - `chat-assist.js`: OpenAI-compatible API wrapper for AI matching
+  - `queue.js`: In-memory job queue with auto-cleanup for async operations
   - `request.js`: HTTP request helper
-- **`config/`**: Configuration files for external systems
-  - `moodle-config.js`: Maps class names to Moodle category IDs
-  - `suap-config.js`: Selectors and URLs for SUAP scraping
-- **`public/`**: Web UI for manual matching (Express + vanilla JS)
+- **`config/`**: External system configuration (NOT for credentials)
+  - `moodle-config.js`: Maps class name prefixes → Moodle category IDs
+  - `suap-config.js`: CSS selectors and URLs for SUAP scraping
+  - `chat-assist.js`: AI model and API endpoint configuration
+- **`public/`**: Web UI (vanilla JS + modern CSS, NO frameworks)
   - `index.html`: Main UI entry point
-  - `js/app.js`: Main application logic (SubjectMatcher class)
-  - `js/toast.js`, `js/request.js`: Utility classes
-  - `css/style.css`, `css/toast.css`: Stylesheets
+  - `js/app.js`: Main application (SubjectMatcherApp class)
+  - `js/components/`: Reusable UI components (toast.js, subject-list.js, ai-modal.js)
+  - `js/models/`: Business logic classes (matching.js, moodle.js, suap.js)
+  - `js/helpers/`: Utility functions (request.js, date.js, text.js)
+  - `css/`: Stylesheets using nesting and CSS custom properties
 - **`server.js`**: Express server providing both web UI and REST API
-- **`files/`**: Data files (generated at runtime)
+- **`files/`**: Runtime data files (generated, not committed)
   - `moodle_classes.csv`: Generated Moodle courses
   - `suap_subjects.json`: Scraped SUAP data
-  - `manual_matches.json`: User-defined subject matches
+  - `manual_matches.json`: User-defined matches (manual + AI-approved)
 
 ### Data Flow
-1. **Fetch**: `TimeTables` class fetches raw JSON from EduPage API
-2. **Scrape**: `SUAPScraper` extracts course details from SUAP web interface
-3. **Match**: `matching.js` auto-matches subjects, respects manual overrides from `manual_matches.json`
-4. **Manual UI**: Users can resolve unmatched subjects via web interface at port 80
-5. **Export**: Generates `files/moodle_classes.csv` following strict naming conventions
-6. **Upload**: `MoodleUploader` creates courses in Moodle via web service API
+1. **Fetch**: `TimeTables` helper fetches raw JSON from EduPage API
+2. **Generate**: `generate-csv` module transforms timetables → `files/moodle_classes.csv`
+3. **Scrape**: `extract-suap` module uses Puppeteer → `files/suap_subjects.json`
+4. **Match**: `matching` module auto-matches subjects, checks `files/manual_matches.json` first
+5. **Manual/AI**: Web UI allows manual matching OR AI-assisted batch matching via job queue
+6. **Upload**: `upload-courses` module creates courses in Moodle via web service API
+
+### Key Architectural Patterns
+- **Dual-mode execution**: All modules can run as CLI scripts OR via REST API endpoints
+- **Manual override priority**: `matching.js` ALWAYS checks `manual_matches.json` before auto-matching
+- **AI matching workflow**: Async job queue with polling (no websockets) - see `helpers/queue.js`
+- **Data binding pattern**: UI components bind data via closures, NOT `dataset.*` attributes
+- **Component structure**: Frontend uses model-component-helper pattern (NO framework dependencies)
 
 ## Developer Workflow
 
 ### Docker Services
-- **`web`**: Express server for UI + REST API (port 80 → 3000)
-- **`node`**: Idle container for running CLI scripts manually
-- **`chrome`**: Browserless Chrome for Puppeteer scraping
+- **`node`**: Main service (Express server + CLI execution environment)
+  - Port 80:3000 (bound to 127.0.0.1 only)
+  - Auto-reload via nodemon in development mode
+  - Volumes: `./:/app` for live code sync, named volume for `node_modules`
+- **`chrome`**: Browserless Chrome for Puppeteer scraping (ws://chrome:3000)
 
 ### Key Commands
 ```bash
-# Start all services
+# Start all services (includes Express server + Chrome)
 docker compose up -d
 
 # Access web UI at http://localhost
 # REST API available at http://localhost/api/*
 
-# Execute modules inside node container (alternative to API)
+# Execute modules via API (preferred) OR directly in container:
 docker compose exec node node modules/generate-csv.js
 docker compose exec node node modules/extract-suap.js
 docker compose exec node node modules/upload-courses.js
 
-# Development with auto-reload
-docker compose exec node npm run development
+# Development with auto-reload (already active by default)
+# Set NODE_ENV=production in compose.yaml to disable nodemon
 
-# Restart web service after changes
-docker compose restart web
+# View logs
+docker compose logs -f node
+
+# Restart after changes (usually not needed - nodemon handles it)
+docker compose restart node
 ```
 
 ### Typical Workflow
@@ -134,12 +151,17 @@ Generated course names follow strict format:
 ### Manual Matching System
 - `modules/matching.js` checks `files/manual_matches.json` first before auto-matching
 - Web UI (`server.js` + `public/`) provides interface to create manual matches
-- REST API endpoint: `POST /api/match` with `{ moodleFullname, suapId }`
-- Structure: `[{ moodleFullname: "...", suapId: "..." }]`
+- REST API endpoint: `POST /api/match` with `{ moodleFullname, suapIds }` (supports arrays)
+- Structure: `[{ moodleFullname: "...", suapId: "..." }]` or `[{ moodleFullname: "...", suapId: ["id1", "id2"] }]`
+- Manual matches persist across workflow re-runs and take precedence over auto-matching
 
 ### REST API Endpoints
 - `GET /api/data` - Get matching status and subject lists
-- `POST /api/match` - Create manual match
+- `POST /api/match` - Create manual match (supports single or multiple SUAP IDs)
+  - Body: `{ moodleFullname: "...", suapIds: ["id1", "id2"] }` or legacy `{ moodleFullname: "...", suapId: "id1" }`
+- `POST /api/ai-match` - Start AI matching job (returns jobId)
+  - Body: `{ moodleSubjects: [...], suapSubjects: [...] }`
+- `GET /api/ai-match-status/:jobId` - Poll AI matching job status
 - `POST /api/generate-csv` - Execute generate-csv module
 - `POST /api/extract-suap` - Execute extract-suap module
 - `POST /api/upload-courses` - Execute upload-courses module
