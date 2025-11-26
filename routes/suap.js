@@ -1,5 +1,6 @@
 import express from 'express';
 import SUAP from '../models/SUAP.js';
+import suapConfig from '../config/suap-config.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -10,10 +11,10 @@ const __dirname = path.dirname(__filename);
 const router = express.Router();
 
 /**
- * GET /suap/students-data
+ * GET /suap/students
  * Get all scraped students data from file
  */
-router.get('/students-data', async (req, res) => {
+router.get('/students', async (req, res) => {
     try {
         const filePath = path.join(__dirname, '..', 'files', 'suap_students.json');
         
@@ -23,7 +24,8 @@ router.get('/students-data', async (req, res) => {
             
             res.json({
                 success: true,
-                data
+                data,
+                studentUrl: `${suapConfig.baseUrl}/${suapConfig.studentProfile.url}/{{enrollment}}`,
             });
         } catch (error) {
             // File doesn't exist or is invalid - return empty data
@@ -195,22 +197,23 @@ async function processExtractStudents(jobId, subjectIds, updateProgress) {
         
         try {
             updateProgress({
-                message: `Subject ${i + 1}/${subjectIds.length}: Starting subject ${subjectId}...`,
-                current: completed,
-                total: subjectIds.length,
-                subjectId,
-                subjectIndex: i + 1
+                message: `Starting subject ${subjectId}...`,
+                subject: {
+                    id: subjectId,
+                    current: completed,
+                    total: subjectIds.length,
+                },
             });
 
             // Pass progress callback to scrapeStudents
             const students = await suap.scrapeStudents(subjectId, (studentProgress) => {
                 updateProgress({
-                    message: `Subject ${i + 1}/${subjectIds.length}: ${studentProgress}`,
-                    current: completed,
-                    total: subjectIds.length,
-                    subjectId,
-                    subjectIndex: i + 1,
-                    studentProgress
+                    message: studentProgress,
+                    subject: {
+                        id: subjectId,
+                        current: completed,
+                        total: subjectIds.length,
+                    },
                 });
             });
             
@@ -220,11 +223,13 @@ async function processExtractStudents(jobId, subjectIds, updateProgress) {
             console.log(`[${jobId}] Completed ${completed}/${subjectIds.length} - Subject ${subjectId}: ${students.length} students`);
 
             updateProgress({
-                message: `Subject ${i + 1}/${subjectIds.length}: Completed - ${students.length} students scraped`,
-                current: completed,
-                total: subjectIds.length,
-                subjectId,
-                subjectIndex: i + 1
+                message: `Subject ${subjectId} Completed`,
+                subject: {
+                    id: subjectId,
+                    current: completed,
+                    total: subjectIds.length,
+                    studentCount: students.length,
+                },
             });
 
         } catch (error) {
@@ -233,12 +238,13 @@ async function processExtractStudents(jobId, subjectIds, updateProgress) {
             completed++;
 
             updateProgress({
-                message: `Subject ${i + 1}/${subjectIds.length}: Error - ${error.message}`,
-                current: completed,
-                total: subjectIds.length,
-                subjectId,
-                subjectIndex: i + 1,
-                error: error.message
+                message: `Error processing subject ${subjectId}: ${error.message}`,
+                subject: {
+                    id: subjectId,
+                    current: completed,
+                    total: subjectIds.length,
+                    error: error.message
+                },
             });
         }
     }

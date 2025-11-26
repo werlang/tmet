@@ -23,6 +23,7 @@ class SubjectMatcherApp {
     #studentsModal;
     #selectedSubjectIds = new Set();
     #studentsData = {};
+    #studentUrl = '';
 
     constructor() {
         this.#cacheElements();
@@ -454,8 +455,9 @@ class SubjectMatcherApp {
      */
     async #loadStudentsData() {
         try {
-            const response = await Request.get('/api/suap/students-data');
+            const response = await Request.get('/api/suap/students');
             this.#studentsData = response.data || {};
+            this.#studentUrl = response.studentUrl;
         } catch (error) {
             console.error('Error loading students data:', error);
             this.#studentsData = {};
@@ -636,7 +638,7 @@ class SubjectMatcherApp {
      */
     #viewStudents(subject) {
         const students = this.#studentsData[subject.id] || [];
-        this.#studentsModal.show(subject, students);
+        this.#studentsModal.show(subject, students, this.#studentUrl);
     }
 
     /**
@@ -669,8 +671,8 @@ class SubjectMatcherApp {
             
             // Poll for job completion
             const result = await this.#pollJobStatus(response.jobId, (status) => {
-                const current = status.progress?.current || 0;
-                const total = status.progress?.total || subjectIds.length;
+                const current = status.subject.current || 0;
+                const total = subjectIds.length;
                 const message = status.message || 'Processing...';
                 
                 // Format progress message with completion count
@@ -715,12 +717,13 @@ class SubjectMatcherApp {
             try {
                 const status = await Request.get(`/api/jobs/${jobId}`);
                 
-                if (onProgress && status.progress) {
+                // Fire progress callback if there's any progress info (message, current, total)
+                if (onProgress && (status.message || status.current !== undefined)) {
                     onProgress(status);
                 }
                 
                 if (status.status === 'completed') {
-                    return status.result;
+                    return status.results;
                 }
                 
                 if (status.status === 'failed') {

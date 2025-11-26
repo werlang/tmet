@@ -150,7 +150,7 @@ export default class SUAP {
             const student = basicStudents[i];
             
             if (progressCallback) {
-                progressCallback(`Fetching email for student ${i + 1}/${basicStudents.length}: ${student.name}`);
+                progressCallback(`Fetching email for student ${i + 1}/${basicStudents.length}:\n${student.name}`);
             }
             
             const email = await this.#fetchStudentEmail(student.enrollment);

@@ -96,7 +96,7 @@ export class StudentsModal {
      * @param {Object} subject - SUAP subject object
      * @param {Array} students - Array of student objects
      */
-    show(subject, students) {
+    show(subject, students, url) {
         this.#currentSubject = subject;
         
         // Update title
@@ -107,7 +107,7 @@ export class StudentsModal {
         this.#countElement.textContent = `${count} student${count !== 1 ? 's' : ''}`;
         
         // Render students
-        this.#renderStudents(students);
+        this.#renderStudents(students, url);
         
         // Show modal
         this.#modalElement.classList.add('show');
@@ -127,7 +127,7 @@ export class StudentsModal {
      * Render student list
      * @param {Array} students - Array of student objects
      */
-    #renderStudents(students) {
+    #renderStudents(students, url) {
         this.#listElement.innerHTML = '';
         
         if (!students || students.length === 0) {
@@ -139,7 +139,7 @@ export class StudentsModal {
         }
         
         students.forEach(student => {
-            const studentCard = this.#createStudentCard(student);
+            const studentCard = this.#createStudentCard(student, url);
             this.#listElement.appendChild(studentCard);
         });
     }
@@ -149,7 +149,7 @@ export class StudentsModal {
      * @param {Object} student - Student object
      * @returns {HTMLElement}
      */
-    #createStudentCard(student) {
+    #createStudentCard(student, url) {
         const card = document.createElement('div');
         card.className = 'student-card';
         
@@ -163,7 +163,7 @@ export class StudentsModal {
         
         const enrollment = document.createElement('div');
         enrollment.className = 'student-enrollment';
-        enrollment.textContent = student.enrollment;
+        enrollment.innerHTML = `<a href="${url.replace('{{enrollment}}', student.enrollment)}" target="_blank" rel="noopener noreferrer">${student.enrollment}</a>`;
         
         card.appendChild(name);
         card.appendChild(email);
