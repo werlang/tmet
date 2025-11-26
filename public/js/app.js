@@ -502,20 +502,42 @@ class SubjectMatcherApp {
         const header = document.createElement('div');
         header.className = 'student-subject-header';
         
+        // Custom checkbox structure
+        const checkboxWrapper = document.createElement('div');
+        checkboxWrapper.className = 'checkbox-wrapper';
+        
         const checkbox = document.createElement('input');
         checkbox.type = 'checkbox';
         checkbox.className = 'student-subject-checkbox';
         checkbox.checked = isSelected;
+        
+        // Handle checkbox change directly
         checkbox.addEventListener('change', (e) => {
             e.stopPropagation();
             this.#toggleSubjectSelection(subject.id, e.target.checked);
         });
         
+        // Handle wrapper click to toggle checkbox
+        checkboxWrapper.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (e.target !== checkbox) {
+                checkbox.checked = !checkbox.checked;
+                this.#toggleSubjectSelection(subject.id, checkbox.checked);
+            }
+        });
+
+        const checkmark = document.createElement('div');
+        checkmark.className = 'custom-checkmark';
+        checkmark.innerHTML = '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+        
+        checkboxWrapper.appendChild(checkbox);
+        checkboxWrapper.appendChild(checkmark);
+        
         const name = document.createElement('div');
         name.className = 'student-subject-name';
         name.textContent = subject.fullname || subject.name;
         
-        header.appendChild(checkbox);
+        header.appendChild(checkboxWrapper);
         header.appendChild(name);
         
         const footer = document.createElement('div');
