@@ -456,11 +456,12 @@ class SubjectMatcherApp {
     async #loadStudentsData() {
         try {
             const response = await Request.get('/api/suap/students');
-            this.#studentsData = response.data || {};
+            // format: {subjects: {id: [enrollments]}, students: {enrollment: info}}
+            this.#studentsData = response.data || { subjects: {}, students: {} };
             this.#studentUrl = response.studentUrl;
         } catch (error) {
             console.error('Error loading students data:', error);
-            this.#studentsData = {};
+            this.#studentsData = { subjects: {}, students: {} };
         }
     }
 
@@ -492,8 +493,9 @@ class SubjectMatcherApp {
      * @param {Object} subject - SUAP subject
      */
     #createStudentSubjectCard(subject) {
-        const hasStudents = !!this.#studentsData[subject.id];
-        const studentCount = hasStudents ? this.#studentsData[subject.id].length : 0;
+        const enrollments = this.#studentsData.subjects?.[subject.id];
+        const hasStudents = !!enrollments && enrollments.length > 0;
+        const studentCount = hasStudents ? enrollments.length : 0;
         const isSelected = this.#selectedSubjectIds.has(subject.id);
         
         const card = document.createElement('div');
@@ -615,7 +617,8 @@ class SubjectMatcherApp {
     #selectNotScraped() {
         const matchedSubjects = this.#suap.getMatchedSubjects();
         matchedSubjects.forEach(subject => {
-            if (!this.#studentsData[subject.id]) {
+            const enrollments = this.#studentsData.subjects?.[subject.id];
+            if (!enrollments || enrollments.length === 0) {
                 this.#selectedSubjectIds.add(subject.id);
             }
         });
@@ -637,7 +640,11 @@ class SubjectMatcherApp {
      * @param {Object} subject - SUAP subject
      */
     #viewStudents(subject) {
-        const students = this.#studentsData[subject.id] || [];
+        const enrollments = this.#studentsData.subjects?.[subject.id] || [];
+        const students = enrollments.map(enrollment => ({
+            enrollment,
+            ...this.#studentsData.students?.[enrollment]
+        }));
         this.#studentsModal.show(subject, students, this.#studentUrl);
     }
 

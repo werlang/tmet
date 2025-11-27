@@ -176,20 +176,35 @@ export default class SUAP {
      * @param {Array} students - Array of student objects
      */
     async #saveStudents(subjectId, students) {
-        let data = {};
+        let data = {
+            subjects: {},
+            students: {}
+        };
         
         // Load existing data if file exists
         if (fs.existsSync(this.#studentsPath)) {
             try {
                 const content = fs.readFileSync(this.#studentsPath, 'utf-8');
-                data = JSON.parse(content);
+                const existingData = JSON.parse(content);
+                // Ensure structure exists (handle legacy format)
+                data.subjects = existingData.subjects || {};
+                data.students = existingData.students || {};
             } catch (error) {
                 console.error('Error reading existing students file:', error.message);
             }
         }
         
-        // Add/update students for this subject
-        data[subjectId] = students;
+        // Store enrollments list for this subject
+        const enrollments = students.map(s => s.enrollment);
+        data.subjects[subjectId] = enrollments;
+        
+        // Add/update student info (deduplicated by enrollment)
+        students.forEach(student => {
+            data.students[student.enrollment] = {
+                name: student.name,
+                email: student.email
+            };
+        });
         
         // Write back to file
         fs.writeFileSync(this.#studentsPath, JSON.stringify(data, null, 2));

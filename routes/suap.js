@@ -22,9 +22,15 @@ router.get('/students', async (req, res) => {
             const fileContent = await fs.readFile(filePath, 'utf8');
             const data = JSON.parse(fileContent);
             
+            // Ensure the structure is correct (handle legacy format)
+            const normalizedData = {
+                subjects: data.subjects || {},
+                students: data.students || {}
+            };
+            
             res.json({
                 success: true,
-                data,
+                data: normalizedData,
                 studentUrl: `${suapConfig.baseUrl}/${suapConfig.studentProfile.url}/{{enrollment}}`,
             });
         } catch (error) {
@@ -32,7 +38,10 @@ router.get('/students', async (req, res) => {
             if (error.code === 'ENOENT') {
                 res.json({
                     success: true,
-                    data: {}
+                    data: {
+                        subjects: {},
+                        students: {}
+                    }
                 });
             } else {
                 throw error;
