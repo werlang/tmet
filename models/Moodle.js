@@ -25,7 +25,7 @@ export default class Moodle {
      * @param {Function} progressCallback - Optional progress callback
      * @returns {Promise<string>} CSV content
      */
-    async generateCSV({ year, semester, dateFrom, dateTo }, progressCallback = null) {
+    async generateCourseCSV({ year, semester, dateFrom, dateTo }, progressCallback = null) {
         const moodleSubjects = [];
 
         if (progressCallback) progressCallback('Fetching classes from EduPage API');
@@ -121,5 +121,119 @@ export default class Moodle {
         }
 
         return results;
+    }
+
+    /**
+     * Generate students CSV for Moodle bulk enrollment
+     * Uses matched subjects and their students from suap_students.json
+     * @param {Function} progressCallback - Optional progress callback
+     * @returns {Promise<Object>} Result with file path and stats
+     */
+    async generateStudentCSV(progressCallback = null) {
+        const studentsPath = path.resolve('files', 'suap_students.json');
+        const csvPath = path.resolve('files', 'moodle_students.csv');
+
+        if (progressCallback) progressCallback('Loading students data');
+
+        if (!fs.existsSync(studentsPath)) {
+            throw new Error('Students data not found. Extract students first.');
+        }
+
+        if (!fs.existsSync(this.#csvPath)) {
+            throw new Error('Moodle courses CSV not found. Generate courses CSV first.');
+        }
+
+        const studentsData = JSON.parse(fs.readFileSync(studentsPath, 'utf-8'));
+        const { subjects: subjectStudents, students: studentInfo } = studentsData;
+
+        // Load all matches from unified matches.json
+        const matchesPath = path.resolve('files', 'matches.json');
+        const moodleCsvContent = fs.readFileSync(this.#csvPath, 'utf-8');
+        const matches = fs.existsSync(matchesPath) 
+            ? JSON.parse(fs.readFileSync(matchesPath, 'utf-8')) 
+            : [];
+
+        // Parse Moodle CSV to get shortnames
+        const moodleSubjects = moodleCsvContent
+            .split('\n')
+            .slice(1) // Skip header
+            .map(line => {
+                const match = line?.match(/"(.+)", (.+), (\d+)/);
+                if (!match) return null;
+                return {
+                    fullname: match[1],
+                    shortname: match[2],
+                    category: match[3]
+                };
+            })
+            .filter(s => s !== null);
+
+        if (progressCallback) progressCallback('Processing matched subjects');
+
+        const csvRows = [];
+        const header = ['username', 'password', 'firstname', 'lastname', 'email', 'course1', 'role1'];
+        csvRows.push(header);
+
+        let totalStudents = 0;
+        let processedSubjects = 0;
+
+        // Process each match (auto and manual) to find students
+        for (const match of matches) {
+            const moodleSubject = moodleSubjects.find(s => s.fullname === match.moodleFullname);
+            if (!moodleSubject) continue;
+
+            // Handle both single and array suapId
+            const suapIds = Array.isArray(match.suapId) ? match.suapId : [match.suapId];
+
+            // Collect unique enrollments from all SUAP subjects
+            const enrollmentSet = new Set();
+            for (const suapId of suapIds) {
+                const enrollments = subjectStudents[suapId] || [];
+                enrollments.forEach(e => enrollmentSet.add(e));
+            }
+
+            // Add students to CSV
+            for (const enrollment of enrollmentSet) {
+                const student = studentInfo[enrollment];
+                if (!student) continue;
+
+                const studentName = student.name || '';
+                const studentEmail = student.email || '';
+                const nameParts = studentName.trim().split(/\s+/);
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.slice(1).join(' ') || '';
+                const username = studentEmail.split('@')[0] || enrollment;
+
+                csvRows.push([
+                    username,
+                    enrollment,
+                    firstName,
+                    lastName,
+                    studentEmail,
+                    moodleSubject.shortname,
+                    'student'
+                ]);
+                totalStudents++;
+            }
+
+            processedSubjects++;
+            if (progressCallback) {
+                progressCallback(`Processed ${processedSubjects}/${matches.length} subjects`);
+            }
+        }
+
+        if (progressCallback) progressCallback('Writing CSV file');
+
+        const csvString = csvRows.map(row => row.join(',')).join('\n');
+        fs.writeFileSync(csvPath, csvString);
+
+        console.log(`Student CSV generated at: ${csvPath}`);
+        console.log(`Total students: ${totalStudents}, Subjects processed: ${processedSubjects}`);
+
+        return {
+            file: csvPath,
+            totalStudents,
+            processedSubjects
+        };
     }
 }

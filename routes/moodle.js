@@ -74,6 +74,38 @@ router.post('/courses', async (req, res) => {
     }
 });
 
+/**
+ * POST /moodle/students-csv
+ * Generate students CSV for Moodle bulk enrollment
+ */
+router.post('/students-csv', async (req, res) => {
+    try {
+        console.log('Starting students CSV generation job...');
+
+        const jobQueue = req.app.locals.jobQueue;
+
+        // Start async job
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
+            return await processGenerateStudentsCSV(jobId, updateProgress);
+        });
+
+        // Return job ID immediately
+        res.status(202).json({ 
+            success: true,
+            jobId,
+            message: 'Students CSV generation job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+
+    } catch (error) {
+        console.error('Students CSV generation error:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
 // Async function to process CSV generation
 async function processGenerateCSV(jobId, params, updateProgress) {
     updateProgress({
@@ -113,6 +145,28 @@ async function processUploadCourses(jobId, updateProgress) {
     return {
         message: 'Courses uploaded successfully',
         results
+    };
+}
+
+// Async function to process students CSV generation
+async function processGenerateStudentsCSV(jobId, updateProgress) {
+    updateProgress({
+        message: 'Starting students CSV generation...'
+    });
+
+    console.log(`[${jobId}] Starting students CSV generation`);
+    
+    const moodle = new Moodle();
+    const result = await moodle.generateStudentCSV((message) => {
+        updateProgress({ message });
+    });
+
+    console.log(`[${jobId}] Students CSV generation completed`);
+
+    return {
+        message: `Students CSV generated successfully. ${result.totalStudents} students from ${result.processedSubjects} subjects.`,
+        file: 'files/moodle_students.csv',
+        ...result
     };
 }
 
