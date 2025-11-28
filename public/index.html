@@ -37,7 +37,11 @@
                         <input type="date" id="date-to-input">
                     </div>
                 </div>
-                <button id="generate-csv-btn" class="pipeline-btn primary">Extract & Generate CSV</button>
+                <div class="button-row">
+                    <button id="generate-csv-btn" class="pipeline-btn primary">Extract & Generate CSV</button>
+                    <button id="upload-courses-btn" class="pipeline-btn primary">Upload courses to Moodle</button>
+                </div>
+            </div>
             </div>
         </div>
 
@@ -130,10 +134,13 @@
         </div>
 
         <div class="pipeline-section">
-            <h2>Step 5: Upload Courses to Moodle</h2>
+            <h2>Step 5: Generate & Upload Students</h2>
             <div class="pipeline-content">
-                <p class="section-description">Upload generated courses to Moodle via Web Service API</p>
-                <button id="upload-courses-btn" class="pipeline-btn primary">Upload to Moodle</button>
+                <p class="section-description">Generate a CSV file with student enrollments for bulk upload to Moodle</p>
+                <div class="button-row">
+                    <button id="generate-students-csv-btn" class="pipeline-btn primary">Generate Students CSV</button>
+                    <button id="upload-students-btn" class="pipeline-btn secondary" disabled title="Coming soon">Upload Students to Moodle</button>
+                </div>
             </div>
         </div>
     </div>

@@ -113,8 +113,33 @@
 
         &:disabled {
             background-color: var(--color-border);
-            cursor: wait;
+            cursor: not-allowed;
             opacity: 0.7;
         }
+
+        &.secondary {
+            background-color: var(--color-bg-body);
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border);
+            box-shadow: none;
+
+            &:hover:not(:disabled) {
+                background-color: var(--color-bg-surface);
+                border-color: var(--color-primary);
+                color: var(--color-primary);
+            }
+
+            &:disabled {
+                background-color: var(--color-bg-body);
+                color: var(--color-text-secondary);
+                opacity: 0.5;
+            }
+        }
+    }
+
+    .button-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
     }
 }
