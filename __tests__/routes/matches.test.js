@@ -168,55 +168,70 @@ describe('Match Model Logic', () => {
         });
 
         it('should handle manual match with single suapId', () => {
-            const manualMatches = [{ moodleFullname: "[2025.1] Test", suapId: "123" }];
+            const matches = [{ moodleFullname: "[2025.1] Test", suapId: "123", type: "manual" }];
             const msubject = { fullname: "[2025.1] Test" };
             
-            const manualMatch = manualMatches.find(m => m.moodleFullname === msubject.fullname);
+            const existingMatch = matches.find(m => m.moodleFullname === msubject.fullname);
             
-            expect(manualMatch).toBeDefined();
-            expect(manualMatch.suapId).toBe("123");
+            expect(existingMatch).toBeDefined();
+            expect(existingMatch.suapId).toBe("123");
+            expect(existingMatch.type).toBe("manual");
         });
 
         it('should handle manual match with array suapIds', () => {
-            const manualMatches = [{ moodleFullname: "[2025.1] Test", suapId: ["123", "456"] }];
+            const matches = [{ moodleFullname: "[2025.1] Test", suapId: ["123", "456"], type: "manual" }];
             const msubject = { fullname: "[2025.1] Test" };
             
-            const manualMatch = manualMatches.find(m => m.moodleFullname === msubject.fullname);
+            const existingMatch = matches.find(m => m.moodleFullname === msubject.fullname);
             
-            expect(manualMatch).toBeDefined();
-            expect(Array.isArray(manualMatch.suapId)).toBe(true);
-            expect(manualMatch.suapId).toEqual(["123", "456"]);
+            expect(existingMatch).toBeDefined();
+            expect(Array.isArray(existingMatch.suapId)).toBe(true);
+            expect(existingMatch.suapId).toEqual(["123", "456"]);
+            expect(existingMatch.type).toBe("manual");
+        });
+
+        it('should handle auto match', () => {
+            const matches = [{ moodleFullname: "[2025.1] Test", suapId: "123", type: "auto" }];
+            const msubject = { fullname: "[2025.1] Test" };
+            
+            const existingMatch = matches.find(m => m.moodleFullname === msubject.fullname);
+            
+            expect(existingMatch).toBeDefined();
+            expect(existingMatch.suapId).toBe("123");
+            expect(existingMatch.type).toBe("auto");
         });
     });
 
     describe('create() logic', () => {
-        it('should create match object correctly', () => {
+        it('should create manual match object correctly', () => {
             const moodleFullname = "[2025.1] Test Subject";
             const suapId = "12345";
             
-            const newMatch = { moodleFullname, suapId };
+            const newMatch = { moodleFullname, suapId, type: 'manual' };
             
             expect(newMatch.moodleFullname).toBe(moodleFullname);
             expect(newMatch.suapId).toBe(suapId);
+            expect(newMatch.type).toBe('manual');
         });
 
-        it('should replace existing match in array', () => {
-            let manualMatches = [
-                { moodleFullname: "[2025.1] Other", suapId: "other" },
-                { moodleFullname: "[2025.1] Test", suapId: "old-id" }
+        it('should replace existing match in array (auto or manual)', () => {
+            let matches = [
+                { moodleFullname: "[2025.1] Other", suapId: "other", type: "auto" },
+                { moodleFullname: "[2025.1] Test", suapId: "old-id", type: "auto" }
             ];
             
             const moodleFullname = "[2025.1] Test";
             const suapId = "new-id";
             
-            // Filter out existing match
-            manualMatches = manualMatches.filter(m => m.moodleFullname !== moodleFullname);
-            // Add new match
-            manualMatches.push({ moodleFullname, suapId });
+            // Filter out existing match (regardless of type)
+            matches = matches.filter(m => m.moodleFullname !== moodleFullname);
+            // Add new manual match (overwrites auto match)
+            matches.push({ moodleFullname, suapId, type: 'manual' });
             
-            expect(manualMatches.length).toBe(2);
-            expect(manualMatches.find(m => m.moodleFullname === "[2025.1] Test").suapId).toBe("new-id");
-            expect(manualMatches.find(m => m.moodleFullname === "[2025.1] Other").suapId).toBe("other");
+            expect(matches.length).toBe(2);
+            expect(matches.find(m => m.moodleFullname === "[2025.1] Test").suapId).toBe("new-id");
+            expect(matches.find(m => m.moodleFullname === "[2025.1] Test").type).toBe("manual");
+            expect(matches.find(m => m.moodleFullname === "[2025.1] Other").suapId).toBe("other");
         });
     });
 
@@ -400,22 +415,23 @@ describe('Match Model Logic', () => {
             expect(match).toBeNull();
         });
 
-        it('should handle manual match array with duplicates before filter', () => {
-            let manualMatches = [
-                { moodleFullname: "[2025.1] Test", suapId: "id1" },
-                { moodleFullname: "[2025.1] Test", suapId: "id2" },
-                { moodleFullname: "[2025.1] Test", suapId: "id3" }
+        it('should handle match array with duplicates before filter', () => {
+            let matches = [
+                { moodleFullname: "[2025.1] Test", suapId: "id1", type: "auto" },
+                { moodleFullname: "[2025.1] Test", suapId: "id2", type: "auto" },
+                { moodleFullname: "[2025.1] Test", suapId: "id3", type: "manual" }
             ];
             
             const moodleFullname = "[2025.1] Test";
             const suapId = "new-id";
             
             // Filter removes all matches with that fullname
-            manualMatches = manualMatches.filter(m => m.moodleFullname !== moodleFullname);
-            manualMatches.push({ moodleFullname, suapId });
+            matches = matches.filter(m => m.moodleFullname !== moodleFullname);
+            matches.push({ moodleFullname, suapId, type: 'manual' });
             
-            expect(manualMatches.length).toBe(1);
-            expect(manualMatches[0].suapId).toBe("new-id");
+            expect(matches.length).toBe(1);
+            expect(matches[0].suapId).toBe("new-id");
+            expect(matches[0].type).toBe("manual");
         });
 
         it('should handle suapId with special characters', () => {

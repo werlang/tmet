@@ -68,16 +68,39 @@ export const sampleMoodleCsvContent = `fullname, shortname, category
 "[2025.1] ECA-1AN - Cálculo I", CH_ECA_1AN_Calc1_2025.1, 119`;
 
 /**
- * Sample manual matches for testing
+ * Sample manual matches for testing (unified format with type)
  */
 export const sampleManualMatches = [
     {
         moodleFullname: "[2025.1] INF-1AT-G1 - Matemática I",
-        suapId: "55039"
+        suapId: "55039",
+        type: "manual"
     },
     {
         moodleFullname: "[2025.1] INF-1AT-G2 - Matemática I",
-        suapId: ["60237"]
+        suapId: ["60237"],
+        type: "manual"
+    }
+];
+
+/**
+ * Sample matches for testing (includes both auto and manual)
+ */
+export const sampleMatches = [
+    {
+        moodleFullname: "[2025.1] INF-1AT-G1 - Matemática I",
+        suapId: "55039",
+        type: "manual"
+    },
+    {
+        moodleFullname: "[2025.1] INF-2AT-G2 - Programação Web I",
+        suapId: "60244",
+        type: "auto"
+    },
+    {
+        moodleFullname: "[2025.1] INF-1AT-G2 - Matemática I",
+        suapId: ["60237"],
+        type: "manual"
     }
 ];
 
