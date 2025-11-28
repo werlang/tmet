@@ -4,43 +4,47 @@ import fs from 'fs';
 /**
  * Match Model
  * Handles matching operations between Moodle and SUAP subjects
+ * Uses unified matches.json for both auto and manual matches
  */
 export default class Match {
-    #manualMatchesPath;
+    #matchesPath;
     #moodleClassesPath;
     #suapSubjectsPath;
 
     constructor() {
-        this.#manualMatchesPath = path.resolve('files', 'manual_matches.json');
+        this.#matchesPath = path.resolve('files', 'matches.json');
         this.#moodleClassesPath = path.resolve('files', 'moodle_classes.csv');
         this.#suapSubjectsPath = path.resolve('files', 'suap_subjects.json');
     }
 
     /**
      * Get all matching data (matched and unmatched subjects)
+     * Auto-matches are computed and recorded in the unified matches.json
      * @returns {Object} Matching data
      */
     getAll() {
         const suapSubjects = this.#loadSuapSubjects();
         const moodleSubjects = this.#loadMoodleSubjects();
-        const manualMatches = this.#loadManualMatches();
+        const existingMatches = this.#loadMatches();
 
         const noMatch = [];
+        const newAutoMatches = [];
 
         // Try to match Moodle subjects with SUAP subjects
         for (const msubject of moodleSubjects) {
-            // Check for manual match first
-            const manualMatch = manualMatches.find(m => m.moodleFullname === msubject.fullname);
-            if (manualMatch) {
-                msubject.suapId = manualMatch.suapId; // Can be string or array
+            // Check for existing match first (manual or auto)
+            const existingMatch = existingMatches.find(m => m.moodleFullname === msubject.fullname);
+            if (existingMatch) {
+                msubject.suapId = existingMatch.suapId; // Can be string or array
+                msubject.matchType = existingMatch.type;
 
                 // Handle both single and multiple matches
-                if (Array.isArray(manualMatch.suapId)) {
-                    msubject.suapMatch = manualMatch.suapId
+                if (Array.isArray(existingMatch.suapId)) {
+                    msubject.suapMatch = existingMatch.suapId
                         .map(id => suapSubjects.find(s => s.id === id))
                         .filter(s => s);
                 } else {
-                    const suapSubject = suapSubjects.find(s => s.id === manualMatch.suapId);
+                    const suapSubject = suapSubjects.find(s => s.id === existingMatch.suapId);
                     if (suapSubject) {
                         msubject.suapMatch = suapSubject;
                     }
@@ -76,9 +80,22 @@ export default class Match {
             if (match) {
                 msubject.suapId = match.id;
                 msubject.suapMatch = match;
+                msubject.matchType = 'auto';
+                
+                // Record auto-match for persistence
+                newAutoMatches.push({
+                    moodleFullname: msubject.fullname,
+                    suapId: match.id,
+                    type: 'auto'
+                });
             } else {
                 noMatch.push(msubject);
             }
+        }
+
+        // Save new auto-matches to the unified file
+        if (newAutoMatches.length > 0) {
+            this.#saveAutoMatches(newAutoMatches);
         }
 
         const matching = moodleSubjects.filter(m => m.suapId).length;
@@ -92,21 +109,30 @@ export default class Match {
     }
 
     /**
+     * Get all stored matches from unified file
+     * @returns {Array} All matches (auto and manual)
+     */
+    getAllMatches() {
+        return this.#loadMatches();
+    }
+
+    /**
      * Create a manual match between Moodle and SUAP subjects
+     * Overwrites any existing match (auto or manual) for this Moodle subject
      * @param {string} moodleFullname - Moodle subject fullname
      * @param {string|string[]} suapId - SUAP ID(s) to match
      * @returns {boolean} Success status
      */
     create(moodleFullname, suapId) {
-        let manualMatches = this.#loadManualMatches();
+        let matches = this.#loadMatches();
 
-        // Remove existing match for this moodle subject
-        manualMatches = manualMatches.filter(m => m.moodleFullname !== moodleFullname);
+        // Remove existing match for this moodle subject (auto or manual)
+        matches = matches.filter(m => m.moodleFullname !== moodleFullname);
 
-        // Add new match
-        manualMatches.push({ moodleFullname, suapId });
+        // Add new manual match
+        matches.push({ moodleFullname, suapId, type: 'manual' });
 
-        this.#saveManualMatches(manualMatches);
+        this.#saveMatches(matches);
         return true;
     }
 
@@ -148,22 +174,41 @@ export default class Match {
     }
 
     /**
-     * Load manual matches from JSON
+     * Load matches from unified JSON file
      * @private
      */
-    #loadManualMatches() {
-        if (!fs.existsSync(this.#manualMatchesPath)) {
+    #loadMatches() {
+        if (!fs.existsSync(this.#matchesPath)) {
             return [];
         }
 
-        return JSON.parse(fs.readFileSync(this.#manualMatchesPath, 'utf-8'));
+        return JSON.parse(fs.readFileSync(this.#matchesPath, 'utf-8'));
     }
 
     /**
-     * Save manual matches to JSON
+     * Save all matches to unified JSON file
      * @private
      */
-    #saveManualMatches(matches) {
-        fs.writeFileSync(this.#manualMatchesPath, JSON.stringify(matches, null, 2));
+    #saveMatches(matches) {
+        fs.writeFileSync(this.#matchesPath, JSON.stringify(matches, null, 2));
+    }
+
+    /**
+     * Save new auto-matches without overwriting existing matches
+     * @param {Array} autoMatches - New auto-matches to add
+     * @private
+     */
+    #saveAutoMatches(autoMatches) {
+        let matches = this.#loadMatches();
+        
+        // Only add auto-matches that don't already exist
+        for (const autoMatch of autoMatches) {
+            const exists = matches.find(m => m.moodleFullname === autoMatch.moodleFullname);
+            if (!exists) {
+                matches.push(autoMatch);
+            }
+        }
+        
+        this.#saveMatches(matches);
     }
 }
