@@ -35,6 +35,12 @@
     border-color: var(--color-primary);
 }
 
+.students-selected-count {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary);
+    align-self: center;
+}
+
 .students-subject-list {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

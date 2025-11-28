@@ -67,6 +67,9 @@ class SubjectMatcherApp {
             selectAllStudentsBtn: document.getElementById('select-all-students-btn'),
             selectNotScrapedBtn: document.getElementById('select-not-scraped-btn'),
             deselectAllStudentsBtn: document.getElementById('deselect-all-students-btn'),
+            studentsSelectedCount: document.getElementById('students-selected-count'),
+            generateStudentsCsvBtn: document.getElementById('generate-students-csv-btn'),
+            uploadStudentsBtn: document.getElementById('upload-students-btn'),
         };
     }
 
@@ -597,6 +600,9 @@ class SubjectMatcherApp {
      */
     #updateExtractStudentsButton() {
         this.#elements.extractStudentsBtn.disabled = this.#selectedSubjectIds.size === 0;
+        const count = this.#selectedSubjectIds.size;
+        const total = this.#suap.getMatchedSubjects().length;
+        this.#elements.studentsSelectedCount.textContent = `${count} selected of ${total}`;
     }
 
     /**
