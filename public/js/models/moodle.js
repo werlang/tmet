@@ -74,6 +74,34 @@ export default class Moodle {
     }
 
     /**
+     * Generate students CSV for Moodle bulk enrollment
+     * @param {Function} progressCallback - Optional callback for progress updates
+     * @returns {Promise<Object>} Result object
+     */
+    async generateStudentsCSV(progressCallback) {
+        try {
+            const result = await Request.post('/api/moodle/students-csv');
+            
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            // Poll for completion
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/jobs',
+                'Students CSV generation',
+                progressCallback
+            );
+
+        } catch (error) {
+            console.error('Generate students CSV error:', error);
+            Toast.error('Error generating students CSV: ' + error.message);
+            throw error;
+        }
+    }
+
+    /**
      * Poll job status until completion
      * @param {string} jobId - Job ID to poll
      * @param {string} endpoint - Status endpoint path
