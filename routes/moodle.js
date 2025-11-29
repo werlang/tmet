@@ -125,7 +125,7 @@ async function processGenerateCSV(jobId, params, updateProgress) {
     console.log(`[${jobId}] Starting CSV generation with params:`, params);
     
     const moodle = new Moodle();
-    await moodle.generateCSV(params, (message) => {
+    await moodle.generateCourseCSV(params, (message) => {
         updateProgress({ message });
     });
 

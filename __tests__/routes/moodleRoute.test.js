@@ -33,7 +33,7 @@ const mockMoodleUploader = jest.fn().mockImplementation(() => ({
 // Mock Moodle model - used by job callbacks
 // These mocks call the progress callback to cover that code path
 const mockMoodleInstance = {
-    generateCSV: jest.fn().mockImplementation(async (params, progressCallback) => {
+    generateCourseCSV: jest.fn().mockImplementation(async (params, progressCallback) => {
         if (progressCallback) progressCallback('Processing...');
         return undefined;
     }),
