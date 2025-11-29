@@ -3,9 +3,12 @@
  * Tests for /api/moodle route handlers
  */
 
-import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { jest, describe, it, expect, beforeEach, afterAll } from '@jest/globals';
 import { suppressConsole, createMockRequest, createMockResponse } from '../setup.js';
 import { sampleEdupageClasses, sampleMoodleCsvContent } from '../fixtures.js';
+
+// Store original NODE_ENV
+const originalNodeEnv = process.env.NODE_ENV;
 
 // Mock fs module
 const mockFs = {
@@ -81,6 +84,11 @@ describe('Moodle Route', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+    });
+
+    afterAll(() => {
+        // Restore original NODE_ENV
+        process.env.NODE_ENV = originalNodeEnv;
     });
 
     describe('POST /csv', () => {
@@ -166,7 +174,27 @@ describe('Moodle Route', () => {
     });
 
     describe('POST /courses', () => {
-        it('should return 202 with jobId when starting course upload', async () => {
+        it('should return skipped response in development mode', async () => {
+            process.env.NODE_ENV = 'development';
+
+            const handler = getRouteHandler('post', '/courses');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: { queue: jest.fn() } } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(200);
+            expect(res._data.success).toBe(true);
+            expect(res._data.skipped).toBe(true);
+            expect(res._data.message).toBe('Moodle upload is disabled in development mode');
+        });
+
+        it('should return 202 with jobId when starting course upload in production', async () => {
+            process.env.NODE_ENV = 'production';
+
             const mockJobQueue = {
                 queue: jest.fn().mockReturnValue('test-job-123')
             };
@@ -185,7 +213,9 @@ describe('Moodle Route', () => {
             expect(res._data.jobId).toBe('test-job-123');
         });
 
-        it('should handle errors and return 500', async () => {
+        it('should handle errors and return 500 in production', async () => {
+            process.env.NODE_ENV = 'production';
+
             const mockJobQueue = {
                 queue: jest.fn().mockImplementation(() => {
                     throw new Error('Upload error');

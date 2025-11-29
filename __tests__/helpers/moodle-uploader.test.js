@@ -26,8 +26,8 @@ describe('MoodleUploader Helper', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        // Ensure we're not in development mode for tests
-        process.env.NODE_ENV = 'test';
+        // Set to production mode for tests that verify actual API behavior
+        process.env.NODE_ENV = 'production';
     });
 
     afterAll(() => {
@@ -162,7 +162,7 @@ describe('MoodleUploader Helper', () => {
             })).rejects.toThrow('API Error');
         });
 
-        it('should skip API call in development mode', async () => {
+        it('should skip API call outside production mode', async () => {
             process.env.NODE_ENV = 'development';
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
@@ -172,11 +172,22 @@ describe('MoodleUploader Helper', () => {
                 category: '1'
             });
 
-            expect(result).toEqual({});
+            expect(result).toEqual({ skipped: true, reason: 'development mode' });
             expect(mockRequest.post).not.toHaveBeenCalled();
-            
-            // Reset for other tests
+        });
+
+        it('should skip API call in test mode', async () => {
             process.env.NODE_ENV = 'test';
+
+            const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            const result = await uploader.createCourse({
+                fullname: 'Test',
+                shortname: 'T',
+                category: '1'
+            });
+
+            expect(result).toEqual({ skipped: true, reason: 'development mode' });
+            expect(mockRequest.post).not.toHaveBeenCalled();
         });
     });
 });
