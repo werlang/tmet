@@ -13,9 +13,9 @@ function createTestApp() {
     const app = express();
     app.use(express.json());
     
-    // Create a real job queue for testing with short cleanup timeout
-    // Use 100ms so timers don't linger after tests
-    const jobQueue = new Queue(100);
+    // Create a real job queue for testing
+    // Use 5000ms cleanup timeout to prevent race conditions in tests
+    const jobQueue = new Queue(5000);
     app.locals.jobQueue = jobQueue;
     
     // Simple mock routes that mimic the actual routes

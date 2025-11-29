@@ -1,0 +1,332 @@
+/**
+ * Moodle Route Tests
+ * Tests for /api/moodle route handlers
+ */
+
+import { jest, describe, it, expect, beforeEach } from '@jest/globals';
+import { suppressConsole, createMockRequest, createMockResponse } from '../setup.js';
+import { sampleEdupageClasses, sampleMoodleCsvContent } from '../fixtures.js';
+
+// Mock fs module
+const mockFs = {
+    existsSync: jest.fn(),
+    readFileSync: jest.fn(),
+    writeFileSync: jest.fn(),
+};
+
+// Mock TimeTables helper
+const mockTimeTables = jest.fn().mockImplementation(() => ({
+    getClasses: jest.fn().mockResolvedValue(sampleEdupageClasses)
+}));
+
+// Mock MoodleUploader helper
+const mockMoodleUploader = jest.fn().mockImplementation(() => ({
+    uploadCourses: jest.fn().mockResolvedValue({
+        success: [{ id: 1 }],
+        errors: []
+    })
+}));
+
+// Mock Moodle model - used by job callbacks
+// These mocks call the progress callback to cover that code path
+const mockMoodleInstance = {
+    generateCSV: jest.fn().mockImplementation(async (params, progressCallback) => {
+        if (progressCallback) progressCallback('Processing...');
+        return undefined;
+    }),
+    uploadCourses: jest.fn().mockImplementation(async (progressCallback) => {
+        if (progressCallback) progressCallback('Uploading...');
+        return { created: 5, updated: 2 };
+    }),
+    generateStudentCSV: jest.fn().mockImplementation(async (progressCallback) => {
+        if (progressCallback) progressCallback('Generating...');
+        return { totalStudents: 100, processedSubjects: 10 };
+    })
+};
+const mockMoodle = jest.fn().mockImplementation(() => mockMoodleInstance);
+
+jest.unstable_mockModule('fs', () => ({
+    default: mockFs,
+    ...mockFs
+}));
+
+jest.unstable_mockModule('../../helpers/timetables.js', () => ({
+    default: mockTimeTables
+}));
+
+jest.unstable_mockModule('../../helpers/moodle-uploader.js', () => ({
+    default: mockMoodleUploader
+}));
+
+jest.unstable_mockModule('../../models/Moodle.js', () => ({
+    default: mockMoodle
+}));
+
+// Import routes after mocking
+const moodleModule = await import('../../routes/moodle.js');
+const moodleRouter = moodleModule.default;
+
+// Get the route handlers directly
+function getRouteHandler(method, path) {
+    const layer = moodleRouter.stack.find(l => 
+        l.route && 
+        l.route.path === path && 
+        l.route.methods[method]
+    );
+    return layer?.route.stack[0].handle;
+}
+
+describe('Moodle Route', () => {
+    suppressConsole();
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    describe('POST /csv', () => {
+        it('should return 202 with jobId when starting CSV generation', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/csv');
+            const req = createMockRequest({
+                body: { year: 2025, semester: 1 },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data.success).toBe(true);
+            expect(res._data.jobId).toBe('test-job-123');
+            expect(res._data.statusUrl).toBe('/api/jobs/test-job-123');
+        });
+
+        it('should use default year and semester when not provided', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/csv');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(mockJobQueue.queue).toHaveBeenCalled();
+        });
+
+        it('should accept dateFrom and dateTo params', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/csv');
+            const req = createMockRequest({
+                body: {
+                    year: 2025,
+                    semester: 1,
+                    dateFrom: '2025-01-01',
+                    dateTo: '2025-06-30'
+                },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+        });
+
+        it('should handle errors and return 500', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation(() => {
+                    throw new Error('Queue error');
+                })
+            };
+
+            const handler = getRouteHandler('post', '/csv');
+            const req = createMockRequest({
+                body: { year: 2025, semester: 1 },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(500);
+            expect(res._data.success).toBe(false);
+        });
+    });
+
+    describe('POST /courses', () => {
+        it('should return 202 with jobId when starting course upload', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/courses');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data.success).toBe(true);
+            expect(res._data.jobId).toBe('test-job-123');
+        });
+
+        it('should handle errors and return 500', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation(() => {
+                    throw new Error('Upload error');
+                })
+            };
+
+            const handler = getRouteHandler('post', '/courses');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(500);
+        });
+    });
+
+    describe('POST /students-csv', () => {
+        it('should return 202 with jobId when starting students CSV generation', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/students-csv');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data.success).toBe(true);
+            expect(res._data.message).toBe('Students CSV generation job started');
+        });
+
+        it('should handle errors and return 500', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation(() => {
+                    throw new Error('Generation error');
+                })
+            };
+
+            const handler = getRouteHandler('post', '/students-csv');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(500);
+        });
+    });
+
+    describe('Job callback execution', () => {
+        it('should execute CSV generation job callback correctly', async () => {
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/csv');
+            const req = createMockRequest({
+                body: { year: 2025, semester: 1, dateFrom: '2025-01-01', dateTo: '2025-06-30' },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            // Execute the captured callback
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toBe('Moodle CSV generated successfully');
+            expect(result.file).toBe('files/moodle_classes.csv');
+            expect(updateProgress).toHaveBeenCalledWith({ message: 'Starting CSV generation...' });
+        });
+
+        it('should execute course upload job callback correctly', async () => {
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/courses');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            // Execute the captured callback
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toBe('Courses uploaded successfully');
+            expect(result.results).toBeDefined();
+            expect(updateProgress).toHaveBeenCalledWith({ message: 'Starting course upload...' });
+        });
+
+        it('should execute students CSV job callback correctly', async () => {
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/students-csv');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            // Execute the captured callback
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('Students CSV generated successfully');
+            expect(result.file).toBe('files/moodle_students.csv');
+            expect(result.totalStudents).toBeDefined();
+            expect(result.processedSubjects).toBeDefined();
+            expect(updateProgress).toHaveBeenCalledWith({ message: 'Starting students CSV generation...' });
+        });
+    });
+});
