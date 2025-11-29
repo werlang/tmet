@@ -116,6 +116,38 @@ router.post('/students-csv', async (req, res) => {
     }
 });
 
+/**
+ * POST /moodle/professors-csv
+ * Generate professors CSV for Moodle bulk enrollment
+ */
+router.post('/professors-csv', async (req, res) => {
+    try {
+        console.log('Starting professors CSV generation job...');
+
+        const jobQueue = req.app.locals.jobQueue;
+
+        // Start async job
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
+            return await processGenerateProfessorsCSV(jobId, updateProgress);
+        });
+
+        // Return job ID immediately
+        res.status(202).json({ 
+            success: true,
+            jobId,
+            message: 'Professors CSV generation job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+
+    } catch (error) {
+        console.error('Professors CSV generation error:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
 // Async function to process CSV generation
 async function processGenerateCSV(jobId, params, updateProgress) {
     updateProgress({
@@ -176,6 +208,28 @@ async function processGenerateStudentsCSV(jobId, updateProgress) {
     return {
         message: `Students CSV generated successfully. ${result.totalStudents} students from ${result.processedSubjects} subjects.`,
         file: 'files/moodle_students.csv',
+        ...result
+    };
+}
+
+// Async function to process professors CSV generation
+async function processGenerateProfessorsCSV(jobId, updateProgress) {
+    updateProgress({
+        message: 'Starting professors CSV generation...'
+    });
+
+    console.log(`[${jobId}] Starting professors CSV generation`);
+    
+    const moodle = new Moodle();
+    const result = await moodle.generateProfessorCSV((message) => {
+        updateProgress({ message });
+    });
+
+    console.log(`[${jobId}] Professors CSV generation completed`);
+
+    return {
+        message: `Professors CSV generated successfully. ${result.totalProfessors} professors from ${result.processedSubjects} subjects.`,
+        file: 'files/moodle_professors.csv',
         ...result
     };
 }

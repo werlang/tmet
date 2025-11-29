@@ -360,6 +360,12 @@ describe('SUAP Route', () => {
         });
 
         it('should execute student extraction job callback correctly', async () => {
+            // Update mock to return new format {students, professors}
+            mockSuapInstance.scrapeStudents.mockResolvedValue({
+                students: [{ enrollment: '2021001', name: 'Test' }],
+                professors: []
+            });
+
             let capturedCallback;
             const mockJobQueue = {
                 queue: jest.fn().mockImplementation((callback) => {
@@ -381,7 +387,7 @@ describe('SUAP Route', () => {
             const updateProgress = jest.fn();
             const result = await capturedCallback('job-123', updateProgress);
 
-            expect(result.message).toContain('Student extraction completed');
+            expect(result.message).toContain('Extraction completed');
             expect(result.results).toBeDefined();
             expect(result.results['60244']).toBeDefined();
             expect(result.results['60245']).toBeDefined();
@@ -390,7 +396,10 @@ describe('SUAP Route', () => {
 
         it('should handle student extraction errors gracefully', async () => {
             mockSuapInstance.scrapeStudents
-                .mockResolvedValueOnce([{ enrollment: '2021001', name: 'Test' }])
+                .mockResolvedValueOnce({
+                    students: [{ enrollment: '2021001', name: 'Test' }],
+                    professors: []
+                })
                 .mockRejectedValueOnce(new Error('Scrape error'));
 
             let capturedCallback;

@@ -6,14 +6,43 @@
 
 .students-controls {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
+    flex-direction: column;
     gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.selection-row {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
     flex-wrap: wrap;
 }
 
+.selection-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: var(--color-bg-surface);
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+}
+
+.selection-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
 .selection-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.extract-buttons {
     display: flex;
     gap: 0.5rem;
     flex-wrap: wrap;
@@ -162,48 +191,66 @@
     border-top: 1px solid var(--color-border);
 }
 
-.student-count-badge {
+.badge-container {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.student-count-badge,
+.professor-count-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.25rem 0.75rem;
-    background: var(--color-success-light);
-    color: #2b8a3e;
-    border: 1px solid #b2f2bb;
+    gap: 0.35rem;
+    padding: 0.25rem 0.6rem;
     border-radius: 12px;
     font-size: 0.75rem;
     font-weight: 600;
 }
 
-.student-count-badge.no-students {
-    background: rgba(255, 193, 7, 0.1);
-    color: #d97706;
-    border-color: rgba(255, 193, 7, 0.3);
+.student-count-badge {
+    background: var(--color-success-light);
+    color: #2b8a3e;
+    border: 1px solid #b2f2bb;
 }
 
-.view-students-btn {
-    padding: 0.35rem 0.85rem;
-    font-size: 0.8rem;
-    background: transparent;
-    color: var(--color-primary);
-    border: 1px solid var(--color-primary);
-    border-radius: 6px;
+.professor-count-badge {
+    background: rgba(139, 92, 246, 0.1);
+    color: #7c3aed;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.student-count-badge.no-data,
+.professor-count-badge.no-data {
+    background: var(--color-bg-surface);
+    color: var(--color-text-muted);
+    border-color: var(--color-border);
+}
+
+/* Clickable badges */
+.student-count-badge.clickable,
+.professor-count-badge.clickable {
     cursor: pointer;
     transition: all 0.2s ease;
-    font-weight: 500;
 }
 
-.view-students-btn:hover:not(:disabled) {
-    background: var(--color-primary);
+.student-count-badge.clickable:hover {
+    background: #2b8a3e;
     color: white;
+    border-color: #2b8a3e;
+    transform: scale(1.05);
 }
 
-.view-students-btn:disabled {
-    border-color: var(--color-border);
-    color: var(--color-text-muted);
-    cursor: not-allowed;
-    background: transparent;
-    opacity: 0.6;
+.professor-count-badge.clickable:hover {
+    background: #7c3aed;
+    color: white;
+    border-color: #7c3aed;
+    transform: scale(1.05);
+}
+
+/* Card left border when has professors */
+.student-subject-card.has-professors {
+    border-right: 4px solid #7c3aed;
 }
 
 .students-empty-state {

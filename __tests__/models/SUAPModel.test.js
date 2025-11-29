@@ -215,8 +215,12 @@ describe('SUAP Model', () => {
     });
 
     describe('scrapeStudents()', () => {
-        it('should scrape students from subject page', async () => {
+        it('should scrape students and professors from subject page', async () => {
+            // First call - professors from main page
+            // Second call - students from notas_faltas tab
+            // Third+ calls - email fetches
             mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors (empty for this test)
                 .mockResolvedValueOnce([
                     { enrollment: "2021001", name: "João Silva" }
                 ])
@@ -229,13 +233,15 @@ describe('SUAP Model', () => {
 
             expect(mockSUAPScraper.initialize).toHaveBeenCalled();
             expect(mockSUAPScraper.goto).toHaveBeenCalled();
-            expect(result.length).toBe(1);
-            expect(result[0].name).toBe("João Silva");
-            expect(result[0].email).toBe("joao.silva@email.com");
+            expect(result.students.length).toBe(1);
+            expect(result.students[0].name).toBe("João Silva");
+            expect(result.students[0].email).toBe("joao.silva@email.com");
+            expect(result.professors).toEqual([]);
         });
 
         it('should call progress callback during scraping', async () => {
             mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors
                 .mockResolvedValueOnce([
                     { enrollment: "2021001", name: "João Silva" }
                 ])
@@ -252,6 +258,7 @@ describe('SUAP Model', () => {
 
         it('should fetch email for each student', async () => {
             mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors
                 .mockResolvedValueOnce([
                     { enrollment: "2021001", name: "João Silva" },
                     { enrollment: "2021002", name: "Maria Santos" }
@@ -263,13 +270,14 @@ describe('SUAP Model', () => {
             const suap = new SUAP();
             const result = await suap.scrapeStudents("60244");
 
-            expect(result.length).toBe(2);
-            expect(result[0]).toHaveProperty('email');
-            expect(result[1]).toHaveProperty('email');
+            expect(result.students.length).toBe(2);
+            expect(result.students[0]).toHaveProperty('email');
+            expect(result.students[1]).toHaveProperty('email');
         });
 
         it('should save students to file', async () => {
             mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors
                 .mockResolvedValueOnce([
                     { enrollment: "2021001", name: "João Silva" }
                 ])
@@ -281,10 +289,13 @@ describe('SUAP Model', () => {
             await suap.scrapeStudents("60244");
 
             expect(mockFs.writeFileSync).toHaveBeenCalled();
-            const [path, content] = mockFs.writeFileSync.mock.calls[0];
-            expect(path).toContain('suap_students.json');
+            // Find the call that writes to suap_students.json
+            const studentWriteCall = mockFs.writeFileSync.mock.calls.find(call => 
+                call[0].includes('suap_students.json')
+            );
+            expect(studentWriteCall).toBeDefined();
             
-            const savedData = JSON.parse(content);
+            const savedData = JSON.parse(studentWriteCall[1]);
             expect(savedData.subjects).toHaveProperty('60244');
             expect(savedData.students).toHaveProperty('2021001');
         });
@@ -296,6 +307,7 @@ describe('SUAP Model', () => {
             };
 
             mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors
                 .mockResolvedValueOnce([
                     { enrollment: "2021001", name: "João Silva" }
                 ])
@@ -307,8 +319,11 @@ describe('SUAP Model', () => {
             const suap = new SUAP();
             await suap.scrapeStudents("60244");
 
-            const [, content] = mockFs.writeFileSync.mock.calls[0];
-            const savedData = JSON.parse(content);
+            // Find the call that writes to suap_students.json
+            const studentWriteCall = mockFs.writeFileSync.mock.calls.find(call => 
+                call[0].includes('suap_students.json')
+            );
+            const savedData = JSON.parse(studentWriteCall[1]);
             
             // Should have both old and new data
             expect(savedData.subjects).toHaveProperty('60243');
@@ -318,24 +333,29 @@ describe('SUAP Model', () => {
         });
 
         it('should handle empty student list', async () => {
-            mockSUAPScraper.evaluate.mockResolvedValueOnce([]);
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors
+                .mockResolvedValueOnce([]); // students
             mockFs.existsSync.mockReturnValue(false);
 
             const suap = new SUAP();
             const result = await suap.scrapeStudents("60244");
 
-            expect(result).toEqual([]);
+            expect(result.students).toEqual([]);
+            expect(result.professors).toEqual([]);
         });
 
         it('should handle email fetch error gracefully', async () => {
             mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors
                 .mockResolvedValueOnce([
                     { enrollment: "2021001", name: "João Silva" }
                 ]);
             
             // Simulate error on email fetch
             mockSUAPScraper.goto
-                .mockResolvedValueOnce(undefined)  // First call for subject page
+                .mockResolvedValueOnce(undefined)  // First call for main page
+                .mockResolvedValueOnce(undefined)  // Second call for notas_faltas tab
                 .mockRejectedValueOnce(new Error('Page not found'));  // Email page fails
 
             mockFs.existsSync.mockReturnValue(false);
@@ -343,11 +363,12 @@ describe('SUAP Model', () => {
             const suap = new SUAP();
             const result = await suap.scrapeStudents("60244");
 
-            expect(result[0].email).toBeNull();
+            expect(result.students[0].email).toBeNull();
         });
 
         it('should report progress for each student email fetch', async () => {
             mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors
                 .mockResolvedValueOnce([
                     { enrollment: "2021001", name: "João Silva" },
                     { enrollment: "2021002", name: "Maria Santos" }
@@ -365,6 +386,7 @@ describe('SUAP Model', () => {
 
         it('should handle corrupted existing file gracefully', async () => {
             mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors
                 .mockResolvedValueOnce([
                     { enrollment: "2021001", name: "João Silva" }
                 ])
@@ -379,12 +401,13 @@ describe('SUAP Model', () => {
             const result = await suap.scrapeStudents("60244");
 
             // Should still work and save new data
-            expect(result.length).toBe(1);
+            expect(result.students.length).toBe(1);
             expect(mockFs.writeFileSync).toHaveBeenCalled();
         });
 
         it('should handle legacy file format without subjects/students structure', async () => {
             mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([]) // professors
                 .mockResolvedValueOnce([
                     { enrollment: "2021001", name: "João Silva" }
                 ])
@@ -397,8 +420,11 @@ describe('SUAP Model', () => {
             const suap = new SUAP();
             await suap.scrapeStudents("60244");
 
-            const [, content] = mockFs.writeFileSync.mock.calls[0];
-            const savedData = JSON.parse(content);
+            // Find the call that writes to suap_students.json
+            const studentWriteCall = mockFs.writeFileSync.mock.calls.find(call => 
+                call[0].includes('suap_students.json')
+            );
+            const savedData = JSON.parse(studentWriteCall[1]);
             
             // Should create proper structure
             expect(savedData).toHaveProperty('subjects');
@@ -568,13 +594,20 @@ describe('SUAP Model', () => {
             };
 
             global.document = {
-                querySelectorAll: jest.fn((selector) => [mockStudentRow])
+                querySelectorAll: jest.fn((selector) => {
+                    if (selector.includes('rh/servidor')) return []; // No professors
+                    return [mockStudentRow];
+                })
             };
 
             mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
                 callCount++;
                 if (callCount === 1) {
-                    // First call - student list, execute the callback
+                    // First call - professor list (empty)
+                    return Promise.resolve([]);
+                }
+                if (callCount === 2) {
+                    // Second call - student list, execute the callback
                     return Promise.resolve(callback(config));
                 }
                 // Email calls - just return mock email
@@ -586,9 +619,9 @@ describe('SUAP Model', () => {
             const suap = new SUAP();
             const result = await suap.scrapeStudents('60244');
 
-            expect(result.length).toBe(1);
-            expect(result[0].enrollment).toBe('2021001');
-            expect(result[0].name).toBe('João Silva');
+            expect(result.students.length).toBe(1);
+            expect(result.students[0].enrollment).toBe('2021001');
+            expect(result.students[0].name).toBe('João Silva');
         });
 
         it('should execute email extraction browser callback', async () => {
@@ -597,6 +630,10 @@ describe('SUAP Model', () => {
             mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
                 callCount++;
                 if (callCount === 1) {
+                    // Professor list (empty)
+                    return Promise.resolve([]);
+                }
+                if (callCount === 2) {
                     // Student list
                     return Promise.resolve([{ enrollment: '2021001', name: 'Test' }]);
                 }
@@ -628,7 +665,7 @@ describe('SUAP Model', () => {
             const suap = new SUAP();
             const result = await suap.scrapeStudents('60244');
 
-            expect(result[0].email).toBe('student@school.edu');
+            expect(result.students[0].email).toBe('student@school.edu');
         });
 
         it('should return null when email dt element not found', async () => {
@@ -637,7 +674,10 @@ describe('SUAP Model', () => {
             mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
                 callCount++;
                 if (callCount === 1) {
-                    return Promise.resolve([{ enrollment: '2021001', name: 'Test' }]);
+                    return Promise.resolve([]); // professors
+                }
+                if (callCount === 2) {
+                    return Promise.resolve([{ enrollment: '2021001', name: 'Test' }]); // students
                 }
                 
                 // No matching dt element
@@ -653,7 +693,7 @@ describe('SUAP Model', () => {
             const suap = new SUAP();
             const result = await suap.scrapeStudents('60244');
 
-            expect(result[0].email).toBeNull();
+            expect(result.students[0].email).toBeNull();
         });
 
         it('should return null when dd element is not next sibling', async () => {
@@ -662,7 +702,10 @@ describe('SUAP Model', () => {
             mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
                 callCount++;
                 if (callCount === 1) {
-                    return Promise.resolve([{ enrollment: '2021001', name: 'Test' }]);
+                    return Promise.resolve([]); // professors
+                }
+                if (callCount === 2) {
+                    return Promise.resolve([{ enrollment: '2021001', name: 'Test' }]); // students
                 }
                 
                 const mockDt = {
@@ -682,7 +725,7 @@ describe('SUAP Model', () => {
             const suap = new SUAP();
             const result = await suap.scrapeStudents('60244');
 
-            expect(result[0].email).toBeNull();
+            expect(result.students[0].email).toBeNull();
         });
 
         it('should return null when next sibling is not DD tag', async () => {
@@ -691,7 +734,10 @@ describe('SUAP Model', () => {
             mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
                 callCount++;
                 if (callCount === 1) {
-                    return Promise.resolve([{ enrollment: '2021001', name: 'Test' }]);
+                    return Promise.resolve([]); // professors
+                }
+                if (callCount === 2) {
+                    return Promise.resolve([{ enrollment: '2021001', name: 'Test' }]); // students
                 }
                 
                 const mockDt = {
@@ -714,7 +760,7 @@ describe('SUAP Model', () => {
             const suap = new SUAP();
             const result = await suap.scrapeStudents('60244');
 
-            expect(result[0].email).toBeNull();
+            expect(result.students[0].email).toBeNull();
         });
 
         it('should skip rows without valid student data', async () => {
@@ -732,7 +778,10 @@ describe('SUAP Model', () => {
             mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
                 callCount++;
                 if (callCount === 1) {
-                    return Promise.resolve(callback(config));
+                    return Promise.resolve([]); // professors
+                }
+                if (callCount === 2) {
+                    return Promise.resolve(callback(config)); // students
                 }
                 return Promise.resolve('test@email.com');
             });
@@ -743,7 +792,8 @@ describe('SUAP Model', () => {
             const result = await suap.scrapeStudents('60244');
 
             // Should return empty since row was invalid
-            expect(result).toEqual([]);
+            expect(result.students).toEqual([]);
+            expect(result.professors).toEqual([]);
         });
     });
 });

@@ -1,6 +1,7 @@
 import Toast from '../components/toast.js';
 import ProgressModal from '../components/progress-modal.js';
 import StudentsModal from '../components/students-modal.js';
+import ProfessorsModal from '../components/professors-modal.js';
 import Request from '../helpers/request.js';
 
 /**
@@ -17,9 +18,12 @@ export default class StudentsSection {
     #suap;
     #progressModal;
     #studentsModal;
+    #professorsModal;
     #selectedSubjectIds = new Set();
     #studentsData = {};
+    #professorsData = {};
     #studentUrl = '';
+    #professorUrl = '';
     #onDataChange;
 
     /**
@@ -36,6 +40,7 @@ export default class StudentsSection {
         this.#onDataChange = onDataChange;
         this.#progressModal = new ProgressModal();
         this.#studentsModal = new StudentsModal();
+        this.#professorsModal = new ProfessorsModal();
 
         this.#attachEventListeners();
     }
@@ -44,11 +49,24 @@ export default class StudentsSection {
      * Attach event listeners for students actions
      */
     #attachEventListeners() {
-        this.#elements.extractStudentsBtn.addEventListener('click', () => this.#extractStudents());
-        this.#elements.selectAllStudentsBtn.addEventListener('click', () => this.#selectAllSubjects());
-        this.#elements.selectNotScrapedBtn.addEventListener('click', () => this.#selectNotScraped());
-        this.#elements.deselectAllStudentsBtn.addEventListener('click', () => this.#deselectAllSubjects());
+        // Extraction buttons
+        this.#elements.extractStudentsBtn.addEventListener('click', () => this.#extractStudents('both'));
+        this.#elements.extractStudentsOnlyBtn.addEventListener('click', () => this.#extractStudents('students'));
+        this.#elements.extractProfessorsOnlyBtn.addEventListener('click', () => this.#extractStudents('professors'));
+        
+        // Students selection buttons
+        this.#elements.selectAllStudentsBtn.addEventListener('click', () => this.#selectByType('students', 'all'));
+        this.#elements.selectStudentsNotScrapedBtn.addEventListener('click', () => this.#selectByType('students', 'not-scraped'));
+        this.#elements.deselectAllStudentsBtn.addEventListener('click', () => this.#selectByType('students', 'none'));
+        
+        // Professors selection buttons
+        this.#elements.selectAllProfessorsBtn.addEventListener('click', () => this.#selectByType('professors', 'all'));
+        this.#elements.selectProfessorsNotScrapedBtn.addEventListener('click', () => this.#selectByType('professors', 'not-scraped'));
+        this.#elements.deselectAllProfessorsBtn.addEventListener('click', () => this.#selectByType('professors', 'none'));
+        
+        // CSV generation
         this.#elements.generateStudentsCsvBtn.addEventListener('click', () => this.#generateStudentsCSV());
+        this.#elements.generateProfessorsCsvBtn.addEventListener('click', () => this.#generateProfessorsCSV());
     }
 
     /**
@@ -56,13 +74,20 @@ export default class StudentsSection {
      */
     async loadStudentsData() {
         try {
-            const response = await Request.get('/api/suap/students');
+            const [studentsResponse, professorsResponse] = await Promise.all([
+                Request.get('/api/suap/students'),
+                Request.get('/api/suap/professors')
+            ]);
             // format: {subjects: {id: [enrollments]}, students: {enrollment: info}}
-            this.#studentsData = response.data || { subjects: {}, students: {} };
-            this.#studentUrl = response.studentUrl;
+            this.#studentsData = studentsResponse.data || { subjects: {}, students: {} };
+            this.#studentUrl = studentsResponse.studentUrl;
+            // format: {subjects: {id: [siapes]}, professors: {siape: info}}
+            this.#professorsData = professorsResponse.data || { subjects: {}, professors: {} };
+            this.#professorUrl = professorsResponse.professorUrl;
         } catch (error) {
-            console.error('Error loading students data:', error);
+            console.error('Error loading students/professors data:', error);
             this.#studentsData = { subjects: {}, students: {} };
+            this.#professorsData = { subjects: {}, professors: {} };
         }
     }
 
@@ -84,6 +109,19 @@ export default class StudentsSection {
         return enrollments.map(enrollment => ({
             enrollment,
             ...this.#studentsData.students?.[enrollment]
+        }));
+    }
+
+    /**
+     * Get professors from a subject
+     * @param {string} subjectId - Subject ID
+     * @returns {Array} - List of professor objects
+     */
+    #getProfessorsFromSubject(subjectId) {
+        const siapes = this.#professorsData.subjects?.[subjectId] || [];
+        return siapes.map(siape => ({
+            siape,
+            ...this.#professorsData.professors?.[siape]
         }));
     }
 
@@ -118,11 +156,17 @@ export default class StudentsSection {
         const enrollments = this.#studentsData.subjects?.[subject.id];
         const hasStudents = !!enrollments && enrollments.length > 0;
         const studentCount = hasStudents ? enrollments.length : 0;
+        
+        const siapes = this.#professorsData.subjects?.[subject.id];
+        const hasProfessors = !!siapes && siapes.length > 0;
+        const professorCount = hasProfessors ? siapes.length : 0;
+        
         const isSelected = this.#selectedSubjectIds.has(subject.id);
 
         const card = document.createElement('div');
         card.className = 'student-subject-card';
         if (hasStudents) card.classList.add('has-students');
+        if (hasProfessors) card.classList.add('has-professors');
         if (isSelected) card.classList.add('selected');
 
         const header = document.createElement('div');
@@ -169,23 +213,42 @@ export default class StudentsSection {
         const footer = document.createElement('div');
         footer.className = 'student-subject-footer';
 
-        const badge = document.createElement('span');
-        badge.className = hasStudents ? 'student-count-badge' : 'student-count-badge no-students';
-        badge.textContent = hasStudents ? `${studentCount} students` : 'Not scraped';
+        // Badge container for students and professors
+        const badgeContainer = document.createElement('div');
+        badgeContainer.className = 'badge-container';
 
-        const viewBtn = document.createElement('button');
-        viewBtn.className = 'view-students-btn';
-        viewBtn.textContent = 'View';
-        viewBtn.disabled = !hasStudents;
-        viewBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (hasStudents) {
+        // Student badge - clickable when has students
+        const studentBadge = document.createElement('span');
+        studentBadge.className = hasStudents ? 'student-count-badge clickable' : 'student-count-badge no-data';
+        studentBadge.innerHTML = hasStudents 
+            ? `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg> ${studentCount}`
+            : `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg> -`;
+        
+        if (hasStudents) {
+            studentBadge.addEventListener('click', (e) => {
+                e.stopPropagation();
                 this.#viewStudents(subject);
-            }
-        });
+            });
+        }
 
-        footer.appendChild(badge);
-        footer.appendChild(viewBtn);
+        // Professor badge - clickable when has professors
+        const professorBadge = document.createElement('span');
+        professorBadge.className = hasProfessors ? 'professor-count-badge clickable' : 'professor-count-badge no-data';
+        professorBadge.innerHTML = hasProfessors
+            ? `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg> ${professorCount}`
+            : `<svg viewBox="0 0 24 24" width="14" height="14"><path fill="currentColor" d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/></svg> -`;
+        
+        if (hasProfessors) {
+            professorBadge.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.#viewProfessors(subject);
+            });
+        }
+
+        badgeContainer.appendChild(studentBadge);
+        badgeContainer.appendChild(professorBadge);
+
+        footer.appendChild(badgeContainer);
 
         card.appendChild(header);
         card.appendChild(footer);
@@ -215,47 +278,60 @@ export default class StudentsSection {
     }
 
     /**
-     * Update extract students button state
+     * Update extract buttons state
      */
     #updateExtractStudentsButton() {
-        this.#elements.extractStudentsBtn.disabled = this.#selectedSubjectIds.size === 0;
+        const disabled = this.#selectedSubjectIds.size === 0;
+        this.#elements.extractStudentsBtn.disabled = disabled;
+        this.#elements.extractStudentsOnlyBtn.disabled = disabled;
+        this.#elements.extractProfessorsOnlyBtn.disabled = disabled;
         const count = this.#selectedSubjectIds.size;
         const total = this.#suap.getMatchedSubjects().length;
         this.#elements.studentsSelectedCount.textContent = `${count} selected of ${total}`;
     }
 
     /**
-     * Select all subjects
+     * Select subjects by type and mode
+     * @param {'students'|'professors'} type - What data type to check
+     * @param {'all'|'not-scraped'|'none'} mode - Selection mode
      */
-    #selectAllSubjects() {
+    #selectByType(type, mode) {
         const matchedSubjects = this.#suap.getMatchedSubjects();
-        matchedSubjects.forEach(subject => {
-            this.#selectedSubjectIds.add(subject.id);
-        });
-        this.#updateExtractStudentsButton();
-        this.#renderStudentsSubjectList();
-    }
-
-    /**
-     * Select subjects that haven't been scraped yet
-     */
-    #selectNotScraped() {
-        const matchedSubjects = this.#suap.getMatchedSubjects();
-        matchedSubjects.forEach(subject => {
-            const enrollments = this.#studentsData.subjects?.[subject.id];
-            if (!enrollments || enrollments.length === 0) {
-                this.#selectedSubjectIds.add(subject.id);
-            }
-        });
-        this.#updateExtractStudentsButton();
-        this.#renderStudentsSubjectList();
-    }
-
-    /**
-     * Deselect all subjects
-     */
-    #deselectAllSubjects() {
-        this.#selectedSubjectIds.clear();
+        
+        if (mode === 'none') {
+            // Deselect subjects based on type criteria
+            matchedSubjects.forEach(subject => {
+                if (type === 'students') {
+                    const enrollments = this.#studentsData.subjects?.[subject.id];
+                    const hasStudents = enrollments && enrollments.length > 0;
+                    // Deselect all that have students (or all if checking students)
+                    this.#selectedSubjectIds.delete(subject.id);
+                } else {
+                    const siapes = this.#professorsData.subjects?.[subject.id];
+                    const hasProfessors = siapes && siapes.length > 0;
+                    // Deselect all that have professors (or all if checking professors)
+                    this.#selectedSubjectIds.delete(subject.id);
+                }
+            });
+        } else {
+            // Select subjects
+            matchedSubjects.forEach(subject => {
+                if (type === 'students') {
+                    const enrollments = this.#studentsData.subjects?.[subject.id];
+                    const hasStudents = enrollments && enrollments.length > 0;
+                    if (mode === 'all' || (mode === 'not-scraped' && !hasStudents)) {
+                        this.#selectedSubjectIds.add(subject.id);
+                    }
+                } else {
+                    const siapes = this.#professorsData.subjects?.[subject.id];
+                    const hasProfessors = siapes && siapes.length > 0;
+                    if (mode === 'all' || (mode === 'not-scraped' && !hasProfessors)) {
+                        this.#selectedSubjectIds.add(subject.id);
+                    }
+                }
+            });
+        }
+        
         this.#updateExtractStudentsButton();
         this.#renderStudentsSubjectList();
     }
@@ -270,28 +346,62 @@ export default class StudentsSection {
     }
 
     /**
+     * View professors for a subject
+     * @param {Object} subject - SUAP subject
+     */
+    #viewProfessors(subject) {
+        const professors = this.#getProfessorsFromSubject(subject.id);
+        this.#professorsModal.show(subject, professors, this.#professorUrl);
+    }
+
+    /**
      * Extract students from selected subjects
      */
-    async #extractStudents() {
+    /**
+     * Extract students and/or professors from SUAP
+     * @param {'both'|'students'|'professors'} extractType - What to extract
+     */
+    async #extractStudents(extractType = 'both') {
         if (this.#selectedSubjectIds.size === 0) return;
 
-        this.#updateButton(
-            this.#elements.extractStudentsBtn,
-            true,
-            'Extracting...'
-        );
+        // Determine button, title and labels based on extractType
+        const config = {
+            both: {
+                button: this.#elements.extractStudentsBtn,
+                buttonLabel: 'Extract Both',
+                title: 'Extracting Students & Professors',
+                successMsg: 'Students and professors extracted successfully'
+            },
+            students: {
+                button: this.#elements.extractStudentsOnlyBtn,
+                buttonLabel: 'Extract Students Only',
+                title: 'Extracting Students',
+                successMsg: 'Students extracted successfully'
+            },
+            professors: {
+                button: this.#elements.extractProfessorsOnlyBtn,
+                buttonLabel: 'Extract Professors Only',
+                title: 'Extracting Professors',
+                successMsg: 'Professors extracted successfully'
+            }
+        }[extractType];
+
+        this.#updateButton(config.button, true, 'Extracting...');
 
         this.#progressModal.show({
-            title: 'Extracting Students',
-            message: 'Starting student extraction',
+            title: config.title,
+            message: 'Starting extraction',
             warning: 'This process involves web scraping and may take several minutes.'
         });
 
         try {
             const subjectIds = Array.from(this.#selectedSubjectIds);
 
-            // Start extraction job
-            const response = await Request.post('/api/suap/extract-students', { subjectIds });
+            // Start extraction job with extractType
+            const response = await Request.post('/api/suap/extract-students', { 
+                subjectIds,
+                extractType 
+            });
 
             if (!response.success || !response.jobId) {
                 throw new Error(response.error || 'Failed to start extraction job');
@@ -311,23 +421,20 @@ export default class StudentsSection {
 
             this.#progressModal.hide();
 
-            // Reload students data
+            // Reload students and professors data (loadStudentsData handles both)
             await this.loadStudentsData();
+            
             this.#selectedSubjectIds.clear();
             this.#renderStudentsSubjectList();
             this.#updateExtractStudentsButton();
 
-            Toast.success(result.message || 'Students extracted successfully');
+            Toast.success(result.message || config.successMsg);
         } catch (error) {
             this.#progressModal.hide();
-            console.error('Student extraction error:', error);
-            Toast.error(error.message || 'Failed to extract students');
+            console.error('Extraction error:', error);
+            Toast.error(error.message || 'Failed to extract data');
         } finally {
-            this.#updateButton(
-                this.#elements.extractStudentsBtn,
-                false,
-                'Extract Students'
-            );
+            this.#updateButton(config.button, false, config.buttonLabel);
         }
     }
 
@@ -366,6 +473,45 @@ export default class StudentsSection {
                 this.#elements.generateStudentsCsvBtn,
                 false,
                 'Generate Students CSV'
+            );
+        }
+    }
+
+    /**
+     * Generate professors CSV for Moodle bulk enrollment
+     */
+    async #generateProfessorsCSV() {
+        this.#updateButton(
+            this.#elements.generateProfessorsCsvBtn,
+            true,
+            'Generating...'
+        );
+
+        this.#progressModal.show({
+            title: 'Generating Professors CSV',
+            message: 'Processing matched subjects and professors'
+        });
+
+        try {
+            const result = await this.#moodle.generateProfessorsCSV((message) => {
+                this.#progressModal.updateStatus(message);
+                this.#updateButton(
+                    this.#elements.generateProfessorsCsvBtn,
+                    true,
+                    message
+                );
+            });
+
+            this.#progressModal.hide();
+            Toast.success(result.message || 'Professors CSV generated successfully');
+        } catch (error) {
+            this.#progressModal.hide();
+            // Error already handled in Moodle
+        } finally {
+            this.#updateButton(
+                this.#elements.generateProfessorsCsvBtn,
+                false,
+                'Generate Professors CSV'
             );
         }
     }

@@ -57,12 +57,50 @@ export default class SUAPScraper {
         return SUAPScraper;
     }
 
+    /**
+     * Check if we're still logged in by looking for login form elements
+     * @returns {Promise<boolean>} True if session is valid
+     */
+    static async isSessionValid() {
+        try {
+            // Check if login form exists (means we're on login page or session expired)
+            const hasLoginForm = await SUAPScraper.page.$(suapConfig.login.username);
+            if (hasLoginForm) {
+                console.log('Session expired - login form detected');
+                return false;
+            }
+            
+            // Check if there's an error message about session
+            const pageContent = await SUAPScraper.page.content();
+            if (pageContent.includes('Sua sessão expirou') || 
+                pageContent.includes('faça login novamente') ||
+                pageContent.includes('Efetuar login')) {
+                console.log('Session expired - expiration message detected');
+                return false;
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('Error checking session validity:', error.message);
+            return false;
+        }
+    }
+
     static async goto(url, confirmElement) {
         try {
             if (!SUAPScraper.logged) {
                 await SUAPScraper.login();
             }
             await SUAPScraper.page.goto(url);
+            
+            // Check if session is still valid after navigation
+            const sessionValid = await SUAPScraper.isSessionValid();
+            if (!sessionValid) {
+                console.log('Session invalid after navigation, re-authenticating...');
+                SUAPScraper.logged = false;
+                await SUAPScraper.login();
+                await SUAPScraper.page.goto(url);
+            }
         } catch (err) {
             console.error(err);
             SUAPScraper.connected = false;
@@ -87,9 +125,10 @@ export default class SUAPScraper {
         }
     }
 
-    static async evaluate(fn, data) {
+    static async evaluate(fn, data = {}) {
         // Serialize functions in data
         const serializeFunctions = (data) => {
+            if (!data || typeof data !== 'object') return data;
             for (const [key, value] of Object.entries(data)) {
                 if (typeof value === 'function') {
                     data[key] = `fn:${value.toString()}`;
@@ -106,7 +145,7 @@ export default class SUAPScraper {
             }
             return data;
         };
-        const serialized = serializeFunctions(data);
+        const serialized = serializeFunctions(data) || {};
         // serialize function argument
         serialized.fn = fn.toString();
         // console.log(serialized);

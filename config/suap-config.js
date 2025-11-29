@@ -49,4 +49,14 @@ export default {
             label: 'E-mail Acadêmico',
         }
     },
+    professorProfile: {
+        url: 'rh/servidor',
+        ready: '.definition-list',
+        email: {
+            label: 'E-mail institucional',
+        },
+        name: {
+            label: 'Nome',
+        }
+    },
 }

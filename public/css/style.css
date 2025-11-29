@@ -14,6 +14,7 @@
 @import "./components/pipeline.css";
 @import "./components/subject-list.css";
 @import "./components/students-modal.css";
+@import "./components/professors-modal.css";
 
 /* Section Styles */
 @import "./sections/matched-section.css";

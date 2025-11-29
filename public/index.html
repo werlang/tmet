@@ -117,17 +117,30 @@
         </div>
 
         <div class="pipeline-section students-section">
-            <h2>Step 4: Extract Students from Matched Subjects</h2>
+            <h2>Step 4: Extract Students & Professors from Matched Subjects</h2>
             <div class="pipeline-content">
-                <p class="section-description">Select subjects to scrape student enrollment data from SUAP</p>
+                <p class="section-description">Select subjects to scrape student and professor data from SUAP</p>
                 <div class="students-controls">
-                    <div class="selection-buttons">
-                        <button id="select-all-students-btn" class="btn-secondary small">Select All</button>
-                        <button id="select-not-scraped-btn" class="btn-secondary small">Select Not Scraped</button>
-                        <button id="deselect-all-students-btn" class="btn-secondary small">Deselect All</button>
+                    <div class="selection-row">
+                        <div class="selection-group">
+                            <span class="selection-label">Students:</span>
+                            <button id="select-all-students-btn" class="btn-secondary small">All</button>
+                            <button id="select-students-not-scraped-btn" class="btn-secondary small">Not Scraped</button>
+                            <button id="deselect-all-students-btn" class="btn-secondary small">None</button>
+                        </div>
+                        <div class="selection-group">
+                            <span class="selection-label">Professors:</span>
+                            <button id="select-all-professors-btn" class="btn-secondary small">All</button>
+                            <button id="select-professors-not-scraped-btn" class="btn-secondary small">Not Scraped</button>
+                            <button id="deselect-all-professors-btn" class="btn-secondary small">None</button>
+                        </div>
                         <span id="students-selected-count" class="students-selected-count">0 selected</span>
                     </div>
-                    <button id="extract-students-btn" class="pipeline-btn primary" disabled>Extract Students</button>
+                    <div class="extract-buttons">
+                        <button id="extract-students-btn" class="pipeline-btn primary" disabled>Extract Both</button>
+                        <button id="extract-students-only-btn" class="pipeline-btn secondary" disabled>Students Only</button>
+                        <button id="extract-professors-only-btn" class="pipeline-btn secondary" disabled>Professors Only</button>
+                    </div>
                 </div>
                 <div id="students-subject-list" class="students-subject-list"></div>
             </div>
@@ -140,6 +153,17 @@
                 <div class="button-row">
                     <button id="generate-students-csv-btn" class="pipeline-btn primary">Generate Students CSV</button>
                     <button id="upload-students-btn" class="pipeline-btn secondary" disabled title="Coming soon">Upload Students to Moodle</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2>Step 6: Generate & Upload Professors</h2>
+            <div class="pipeline-content">
+                <p class="section-description">Generate a CSV file with professor assignments for bulk upload to Moodle</p>
+                <div class="button-row">
+                    <button id="generate-professors-csv-btn" class="pipeline-btn primary">Generate Professors CSV</button>
+                    <button id="upload-professors-btn" class="pipeline-btn secondary" disabled title="Coming soon">Upload Professors to Moodle</button>
                 </div>
             </div>
         </div>

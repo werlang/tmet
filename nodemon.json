@@ -1,5 +1,9 @@
 {
     "ignore": [
-        "*.json"
+        "files/*",
+        "coverage/*",
+        "__tests__/*",
+        "*.json",
+        "*.csv"
     ]
 }

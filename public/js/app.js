@@ -65,12 +65,21 @@ class SubjectMatcherApp {
             // Students section
             studentsSubjectList: document.getElementById('students-subject-list'),
             extractStudentsBtn: document.getElementById('extract-students-btn'),
+            extractStudentsOnlyBtn: document.getElementById('extract-students-only-btn'),
+            extractProfessorsOnlyBtn: document.getElementById('extract-professors-only-btn'),
             selectAllStudentsBtn: document.getElementById('select-all-students-btn'),
-            selectNotScrapedBtn: document.getElementById('select-not-scraped-btn'),
+            selectStudentsNotScrapedBtn: document.getElementById('select-students-not-scraped-btn'),
             deselectAllStudentsBtn: document.getElementById('deselect-all-students-btn'),
+            selectAllProfessorsBtn: document.getElementById('select-all-professors-btn'),
+            selectProfessorsNotScrapedBtn: document.getElementById('select-professors-not-scraped-btn'),
+            deselectAllProfessorsBtn: document.getElementById('deselect-all-professors-btn'),
             studentsSelectedCount: document.getElementById('students-selected-count'),
             generateStudentsCsvBtn: document.getElementById('generate-students-csv-btn'),
             uploadStudentsBtn: document.getElementById('upload-students-btn'),
+            
+            // Professors section
+            generateProfessorsCsvBtn: document.getElementById('generate-professors-csv-btn'),
+            uploadProfessorsBtn: document.getElementById('upload-professors-btn'),
         };
     }
 

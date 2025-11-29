@@ -170,6 +170,31 @@ export const sampleAIMatchResponse = `{"moodleFullname": "[2025.1] INF-2AT-G2 - 
 {"moodleFullname": "[2025.1] INF-2AT-G2 - Banco de Dados", "suapIds": ["60241"], "confidence": 0.9}`;
 
 /**
+ * Sample professors data for testing
+ */
+export const sampleProfessorsData = {
+    subjects: {
+        "60244": ["1234567", "2345678"],
+        "60241": ["1234567"],
+        "60240": ["3456789"]
+    },
+    professors: {
+        "1234567": {
+            name: "João Silva",
+            email: "joao.silva@ifsul.edu.br"
+        },
+        "2345678": {
+            name: "Maria Santos",
+            email: "maria.santos@ifsul.edu.br"
+        },
+        "3456789": {
+            name: "Pedro Oliveira",
+            email: "pedro.oliveira@ifsul.edu.br"
+        }
+    }
+};
+
+/**
  * Sample job data
  */
 export const sampleJob = {

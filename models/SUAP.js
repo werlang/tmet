@@ -10,10 +10,12 @@ import suapConfig from '../config/suap-config.js';
 export default class SUAP {
     #dataPath;
     #studentsPath;
+    #professorsPath;
 
     constructor() {
         this.#dataPath = path.resolve('files', 'suap_subjects.json');
         this.#studentsPath = path.resolve('files', 'suap_students.json');
+        this.#professorsPath = path.resolve('files', 'suap_professors.json');
     }
 
     /**
@@ -105,18 +107,57 @@ export default class SUAP {
 
     /**
      * Scrape students from a SUAP subject
+     * Also extracts professor information from the subject page
      * @param {string} subjectId - The SUAP subject ID (diario ID)
      * @param {Function} progressCallback - Optional callback for progress updates
-     * @returns {Promise<Array>} Array of student objects with name, email, and enrollment
+     * @returns {Promise<Object>} Object with students array and professors array
      */
     async scrapeStudents(subjectId, progressCallback = null) {
         await SUAPScraper.initialize();
 
-        // Step 1: Get student list from subject page
+        // Step 1: Go to subject main page first to extract professors
+        const mainUrl = `${suapConfig.baseUrl}/${suapConfig.subjectDetail.url}/${subjectId}/`;
+        
+        if (progressCallback) progressCallback(`Loading subject page...`);
+        await SUAPScraper.goto(mainUrl, '.title-container');
+
+        console.log(`Scraping professors for subject ${subjectId}...`);
+
+        // Extract professor info from the "Professores" box table
+        // The table has columns: Ações, Matrícula, Nome, Campus, Tipo, Carga Horária, Ativo, Período da Posse
+        const basicProfessors = await SUAPScraper.evaluate(() => {
+            const professors = [];
+            
+            // Find the "Professores" box by looking for h3 with that text
+            const boxes = document.querySelectorAll('.box');
+            for (const box of boxes) {
+                const title = box.querySelector('h3')?.textContent?.trim();
+                if (title === 'Professores') {
+                    // Found the professors box - get the table rows
+                    const rows = box.querySelectorAll('table tbody tr');
+                    rows.forEach((tr) => {
+                        const cells = tr.querySelectorAll('td');
+                        if (cells.length >= 3) {
+                            // cells[1] = Matrícula (SIAPE), cells[2] = Nome
+                            const siape = cells[1]?.textContent?.trim();
+                            const name = cells[2]?.textContent?.trim();
+                            if (siape && name && !professors.find(p => p.siape === siape)) {
+                                professors.push({ siape, name });
+                            }
+                        }
+                    });
+                    break;
+                }
+            }
+            return professors;
+        });
+
+        console.log(`Found ${basicProfessors.length} professors`);
+
+        // Step 2: Get student list from notas_faltas tab
         const tab = suapConfig.subjectDetail.tab;
         const url = `${suapConfig.baseUrl}/${suapConfig.subjectDetail.url}/${subjectId}/?tab=${tab}`;
         
-        if (progressCallback) progressCallback(`Loading subject page...`);
         await SUAPScraper.goto(url, suapConfig.subjectDetail.ready);
 
         console.log(`Scraping students for subject ${subjectId}...`);
@@ -142,9 +183,26 @@ export default class SUAP {
         }, { rowsSelector: suapConfig.subjectDetail.students.rows });
 
         console.log(`Found ${basicStudents.length} students. Fetching emails...`);
-        if (progressCallback) progressCallback(`Found ${basicStudents.length} students. Fetching emails...`);
+        if (progressCallback) progressCallback(`Found ${basicStudents.length} students, ${basicProfessors.length} professors. Fetching emails...`);
 
-        // Step 2: Fetch email for each student from their profile page
+        // Step 3: Fetch email for each professor from their profile page
+        const professors = [];
+        for (let i = 0; i < basicProfessors.length; i++) {
+            const professor = basicProfessors[i];
+            
+            if (progressCallback) {
+                progressCallback(`Fetching email for professor ${i + 1}/${basicProfessors.length}:\n${professor.name}`);
+            }
+            
+            const email = await this.#fetchProfessorEmail(professor.siape);
+            professors.push({
+                name: professor.name,
+                email,
+                siape: professor.siape,
+            });
+        }
+
+        // Step 4: Fetch email for each student from their profile page
         const students = [];
         for (let i = 0; i < basicStudents.length; i++) {
             const student = basicStudents[i];
@@ -161,13 +219,14 @@ export default class SUAP {
             });
         }
 
-        console.log(`Completed fetching ${students.length} students with emails`);
-        if (progressCallback) progressCallback(`Completed fetching ${students.length} students. Saving...`);
+        console.log(`Completed fetching ${students.length} students and ${professors.length} professors with emails`);
+        if (progressCallback) progressCallback(`Completed. Saving ${students.length} students and ${professors.length} professors...`);
 
-        // Save students to file
+        // Save students and professors to file
         await this.#saveStudents(subjectId, students);
+        await this.#saveProfessors(subjectId, professors);
 
-        return students;
+        return { students, professors };
     }
 
     /**
@@ -212,6 +271,73 @@ export default class SUAP {
     }
 
     /**
+     * Scrape only students from a SUAP subject (without professors)
+     * @param {string} subjectId - The SUAP subject ID (diario ID)
+     * @param {Function} progressCallback - Optional callback for progress updates
+     * @returns {Promise<Array>} Array of student objects with name, email, and enrollment
+     */
+    async scrapeStudentsOnly(subjectId, progressCallback = null) {
+        await SUAPScraper.initialize();
+
+        // Navigate directly to notas_faltas tab for students
+        const tab = suapConfig.subjectDetail.tab;
+        const url = `${suapConfig.baseUrl}/${suapConfig.subjectDetail.url}/${subjectId}/?tab=${tab}`;
+        
+        if (progressCallback) progressCallback(`Loading students page...`);
+        await SUAPScraper.goto(url, suapConfig.subjectDetail.ready);
+
+        console.log(`Scraping students only for subject ${subjectId}...`);
+
+        if (progressCallback) progressCallback(`Extracting student list...`);
+        const basicStudents = await SUAPScraper.evaluate((config) => {
+            const rows = [];
+            document.querySelectorAll(config.rowsSelector).forEach((tr) => {
+                // Get enrollment from link href
+                const enrollmentLink = tr.querySelector('a[href^="/edu/aluno/"]');
+                const enrollment = enrollmentLink?.getAttribute('href')?.match(/\/edu\/aluno\/([^/]+)\//)?.[1];
+                
+                // Get name from image alt
+                const img = tr.querySelector('img[alt^="Foto de "]');
+                const name = img?.getAttribute('alt')?.replace('Foto de ', '');
+                
+                // Only add rows that have valid student data
+                if (enrollment && name) {
+                    rows.push({ enrollment, name });
+                }
+            });
+            return rows;
+        }, { rowsSelector: suapConfig.subjectDetail.students.rows });
+
+        console.log(`Found ${basicStudents.length} students. Fetching emails...`);
+        if (progressCallback) progressCallback(`Found ${basicStudents.length} students. Fetching emails...`);
+
+        // Fetch email for each student from their profile page
+        const students = [];
+        for (let i = 0; i < basicStudents.length; i++) {
+            const student = basicStudents[i];
+            
+            if (progressCallback) {
+                progressCallback(`Fetching email for student ${i + 1}/${basicStudents.length}:\n${student.name}`);
+            }
+            
+            const email = await this.#fetchStudentEmail(student.enrollment);
+            students.push({
+                name: student.name,
+                email,
+                enrollment: student.enrollment,
+            });
+        }
+
+        console.log(`Completed fetching ${students.length} students with emails`);
+        if (progressCallback) progressCallback(`Completed. Saving ${students.length} students...`);
+
+        // Save only students to file
+        await this.#saveStudents(subjectId, students);
+
+        return students;
+    }
+
+    /**
      * Fetch a student's email from their profile page
      * @param {string} enrollment - Student enrollment ID
      * @returns {Promise<string|null>} Student email or null if not found
@@ -242,5 +368,162 @@ export default class SUAP {
             console.error(`Error fetching email for ${enrollment}:`, error.message);
             return null;
         }
+    }
+
+    /**
+     * Scrape professors from a SUAP subject
+     * @param {string} subjectId - The SUAP subject ID (diario ID)
+     * @param {Function} progressCallback - Optional callback for progress updates
+     * @returns {Promise<Array>} Array of professor objects with name, email, and siape
+     */
+    async scrapeProfessors(subjectId, progressCallback = null) {
+        await SUAPScraper.initialize();
+
+        // Step 1: Get professor list from subject page (main diario page)
+        const url = `${suapConfig.baseUrl}/${suapConfig.subjectDetail.url}/${subjectId}/`;
+        
+        if (progressCallback) progressCallback(`Loading subject page...`);
+        await SUAPScraper.goto(url, '.title-container');
+
+        console.log(`Scraping professors for subject ${subjectId}...`);
+
+        if (progressCallback) progressCallback(`Extracting professor list...`);
+        
+        // Extract professor info from the "Professores" box table
+        // The table has columns: Ações, Matrícula, Nome, Campus, Tipo, Carga Horária, Ativo, Período da Posse
+        const basicProfessors = await SUAPScraper.evaluate(() => {
+            const professors = [];
+            
+            // Find the "Professores" box by looking for h3 with that text
+            const boxes = document.querySelectorAll('.box');
+            for (const box of boxes) {
+                const title = box.querySelector('h3')?.textContent?.trim();
+                if (title === 'Professores') {
+                    // Found the professors box - get the table rows
+                    const rows = box.querySelectorAll('table tbody tr');
+                    rows.forEach((tr) => {
+                        const cells = tr.querySelectorAll('td');
+                        if (cells.length >= 3) {
+                            // cells[1] = Matrícula (SIAPE), cells[2] = Nome
+                            const siape = cells[1]?.textContent?.trim();
+                            const name = cells[2]?.textContent?.trim();
+                            if (siape && name && !professors.find(p => p.siape === siape)) {
+                                professors.push({ siape, name });
+                            }
+                        }
+                    });
+                    break;
+                }
+            }
+            return professors;
+        });
+
+        console.log(`Found ${basicProfessors.length} professors. Fetching emails...`);
+        if (progressCallback) progressCallback(`Found ${basicProfessors.length} professors. Fetching emails...`);
+
+        // Step 2: Fetch email for each professor from their profile page
+        const professors = [];
+        for (let i = 0; i < basicProfessors.length; i++) {
+            const professor = basicProfessors[i];
+            
+            if (progressCallback) {
+                progressCallback(`Fetching email for professor ${i + 1}/${basicProfessors.length}:\n${professor.name}`);
+            }
+            
+            const email = await this.#fetchProfessorEmail(professor.siape);
+            professors.push({
+                name: professor.name,
+                email,
+                siape: professor.siape,
+            });
+        }
+
+        console.log(`Completed fetching ${professors.length} professors with emails`);
+        if (progressCallback) progressCallback(`Completed fetching ${professors.length} professors. Saving...`);
+
+        // Save professors to file
+        await this.#saveProfessors(subjectId, professors);
+
+        return professors;
+    }
+
+    /**
+     * Fetch a professor's email from their profile page
+     * @param {string} siape - Professor SIAPE ID
+     * @returns {Promise<string|null>} Professor email or null if not found
+     */
+    async #fetchProfessorEmail(siape) {
+        const url = `${suapConfig.baseUrl}/${suapConfig.professorProfile.url}/${siape}/`;
+        
+        try {
+            await SUAPScraper.goto(url, suapConfig.professorProfile.ready);
+            
+            const email = await SUAPScraper.evaluate((config) => {
+                // Find the dt element with "E-mail" text (could be "E-mail Institucional" or others)
+                const dtElements = document.querySelectorAll('dt');
+                for (const dt of dtElements) {
+                    const dtText = dt.textContent.trim();
+                    // Check for exact match first, then partial match for email labels
+                    if (dtText === config.emailLabel || dtText.toLowerCase().includes('e-mail')) {
+                        // Get the next sibling dd element
+                        const dd = dt.nextElementSibling;
+                        if (dd && dd.tagName === 'DD') {
+                            const emailText = dd.textContent.trim();
+                            // Validate it looks like an email
+                            if (emailText && emailText.includes('@')) {
+                                return emailText;
+                            }
+                        }
+                    }
+                }
+                return null;
+            }, { emailLabel: suapConfig.professorProfile.email.label });
+            
+            return email;
+        } catch (error) {
+            console.error(`Error fetching email for professor ${siape}:`, error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Save professors to JSON file
+     * @param {string} subjectId - The SUAP subject ID
+     * @param {Array} professors - Array of professor objects
+     */
+    async #saveProfessors(subjectId, professors) {
+        let data = {
+            subjects: {},
+            professors: {}
+        };
+        
+        // Load existing data if file exists
+        if (fs.existsSync(this.#professorsPath)) {
+            try {
+                const content = fs.readFileSync(this.#professorsPath, 'utf-8');
+                const existingData = JSON.parse(content);
+                // Ensure structure exists (handle legacy format)
+                data.subjects = existingData.subjects || {};
+                data.professors = existingData.professors || {};
+            } catch (error) {
+                console.error('Error reading existing professors file:', error.message);
+            }
+        }
+        
+        // Store SIAPE list for this subject
+        const siapes = professors.map(p => p.siape);
+        data.subjects[subjectId] = siapes;
+        
+        // Add/update professor info (deduplicated by SIAPE)
+        professors.forEach(professor => {
+            data.professors[professor.siape] = {
+                name: professor.name,
+                email: professor.email
+            };
+        });
+        
+        // Write back to file
+        fs.writeFileSync(this.#professorsPath, JSON.stringify(data, null, 2));
+        console.log(`Saved ${professors.length} professors to ${this.#professorsPath}`);
     }
 }

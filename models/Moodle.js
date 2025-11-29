@@ -236,4 +236,122 @@ export default class Moodle {
             processedSubjects
         };
     }
+
+    /**
+     * Generate professors CSV for Moodle bulk enrollment
+     * Uses matched subjects and their professors from suap_professors.json
+     * @param {Function} progressCallback - Optional progress callback
+     * @returns {Promise<Object>} Result with file path and stats
+     */
+    async generateProfessorCSV(progressCallback = null) {
+        const professorsPath = path.resolve('files', 'suap_professors.json');
+        const csvPath = path.resolve('files', 'moodle_professors.csv');
+
+        if (progressCallback) progressCallback('Loading professors data');
+
+        if (!fs.existsSync(professorsPath)) {
+            throw new Error('Professors data not found. Extract professors first.');
+        }
+
+        if (!fs.existsSync(this.#csvPath)) {
+            throw new Error('Moodle courses CSV not found. Generate courses CSV first.');
+        }
+
+        const professorsData = JSON.parse(fs.readFileSync(professorsPath, 'utf-8'));
+        const { subjects: subjectProfessors, professors: professorInfo } = professorsData;
+
+        // Load all matches from unified matches.json
+        const matchesPath = path.resolve('files', 'matches.json');
+        const moodleCsvContent = fs.readFileSync(this.#csvPath, 'utf-8');
+        const matches = fs.existsSync(matchesPath) 
+            ? JSON.parse(fs.readFileSync(matchesPath, 'utf-8')) 
+            : [];
+
+        // Parse Moodle CSV to get shortnames
+        const moodleSubjects = moodleCsvContent
+            .split('\n')
+            .slice(1) // Skip header
+            .map(line => {
+                const match = line?.match(/"(.+)", (.+), (\d+)/);
+                if (!match) return null;
+                return {
+                    fullname: match[1],
+                    shortname: match[2],
+                    category: match[3]
+                };
+            })
+            .filter(s => s !== null);
+
+        if (progressCallback) progressCallback('Processing matched subjects');
+
+        const csvRows = [];
+        const header = ['username', 'password', 'firstname', 'lastname', 'email', 'course1', 'role1'];
+        csvRows.push(header);
+
+        let totalProfessors = 0;
+        let processedSubjects = 0;
+
+        // Process each match (auto and manual) to find professors
+        for (const match of matches) {
+            const moodleSubject = moodleSubjects.find(s => s.fullname === match.moodleFullname);
+            if (!moodleSubject) continue;
+
+            // Handle both single and array suapId
+            const suapIds = Array.isArray(match.suapId) ? match.suapId : [match.suapId];
+
+            // Collect unique SIAPEs from all SUAP subjects
+            const siapeSet = new Set();
+            for (const suapId of suapIds) {
+                const siapes = subjectProfessors[suapId] || [];
+                siapes.forEach(s => siapeSet.add(s));
+            }
+
+            // Add professors to CSV
+            for (const siape of siapeSet) {
+                const professor = professorInfo[siape];
+                if (!professor) continue;
+
+                const professorName = professor.name || '';
+                const professorEmail = professor.email || '';
+                const nameParts = professorName.trim().split(/\s+/);
+                const firstName = nameParts[0] || '';
+                const lastName = nameParts.slice(1).join(' ') || '';
+                // Username is email prefix (before @), password is fixed 123456
+                const username = professorEmail.split('@')[0] || '';
+
+                // Skip if no valid username (email is required)
+                if (!username) continue;
+
+                csvRows.push([
+                    username,
+                    '123456',
+                    firstName,
+                    lastName,
+                    professorEmail,
+                    moodleSubject.shortname,
+                    'editingteacher'
+                ]);
+                totalProfessors++;
+            }
+
+            processedSubjects++;
+            if (progressCallback) {
+                progressCallback(`Processed ${processedSubjects}/${matches.length} subjects`);
+            }
+        }
+
+        if (progressCallback) progressCallback('Writing CSV file');
+
+        const csvString = csvRows.map(row => row.join(',')).join('\n');
+        fs.writeFileSync(csvPath, csvString);
+
+        console.log(`Professor CSV generated at: ${csvPath}`);
+        console.log(`Total professors: ${totalProfessors}, Subjects processed: ${processedSubjects}`);
+
+        return {
+            file: csvPath,
+            totalProfessors,
+            processedSubjects
+        };
+    }
 }
