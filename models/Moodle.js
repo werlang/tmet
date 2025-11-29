@@ -90,7 +90,7 @@ export default class Moodle {
         if (progressCallback) progressCallback('Initializing Moodle uploader');
         
         const uploader = new MoodleUploader(
-            process.env.MOODLE_URL || 'https://apnp.ifsul.edu.br',
+            process.env.MOODLE_URL,
             process.env.MOODLE_TOKEN,
         );
 

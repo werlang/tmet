@@ -56,6 +56,11 @@ export default class MoodleUploader {
             'courses[0][categoryid]': course.category,
         }).toString();
 
+        // Failsafe: block API calls outside production
+        if (process.env.NODE_ENV !== 'production') {
+            console.log(`[DEV MODE] Moodle API call blocked. Params: ${params}`);
+            return { skipped: true, reason: 'development mode' };
+        }
         const response = await Request.post(`${this.webserviceUrl}?${params}`);
         console.log(response);
     }

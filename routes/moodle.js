@@ -44,10 +44,20 @@ router.post('/csv', async (req, res) => {
 
 /**
  * POST /moodle/courses
- * Upload courses to Moodle
+ * Upload courses to Moodle (production only)
  */
 router.post('/courses', async (req, res) => {
     try {
+        // Safety check: uploads are production-only
+        if (process.env.NODE_ENV !== 'production') {
+            return res.status(200).json({
+                success: true,
+                message: 'Moodle upload is disabled in development mode',
+                skipped: true,
+                environment: process.env.NODE_ENV || 'unknown'
+            });
+        }
+
         console.log('Starting Moodle course upload job...');
 
         const jobQueue = req.app.locals.jobQueue;
