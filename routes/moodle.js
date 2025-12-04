@@ -48,16 +48,6 @@ router.post('/csv', async (req, res) => {
  */
 router.post('/courses', async (req, res) => {
     try {
-        // Safety check: uploads are production-only
-        if (process.env.NODE_ENV !== 'production') {
-            return res.status(200).json({
-                success: true,
-                message: 'Moodle upload is disabled in development mode',
-                skipped: true,
-                environment: process.env.NODE_ENV || 'unknown'
-            });
-        }
-
         console.log('Starting Moodle course upload job...');
 
         const jobQueue = req.app.locals.jobQueue;
@@ -184,8 +174,21 @@ async function processUploadCourses(jobId, updateProgress) {
 
     console.log(`[${jobId}] Course upload completed`);
 
+    // Generate appropriate message based on results
+    const successCount = results.success?.length || 0;
+    const errorCount = results.errors?.length || 0;
+    let message;
+    
+    if (errorCount > 0 && successCount === 0) {
+        message = `Course upload failed: ${results.errors[0]?.error || 'Unknown error'}`;
+    } else if (errorCount > 0) {
+        message = `Courses uploaded with errors: ${successCount} succeeded, ${errorCount} failed`;
+    } else {
+        message = `${successCount} courses uploaded successfully`;
+    }
+
     return {
-        message: 'Courses uploaded successfully',
+        message,
         results
     };
 }

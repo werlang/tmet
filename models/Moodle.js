@@ -96,6 +96,8 @@ export default class Moodle {
 
         const courses = fs.readFileSync(this.#csvPath, 'utf-8')
             .split('\n')
+            .slice(1) // Skip header row
+            .filter(line => line.trim()) // Skip empty lines
             .map(line => line.split(',').map(item => item.trim()))
             .map(item => ({
                 fullname: item[0],
@@ -103,23 +105,14 @@ export default class Moodle {
                 category: item[2],
             }));
 
+        // console.log(courses);
+
         if (progressCallback) progressCallback(`Uploading ${courses.length} courses to Moodle`);
 
         // Upload via API
         console.log('\n=== Uploading via Moodle Web Service API ===\n');
         const results = await uploader.uploadCourses(courses, progressCallback);
         
-        console.log('\n=== Upload Summary ===');
-        console.log(`✓ Successfully created: ${results.success.length}`);
-        console.log(`✗ Failed: ${results.errors.length}`);
-        
-        if (results.errors.length > 0) {
-            console.log('\nErrors:');
-            results.errors.forEach(err => {
-                console.log(`  - ${err.course}: ${err.error}`);
-            });
-        }
-
         return results;
     }
 
