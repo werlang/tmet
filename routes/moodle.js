@@ -320,14 +320,15 @@ async function processUploadStudents(jobId, updateProgress) {
     const successCount = results.success?.length || 0;
     const errorCount = results.errors?.length || 0;
     const skippedCount = results.skipped?.length || 0;
+    const createdCount = results.created?.length || 0;
     let message;
     
     if (errorCount > 0 && successCount === 0) {
         message = `Student upload failed: ${results.errors[0]?.error || 'Unknown error'}`;
     } else if (errorCount > 0 || skippedCount > 0) {
-        message = `Students uploaded: ${successCount} enrolled, ${skippedCount} skipped, ${errorCount} errors`;
+        message = `Students uploaded: ${successCount} enrolled${createdCount > 0 ? ` (${createdCount} new)` : ''}, ${skippedCount} skipped, ${errorCount} errors`;
     } else {
-        message = `${successCount} students enrolled successfully`;
+        message = `${successCount} students enrolled successfully${createdCount > 0 ? ` (${createdCount} new users created)` : ''}`;
     }
 
     return {
@@ -355,14 +356,15 @@ async function processUploadProfessors(jobId, updateProgress) {
     const successCount = results.success?.length || 0;
     const errorCount = results.errors?.length || 0;
     const skippedCount = results.skipped?.length || 0;
+    const createdCount = results.created?.length || 0;
     let message;
     
     if (errorCount > 0 && successCount === 0) {
         message = `Professor upload failed: ${results.errors[0]?.error || 'Unknown error'}`;
     } else if (errorCount > 0 || skippedCount > 0) {
-        message = `Professors uploaded: ${successCount} enrolled, ${skippedCount} skipped, ${errorCount} errors`;
+        message = `Professors uploaded: ${successCount} enrolled${createdCount > 0 ? ` (${createdCount} new)` : ''}, ${skippedCount} skipped, ${errorCount} errors`;
     } else {
-        message = `${successCount} professors enrolled successfully`;
+        message = `${successCount} professors enrolled successfully${createdCount > 0 ? ` (${createdCount} new users created)` : ''}`;
     }
 
     return {

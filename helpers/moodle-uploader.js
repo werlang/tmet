@@ -59,6 +59,7 @@ export default class MoodleUploader {
             wstoken: this.token,
             wsfunction: 'enrol_manual_enrol_users',
             moodlewsrestformat: 'json',
+            // force create user if not exists
         };
 
         for (let i = 0; i < enrollments.length; i++) {
@@ -132,10 +133,61 @@ export default class MoodleUploader {
     }
 
     /**
-     * Upload students to Moodle - looks up users and courses, then enrolls them
-     * @param {Array} students - Array of student objects with username, course (shortname)
+     * Create a new user in Moodle
+     * @param {Object} user - User object with username, password, firstname, lastname, email
+     * @returns {Promise<number|null>} User ID or null if creation failed
+     */
+    async createUser(user) {
+        const params = {
+            wstoken: this.token,
+            wsfunction: 'core_user_create_users',
+            moodlewsrestformat: 'json',
+            'users[0][username]': user.username,
+            'users[0][password]': user.password,
+            'users[0][firstname]': user.firstname,
+            'users[0][lastname]': user.lastname,
+            'users[0][email]': user.email,
+            'users[0][auth]': 'manual',
+        };
+
+        const response = await Request.post(`${this.webserviceUrl}?${new URLSearchParams(params).toString()}`);
+        
+        if (response.exception || response.errorcode) {
+            console.error(`Failed to create user ${user.username}:`, response.message || response.exception);
+            return null;
+        }
+
+        // Response is array of created users with their IDs
+        if (Array.isArray(response) && response.length > 0) {
+            console.log(`Created user ${user.username} with ID ${response[0].id}`);
+            return response[0].id;
+        }
+        return null;
+    }
+
+    /**
+     * Get or create user - looks up user, creates if not found
+     * @param {Object} user - User object with username, password, firstname, lastname, email
+     * @returns {Promise<{id: number|null, created: boolean}>} User ID and whether it was created
+     */
+    async getOrCreateUser(user) {
+        // First try to find existing user
+        let userId = await this.getUserByUsername(user.username);
+        
+        if (userId) {
+            return { id: userId, created: false };
+        }
+
+        // User not found, create them
+        userId = await this.createUser(user);
+        return { id: userId, created: true };
+    }
+
+    /**
+     * Upload students to Moodle - looks up users (creates if needed) and courses, then enrolls them
+     * @param {Array} students - Array of student objects with username, password, firstname, lastname, email, course
      * @param {Function} progressCallback - Optional callback for progress updates
-     * @returns {Promise<Object>} Result with success and errors arrays
+     * @returns {Promise<Object>} Result with success, errors, skipped, and created arrays
      */
     async uploadStudents(students, progressCallback = null) {
         console.log(`Processing ${students.length} student enrollments...`);
@@ -143,7 +195,8 @@ export default class MoodleUploader {
         const results = {
             success: [],
             errors: [],
-            skipped: []
+            skipped: [],
+            created: []
         };
 
         // Cache for user and course lookups
@@ -158,18 +211,22 @@ export default class MoodleUploader {
             const student = students[i];
             
             if (progressCallback && i % 10 === 0) {
-                progressCallback(`Looking up user ${i + 1}/${students.length}...`);
+                progressCallback(`Processing user ${i + 1}/${students.length}...`);
             }
 
             try {
-                // Get user ID (with caching)
+                // Get or create user (with caching)
                 if (!userCache[student.username]) {
-                    userCache[student.username] = await this.getUserByUsername(student.username);
+                    const userResult = await this.getOrCreateUser(student);
+                    userCache[student.username] = userResult.id;
+                    if (userResult.created && userResult.id) {
+                        results.created.push({ student: student.username });
+                    }
                 }
                 const userId = userCache[student.username];
 
                 if (!userId) {
-                    results.skipped.push({ student: student.username, reason: 'User not found in Moodle' });
+                    results.skipped.push({ student: student.username, reason: 'Failed to get or create user' });
                     continue;
                 }
 
@@ -210,15 +267,15 @@ export default class MoodleUploader {
             }
         }
 
-        console.log(`Enrollment complete: ${results.success.length} enrolled, ${results.skipped.length} skipped, ${results.errors.length} errors`);
+        console.log(`Enrollment complete: ${results.success.length} enrolled, ${results.created.length} created, ${results.skipped.length} skipped, ${results.errors.length} errors`);
         return results;
     }
 
     /**
-     * Upload professors to Moodle - looks up users and courses, then enrolls them as teachers
-     * @param {Array} professors - Array of professor objects with username, course (shortname)
+     * Upload professors to Moodle - looks up users (creates if needed) and courses, then enrolls them as teachers
+     * @param {Array} professors - Array of professor objects with username, password, firstname, lastname, email, course
      * @param {Function} progressCallback - Optional callback for progress updates
-     * @returns {Promise<Object>} Result with success and errors arrays
+     * @returns {Promise<Object>} Result with success, errors, skipped, and created arrays
      */
     async uploadProfessors(professors, progressCallback = null) {
         console.log(`Processing ${professors.length} professor enrollments...`);
@@ -226,7 +283,8 @@ export default class MoodleUploader {
         const results = {
             success: [],
             errors: [],
-            skipped: []
+            skipped: [],
+            created: []
         };
 
         // Cache for user and course lookups
@@ -241,18 +299,22 @@ export default class MoodleUploader {
             const professor = professors[i];
             
             if (progressCallback && i % 10 === 0) {
-                progressCallback(`Looking up professor ${i + 1}/${professors.length}...`);
+                progressCallback(`Processing professor ${i + 1}/${professors.length}...`);
             }
 
             try {
-                // Get user ID (with caching)
+                // Get or create user (with caching)
                 if (!userCache[professor.username]) {
-                    userCache[professor.username] = await this.getUserByUsername(professor.username);
+                    const userResult = await this.getOrCreateUser(professor);
+                    userCache[professor.username] = userResult.id;
+                    if (userResult.created && userResult.id) {
+                        results.created.push({ professor: professor.username });
+                    }
                 }
                 const userId = userCache[professor.username];
 
                 if (!userId) {
-                    results.skipped.push({ professor: professor.username, reason: 'User not found in Moodle' });
+                    results.skipped.push({ professor: professor.username, reason: 'Failed to get or create user' });
                     continue;
                 }
 
@@ -293,7 +355,7 @@ export default class MoodleUploader {
             }
         }
 
-        console.log(`Enrollment complete: ${results.success.length} enrolled, ${results.skipped.length} skipped, ${results.errors.length} errors`);
+        console.log(`Enrollment complete: ${results.success.length} enrolled, ${results.created.length} created, ${results.skipped.length} skipped, ${results.errors.length} errors`);
         return results;
     }
 

@@ -549,6 +549,7 @@ export default class StudentsSection {
             
             // Show detailed results
             const successCount = result.results?.success?.length || 0;
+            const createdCount = result.results?.created?.length || 0;
             const skippedCount = result.results?.skipped?.length || 0;
             const errorCount = result.results?.errors?.length || 0;
             
@@ -565,6 +566,7 @@ export default class StudentsSection {
             Toast.showDetails({
                 title: result.message || 'Student upload completed',
                 successCount,
+                createdCount,
                 skippedCount,
                 errorCount,
                 errors,
@@ -611,6 +613,7 @@ export default class StudentsSection {
             
             // Show detailed results
             const successCount = result.results?.success?.length || 0;
+            const createdCount = result.results?.created?.length || 0;
             const skippedCount = result.results?.skipped?.length || 0;
             const errorCount = result.results?.errors?.length || 0;
             
@@ -627,6 +630,7 @@ export default class StudentsSection {
             Toast.showDetails({
                 title: result.message || 'Professor upload completed',
                 successCount,
+                createdCount,
                 skippedCount,
                 errorCount,
                 errors,

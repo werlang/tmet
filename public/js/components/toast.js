@@ -84,12 +84,13 @@ export default class Toast {
      * @param {Object} options - Result options
      * @param {string} options.title - Main message
      * @param {number} options.successCount - Number of successful items
+     * @param {number} options.createdCount - Number of created items (e.g., new users)
      * @param {number} options.skippedCount - Number of skipped items
      * @param {number} options.errorCount - Number of errors
      * @param {Array} options.errors - Array of {id, message} objects
      * @param {Array} options.skipped - Array of {id, reason} objects
      */
-    static showDetails({ title, successCount = 0, skippedCount = 0, errorCount = 0, errors = [], skipped = [] }) {
+    static showDetails({ title, successCount = 0, createdCount = 0, skippedCount = 0, errorCount = 0, errors = [], skipped = [] }) {
         this.#init();
 
         const hasIssues = errorCount > 0 || skippedCount > 0;
@@ -99,7 +100,10 @@ export default class Toast {
         toast.className = `toast toast-${type} toast-expandable`;
         
         const icon = this.#getIcon(type);
-        const summary = `${successCount} succeeded, ${skippedCount} skipped, ${errorCount} errors`;
+        const summaryParts = [`${successCount} enrolled`];
+        if (createdCount > 0) summaryParts.push(`${createdCount} created`);
+        summaryParts.push(`${skippedCount} skipped`, `${errorCount} errors`);
+        const summary = summaryParts.join(', ');
         
         let detailsHtml = '';
         if (hasIssues) {

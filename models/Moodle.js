@@ -377,6 +377,10 @@ export default class Moodle {
                 const parts = line.split(',').map(item => item.trim());
                 return {
                     username: parts[0],
+                    password: parts[1],
+                    firstname: parts[2],
+                    lastname: parts[3],
+                    email: parts[4],
                     course: parts[5], // course1 is the shortname
                 };
             });
@@ -418,6 +422,10 @@ export default class Moodle {
                 const parts = line.split(',').map(item => item.trim());
                 return {
                     username: parts[0],
+                    password: parts[1],
+                    firstname: parts[2],
+                    lastname: parts[3],
+                    email: parts[4],
                     course: parts[5], // course1 is the shortname
                 };
             });
