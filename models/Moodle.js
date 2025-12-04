@@ -347,4 +347,86 @@ export default class Moodle {
             processedSubjects
         };
     }
+
+    /**
+     * Upload students to Moodle
+     * Reads the students CSV and enrolls them in courses
+     * @param {Function} progressCallback - Optional progress callback
+     * @returns {Promise<Object>} Upload results
+     */
+    async uploadStudents(progressCallback = null) {
+        const csvPath = path.resolve('files', 'moodle_students.csv');
+
+        if (!fs.existsSync(csvPath)) {
+            throw new Error('Students CSV file not found. Generate students CSV first.');
+        }
+
+        if (progressCallback) progressCallback('Initializing Moodle uploader');
+        
+        const uploader = new MoodleUploader(
+            process.env.MOODLE_URL,
+            process.env.MOODLE_TOKEN,
+        );
+
+        // Parse CSV - format: username,password,firstname,lastname,email,course1,role1
+        const students = fs.readFileSync(csvPath, 'utf-8')
+            .split('\n')
+            .slice(1) // Skip header row
+            .filter(line => line.trim()) // Skip empty lines
+            .map(line => {
+                const parts = line.split(',').map(item => item.trim());
+                return {
+                    username: parts[0],
+                    course: parts[5], // course1 is the shortname
+                };
+            });
+
+        if (progressCallback) progressCallback(`Uploading ${students.length} students to Moodle`);
+
+        console.log('\n=== Uploading Students via Moodle Web Service API ===\n');
+        const results = await uploader.uploadStudents(students, progressCallback);
+        
+        return results;
+    }
+
+    /**
+     * Upload professors to Moodle
+     * Reads the professors CSV and enrolls them in courses as teachers
+     * @param {Function} progressCallback - Optional progress callback
+     * @returns {Promise<Object>} Upload results
+     */
+    async uploadProfessors(progressCallback = null) {
+        const csvPath = path.resolve('files', 'moodle_professors.csv');
+
+        if (!fs.existsSync(csvPath)) {
+            throw new Error('Professors CSV file not found. Generate professors CSV first.');
+        }
+
+        if (progressCallback) progressCallback('Initializing Moodle uploader');
+        
+        const uploader = new MoodleUploader(
+            process.env.MOODLE_URL,
+            process.env.MOODLE_TOKEN,
+        );
+
+        // Parse CSV - format: username,password,firstname,lastname,email,course1,role1
+        const professors = fs.readFileSync(csvPath, 'utf-8')
+            .split('\n')
+            .slice(1) // Skip header row
+            .filter(line => line.trim()) // Skip empty lines
+            .map(line => {
+                const parts = line.split(',').map(item => item.trim());
+                return {
+                    username: parts[0],
+                    course: parts[5], // course1 is the shortname
+                };
+            });
+
+        if (progressCallback) progressCallback(`Uploading ${professors.length} professors to Moodle`);
+
+        console.log('\n=== Uploading Professors via Moodle Web Service API ===\n');
+        const results = await uploader.uploadProfessors(professors, progressCallback);
+        
+        return results;
+    }
 }

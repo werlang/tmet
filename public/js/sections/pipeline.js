@@ -221,10 +221,25 @@ export default class PipelineSection {
             });
 
             this.#progressModal.hide();
-            const summary = result.results
-                ? `Created: ${result.results.success.length}, Failed: ${result.results.errors.length}`
-                : '';
-            Toast.success((result.message || 'Courses uploaded successfully') + (summary ? '. ' + summary : ''));
+            
+            // Show detailed results
+            const successCount = result.results?.success?.length || 0;
+            const errorCount = result.results?.errors?.length || 0;
+            
+            // Format errors for Toast (domain-agnostic)
+            const errors = (result.results?.errors || []).map(e => ({
+                id: e.course || 'Unknown',
+                message: e.error || e.message || 'Unknown error'
+            }));
+            
+            Toast.showDetails({
+                title: result.message || 'Course upload completed',
+                successCount,
+                skippedCount: 0,
+                errorCount,
+                errors,
+                skipped: []
+            });
         } catch (error) {
             this.#progressModal.hide();
             // Error already handled in Moodle

@@ -67,6 +67,10 @@ export default class StudentsSection {
         // CSV generation
         this.#elements.generateStudentsCsvBtn.addEventListener('click', () => this.#generateStudentsCSV());
         this.#elements.generateProfessorsCsvBtn.addEventListener('click', () => this.#generateProfessorsCSV());
+        
+        // Upload to Moodle
+        this.#elements.uploadStudentsBtn.addEventListener('click', () => this.#uploadStudents());
+        this.#elements.uploadProfessorsBtn.addEventListener('click', () => this.#uploadProfessors());
     }
 
     /**
@@ -512,6 +516,130 @@ export default class StudentsSection {
                 this.#elements.generateProfessorsCsvBtn,
                 false,
                 'Generate Professors CSV'
+            );
+        }
+    }
+
+    /**
+     * Upload students to Moodle
+     */
+    async #uploadStudents() {
+        this.#updateButton(
+            this.#elements.uploadStudentsBtn,
+            true,
+            'Uploading...'
+        );
+
+        this.#progressModal.show({
+            title: 'Uploading Students to Moodle',
+            message: 'Preparing student enrollment data'
+        });
+
+        try {
+            const result = await this.#moodle.uploadStudents((message) => {
+                this.#progressModal.updateStatus(message);
+                this.#updateButton(
+                    this.#elements.uploadStudentsBtn,
+                    true,
+                    message
+                );
+            });
+
+            this.#progressModal.hide();
+            
+            // Show detailed results
+            const successCount = result.results?.success?.length || 0;
+            const skippedCount = result.results?.skipped?.length || 0;
+            const errorCount = result.results?.errors?.length || 0;
+            
+            // Format errors and skipped for Toast (domain-agnostic)
+            const errors = (result.results?.errors || []).map(e => ({
+                id: e.student || e.user || 'Unknown',
+                message: e.error || e.message || 'Unknown error'
+            }));
+            const skipped = (result.results?.skipped || []).map(s => ({
+                id: s.student || s.user || 'Unknown',
+                reason: s.reason || 'Unknown reason'
+            }));
+            
+            Toast.showDetails({
+                title: result.message || 'Student upload completed',
+                successCount,
+                skippedCount,
+                errorCount,
+                errors,
+                skipped
+            });
+        } catch (error) {
+            this.#progressModal.hide();
+            // Error already handled in Moodle
+        } finally {
+            this.#updateButton(
+                this.#elements.uploadStudentsBtn,
+                false,
+                'Upload Students to Moodle'
+            );
+        }
+    }
+
+    /**
+     * Upload professors to Moodle
+     */
+    async #uploadProfessors() {
+        this.#updateButton(
+            this.#elements.uploadProfessorsBtn,
+            true,
+            'Uploading...'
+        );
+
+        this.#progressModal.show({
+            title: 'Uploading Professors to Moodle',
+            message: 'Preparing professor enrollment data'
+        });
+
+        try {
+            const result = await this.#moodle.uploadProfessors((message) => {
+                this.#progressModal.updateStatus(message);
+                this.#updateButton(
+                    this.#elements.uploadProfessorsBtn,
+                    true,
+                    message
+                );
+            });
+
+            this.#progressModal.hide();
+            
+            // Show detailed results
+            const successCount = result.results?.success?.length || 0;
+            const skippedCount = result.results?.skipped?.length || 0;
+            const errorCount = result.results?.errors?.length || 0;
+            
+            // Format errors and skipped for Toast (domain-agnostic)
+            const errors = (result.results?.errors || []).map(e => ({
+                id: e.professor || e.user || 'Unknown',
+                message: e.error || e.message || 'Unknown error'
+            }));
+            const skipped = (result.results?.skipped || []).map(s => ({
+                id: s.professor || s.user || 'Unknown',
+                reason: s.reason || 'Unknown reason'
+            }));
+            
+            Toast.showDetails({
+                title: result.message || 'Professor upload completed',
+                successCount,
+                skippedCount,
+                errorCount,
+                errors,
+                skipped
+            });
+        } catch (error) {
+            this.#progressModal.hide();
+            // Error already handled in Moodle
+        } finally {
+            this.#updateButton(
+                this.#elements.uploadProfessorsBtn,
+                false,
+                'Upload Professors to Moodle'
             );
         }
     }

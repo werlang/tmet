@@ -138,6 +138,70 @@ router.post('/professors-csv', async (req, res) => {
     }
 });
 
+/**
+ * POST /moodle/students
+ * Upload students to Moodle
+ */
+router.post('/students', async (req, res) => {
+    try {
+        console.log('Starting Moodle student upload job...');
+
+        const jobQueue = req.app.locals.jobQueue;
+
+        // Start async job
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
+            return await processUploadStudents(jobId, updateProgress);
+        });
+
+        // Return job ID immediately
+        res.status(202).json({ 
+            success: true,
+            jobId,
+            message: 'Student upload job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+
+    } catch (error) {
+        console.error('Error uploading students:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
+/**
+ * POST /moodle/professors
+ * Upload professors to Moodle
+ */
+router.post('/professors', async (req, res) => {
+    try {
+        console.log('Starting Moodle professor upload job...');
+
+        const jobQueue = req.app.locals.jobQueue;
+
+        // Start async job
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
+            return await processUploadProfessors(jobId, updateProgress);
+        });
+
+        // Return job ID immediately
+        res.status(202).json({ 
+            success: true,
+            jobId,
+            message: 'Professor upload job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+
+    } catch (error) {
+        console.error('Error uploading professors:', error);
+        res.status(500).json({ 
+            success: false, 
+            error: error.message 
+        });
+    }
+});
+
 // Async function to process CSV generation
 async function processGenerateCSV(jobId, params, updateProgress) {
     updateProgress({
@@ -234,6 +298,76 @@ async function processGenerateProfessorsCSV(jobId, updateProgress) {
         message: `Professors CSV generated successfully. ${result.totalProfessors} professors from ${result.processedSubjects} subjects.`,
         file: 'files/moodle_professors.csv',
         ...result
+    };
+}
+
+// Async function to process student upload
+async function processUploadStudents(jobId, updateProgress) {
+    updateProgress({
+        message: 'Starting student upload...'
+    });
+
+    console.log(`[${jobId}] Starting student upload`);
+    
+    const moodle = new Moodle();
+    const results = await moodle.uploadStudents((message) => {
+        updateProgress({ message });
+    });
+
+    console.log(`[${jobId}] Student upload completed`);
+
+    // Generate appropriate message based on results
+    const successCount = results.success?.length || 0;
+    const errorCount = results.errors?.length || 0;
+    const skippedCount = results.skipped?.length || 0;
+    let message;
+    
+    if (errorCount > 0 && successCount === 0) {
+        message = `Student upload failed: ${results.errors[0]?.error || 'Unknown error'}`;
+    } else if (errorCount > 0 || skippedCount > 0) {
+        message = `Students uploaded: ${successCount} enrolled, ${skippedCount} skipped, ${errorCount} errors`;
+    } else {
+        message = `${successCount} students enrolled successfully`;
+    }
+
+    return {
+        message,
+        results
+    };
+}
+
+// Async function to process professor upload
+async function processUploadProfessors(jobId, updateProgress) {
+    updateProgress({
+        message: 'Starting professor upload...'
+    });
+
+    console.log(`[${jobId}] Starting professor upload`);
+    
+    const moodle = new Moodle();
+    const results = await moodle.uploadProfessors((message) => {
+        updateProgress({ message });
+    });
+
+    console.log(`[${jobId}] Professor upload completed`);
+
+    // Generate appropriate message based on results
+    const successCount = results.success?.length || 0;
+    const errorCount = results.errors?.length || 0;
+    const skippedCount = results.skipped?.length || 0;
+    let message;
+    
+    if (errorCount > 0 && successCount === 0) {
+        message = `Professor upload failed: ${results.errors[0]?.error || 'Unknown error'}`;
+    } else if (errorCount > 0 || skippedCount > 0) {
+        message = `Professors uploaded: ${successCount} enrolled, ${skippedCount} skipped, ${errorCount} errors`;
+    } else {
+        message = `${successCount} professors enrolled successfully`;
+    }
+
+    return {
+        message,
+        results
     };
 }
 

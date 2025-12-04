@@ -130,6 +130,62 @@ export default class Moodle {
     }
 
     /**
+     * Upload students to Moodle
+     * @param {Function} progressCallback - Optional callback for progress updates
+     * @returns {Promise<Object>} Result object
+     */
+    async uploadStudents(progressCallback) {
+        try {
+            const result = await Request.post('/api/moodle/students');
+            
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            // Poll for completion
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/jobs',
+                'Student upload',
+                progressCallback
+            );
+
+        } catch (error) {
+            console.error('Upload students error:', error);
+            Toast.error('Error uploading students: ' + error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Upload professors to Moodle
+     * @param {Function} progressCallback - Optional callback for progress updates
+     * @returns {Promise<Object>} Result object
+     */
+    async uploadProfessors(progressCallback) {
+        try {
+            const result = await Request.post('/api/moodle/professors');
+            
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            // Poll for completion
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/jobs',
+                'Professor upload',
+                progressCallback
+            );
+
+        } catch (error) {
+            console.error('Upload professors error:', error);
+            Toast.error('Error uploading professors: ' + error.message);
+            throw error;
+        }
+    }
+
+    /**
      * Poll job status until completion
      * @param {string} jobId - Job ID to poll
      * @param {string} endpoint - Status endpoint path
