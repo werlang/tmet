@@ -59,7 +59,6 @@ export default class MoodleUploader {
             wstoken: this.token,
             wsfunction: 'enrol_manual_enrol_users',
             moodlewsrestformat: 'json',
-            // force create user if not exists
         };
 
         for (let i = 0; i < enrollments.length; i++) {
@@ -74,7 +73,7 @@ export default class MoodleUploader {
         console.log(response);
 
         // Handle Moodle API error response
-        if (response.exception || response.errorcode) {
+        if (response?.exception || response?.errorcode) {
             return {
                 success: [],
                 errors: [{ user: 'all', error: response.message || response.exception }]
@@ -125,6 +124,7 @@ export default class MoodleUploader {
         }).toString();
 
         const response = await Request.get(`${this.webserviceUrl}?${params}`);
+        // console.log(response);
         
         if (response.courses && response.courses.length > 0) {
             return response.courses[0].id;
