@@ -78,4 +78,95 @@ export default class Toast {
     static warning(message, duration) {
         return this.show(message, 'warning', duration);
     }
+
+    /**
+     * Show upload results with expandable error details
+     * @param {Object} options - Result options
+     * @param {string} options.title - Main message
+     * @param {number} options.successCount - Number of successful items
+     * @param {number} options.skippedCount - Number of skipped items
+     * @param {number} options.errorCount - Number of errors
+     * @param {Array} options.errors - Array of {id, message} objects
+     * @param {Array} options.skipped - Array of {id, reason} objects
+     */
+    static showDetails({ title, successCount = 0, skippedCount = 0, errorCount = 0, errors = [], skipped = [] }) {
+        this.#init();
+
+        const hasIssues = errorCount > 0 || skippedCount > 0;
+        const type = errorCount > 0 && successCount === 0 ? 'error' : hasIssues ? 'warning' : 'success';
+        
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type} toast-expandable`;
+        
+        const icon = this.#getIcon(type);
+        const summary = `${successCount} succeeded, ${skippedCount} skipped, ${errorCount} errors`;
+        
+        let detailsHtml = '';
+        if (hasIssues) {
+            detailsHtml = `
+                <div class="toast-details">
+                    <button class="toast-toggle" aria-label="Toggle details">Show details ▼</button>
+                    <div class="toast-details-content" style="display: none;">`;
+            
+            if (errors.length > 0) {
+                detailsHtml += `<div class="toast-section"><strong>Errors:</strong><ul>`;
+                errors.slice(0, 10).forEach(err => {
+                    detailsHtml += `<li>${this.#escapeHtml(err.id)}: ${this.#escapeHtml(err.message)}</li>`;
+                });
+                if (errors.length > 10) {
+                    detailsHtml += `<li>... and ${errors.length - 10} more</li>`;
+                }
+                detailsHtml += `</ul></div>`;
+            }
+            
+            if (skipped.length > 0) {
+                detailsHtml += `<div class="toast-section"><strong>Skipped:</strong><ul>`;
+                skipped.slice(0, 10).forEach(skip => {
+                    detailsHtml += `<li>${this.#escapeHtml(skip.id)}: ${this.#escapeHtml(skip.reason)}</li>`;
+                });
+                if (skipped.length > 10) {
+                    detailsHtml += `<li>... and ${skipped.length - 10} more</li>`;
+                }
+                detailsHtml += `</ul></div>`;
+            }
+            
+            detailsHtml += `</div></div>`;
+        }
+        
+        toast.innerHTML = `
+            <span class="toast-icon">${icon}</span>
+            <div class="toast-body">
+                <span class="toast-message">${this.#escapeHtml(title)}</span>
+                <span class="toast-summary">${summary}</span>
+                ${detailsHtml}
+            </div>
+            <button class="toast-close" aria-label="Close">×</button>
+        `;
+
+        const closeBtn = toast.querySelector('.toast-close');
+        closeBtn.addEventListener('click', () => this.#remove(toast));
+        
+        // Toggle details
+        const toggleBtn = toast.querySelector('.toast-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                const content = toast.querySelector('.toast-details-content');
+                const isHidden = content.style.display === 'none';
+                content.style.display = isHidden ? 'block' : 'none';
+                toggleBtn.textContent = isHidden ? 'Hide details ▲' : 'Show details ▼';
+            });
+        }
+
+        this.#container.appendChild(toast);
+
+        // Trigger animation
+        setTimeout(() => toast.classList.add('toast-show'), 10);
+
+        // Don't auto-remove if there are issues to review
+        if (!hasIssues) {
+            setTimeout(() => this.#remove(toast), 5000);
+        }
+
+        return toast;
+    }
 }
