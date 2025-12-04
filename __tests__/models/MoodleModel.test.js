@@ -24,6 +24,14 @@ const mockMoodleUploader = jest.fn().mockImplementation(() => ({
     uploadCourses: jest.fn().mockResolvedValue({
         success: [{ id: 1 }],
         errors: []
+    }),
+    uploadStudents: jest.fn().mockResolvedValue({
+        success: [{ id: 1, username: 'student1' }],
+        errors: []
+    }),
+    uploadProfessors: jest.fn().mockResolvedValue({
+        success: [{ id: 1, username: 'professor1' }],
+        errors: []
     })
 }));
 
@@ -906,6 +914,209 @@ describe('Moodle Model', () => {
             expect(writtenCsv).toContain('123456');
             // Username should be email prefix
             expect(writtenCsv).toContain('joao.silva');
+        });
+    });
+
+    describe('uploadStudents()', () => {
+        const sampleStudentsCsv = `username,password,firstname,lastname,email,course1,role1
+joao.silva,123456,João,Silva,joao.silva@email.com,CH_INF_2AT_PW1_2025.1_G2,student
+maria.santos,123456,Maria,Santos,maria.santos@email.com,CH_INF_2AT_PW1_2025.1_G2,student`;
+
+        beforeEach(() => {
+            // Reset to default mock
+            mockMoodleUploader.mockImplementation(() => ({
+                uploadCourses: jest.fn().mockResolvedValue({ success: [], errors: [] }),
+                uploadStudents: jest.fn().mockResolvedValue({ success: [{ id: 1 }], errors: [] }),
+                uploadProfessors: jest.fn().mockResolvedValue({ success: [], errors: [] })
+            }));
+        });
+
+        it('should throw error if students CSV file does not exist', async () => {
+            mockFs.existsSync.mockReturnValue(false);
+
+            const moodle = new Moodle();
+
+            await expect(moodle.uploadStudents()).rejects.toThrow('Students CSV file not found');
+        });
+
+        it('should upload students from CSV file', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(sampleStudentsCsv);
+
+            const moodle = new Moodle();
+            const result = await moodle.uploadStudents();
+
+            expect(result).toHaveProperty('success');
+            expect(result).toHaveProperty('errors');
+        });
+
+        it('should call progress callback during upload', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(sampleStudentsCsv);
+
+            const progressCallback = jest.fn();
+            const moodle = new Moodle();
+            await moodle.uploadStudents(progressCallback);
+
+            expect(progressCallback).toHaveBeenCalledWith('Initializing Moodle uploader');
+            expect(progressCallback).toHaveBeenCalledWith('Uploading 2 students to Moodle');
+        });
+
+        it('should parse CSV correctly and pass to uploader', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(sampleStudentsCsv);
+
+            const moodle = new Moodle();
+            await moodle.uploadStudents();
+
+            // Check that MoodleUploader was called
+            expect(mockMoodleUploader).toHaveBeenCalled();
+        });
+
+        it('should handle empty CSV (header only)', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue('username,password,firstname,lastname,email,course1,role1\n');
+
+            const progressCallback = jest.fn();
+            const moodle = new Moodle();
+            await moodle.uploadStudents(progressCallback);
+
+            expect(progressCallback).toHaveBeenCalledWith('Uploading 0 students to Moodle');
+        });
+
+        it('should skip empty lines in CSV', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(`username,password,firstname,lastname,email,course1,role1
+joao.silva,123456,João,Silva,joao.silva@email.com,CH_INF_2AT_PW1_2025.1_G2,student
+
+maria.santos,123456,Maria,Santos,maria.santos@email.com,CH_INF_2AT_PW1_2025.1_G2,student
+`);
+
+            const progressCallback = jest.fn();
+            const moodle = new Moodle();
+            await moodle.uploadStudents(progressCallback);
+
+            expect(progressCallback).toHaveBeenCalledWith('Uploading 2 students to Moodle');
+        });
+
+        it('should handle upload errors', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(sampleStudentsCsv);
+
+            mockMoodleUploader.mockImplementation(() => ({
+                uploadStudents: jest.fn().mockResolvedValue({
+                    success: [],
+                    errors: [{ username: 'joao.silva', error: 'Failed to create user' }]
+                }),
+                uploadCourses: jest.fn(),
+                uploadProfessors: jest.fn()
+            }));
+
+            const moodle = new Moodle();
+            const result = await moodle.uploadStudents();
+
+            expect(result.errors.length).toBeGreaterThan(0);
+        });
+    });
+
+    describe('uploadProfessors()', () => {
+        const sampleProfessorsCsv = `username,password,firstname,lastname,email,course1,role1
+joao.professor,123456,João,Professor,joao.professor@ifsul.edu.br,CH_INF_2AT_PW1_2025.1_G2,editingteacher
+maria.professor,123456,Maria,Professor,maria.professor@ifsul.edu.br,CH_INF_2AT_PW1_2025.1_G2,editingteacher`;
+
+        beforeEach(() => {
+            // Reset to default mock
+            mockMoodleUploader.mockImplementation(() => ({
+                uploadCourses: jest.fn().mockResolvedValue({ success: [], errors: [] }),
+                uploadStudents: jest.fn().mockResolvedValue({ success: [], errors: [] }),
+                uploadProfessors: jest.fn().mockResolvedValue({ success: [{ id: 1 }], errors: [] })
+            }));
+        });
+
+        it('should throw error if professors CSV file does not exist', async () => {
+            mockFs.existsSync.mockReturnValue(false);
+
+            const moodle = new Moodle();
+
+            await expect(moodle.uploadProfessors()).rejects.toThrow('Professors CSV file not found');
+        });
+
+        it('should upload professors from CSV file', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(sampleProfessorsCsv);
+
+            const moodle = new Moodle();
+            const result = await moodle.uploadProfessors();
+
+            expect(result).toHaveProperty('success');
+            expect(result).toHaveProperty('errors');
+        });
+
+        it('should call progress callback during upload', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(sampleProfessorsCsv);
+
+            const progressCallback = jest.fn();
+            const moodle = new Moodle();
+            await moodle.uploadProfessors(progressCallback);
+
+            expect(progressCallback).toHaveBeenCalledWith('Initializing Moodle uploader');
+            expect(progressCallback).toHaveBeenCalledWith('Uploading 2 professors to Moodle');
+        });
+
+        it('should parse CSV correctly and pass to uploader', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(sampleProfessorsCsv);
+
+            const moodle = new Moodle();
+            await moodle.uploadProfessors();
+
+            expect(mockMoodleUploader).toHaveBeenCalled();
+        });
+
+        it('should handle empty CSV (header only)', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue('username,password,firstname,lastname,email,course1,role1\n');
+
+            const progressCallback = jest.fn();
+            const moodle = new Moodle();
+            await moodle.uploadProfessors(progressCallback);
+
+            expect(progressCallback).toHaveBeenCalledWith('Uploading 0 professors to Moodle');
+        });
+
+        it('should skip empty lines in CSV', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(`username,password,firstname,lastname,email,course1,role1
+joao.professor,123456,João,Professor,joao.professor@ifsul.edu.br,CH_INF_2AT_PW1_2025.1_G2,editingteacher
+
+maria.professor,123456,Maria,Professor,maria.professor@ifsul.edu.br,CH_INF_2AT_PW1_2025.1_G2,editingteacher
+`);
+
+            const progressCallback = jest.fn();
+            const moodle = new Moodle();
+            await moodle.uploadProfessors(progressCallback);
+
+            expect(progressCallback).toHaveBeenCalledWith('Uploading 2 professors to Moodle');
+        });
+
+        it('should handle upload errors', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(sampleProfessorsCsv);
+
+            mockMoodleUploader.mockImplementation(() => ({
+                uploadProfessors: jest.fn().mockResolvedValue({
+                    success: [],
+                    errors: [{ username: 'joao.professor', error: 'Failed to create user' }]
+                }),
+                uploadCourses: jest.fn(),
+                uploadStudents: jest.fn()
+            }));
+
+            const moodle = new Moodle();
+            const result = await moodle.uploadProfessors();
+
+            expect(result.errors.length).toBeGreaterThan(0);
         });
     });
 });

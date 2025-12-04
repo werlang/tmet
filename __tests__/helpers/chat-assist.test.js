@@ -58,8 +58,8 @@ describe('ChatAssist Helper', () => {
             const originalKey = process.env.CHAT_ASSIST_API_KEY;
             delete process.env.CHAT_ASSIST_API_KEY;
             
-            // Need to reimport to trigger the constructor
-            jest.resetModules();
+            // Expect constructor to throw when API key is missing
+            expect(() => new ChatAssist()).toThrow('API_KEY environment variable is required');
             
             // Restore key for other tests
             process.env.CHAT_ASSIST_API_KEY = originalKey;

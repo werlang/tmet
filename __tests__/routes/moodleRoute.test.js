@@ -39,11 +39,23 @@ const mockMoodleInstance = {
     }),
     uploadCourses: jest.fn().mockImplementation(async (progressCallback) => {
         if (progressCallback) progressCallback('Uploading...');
-        return { created: 5, updated: 2 };
+        return { success: [{ id: 1 }], errors: [] };
     }),
     generateStudentCSV: jest.fn().mockImplementation(async (progressCallback) => {
         if (progressCallback) progressCallback('Generating...');
         return { totalStudents: 100, processedSubjects: 10 };
+    }),
+    generateProfessorCSV: jest.fn().mockImplementation(async (progressCallback) => {
+        if (progressCallback) progressCallback('Generating professors...');
+        return { totalProfessors: 20, processedSubjects: 10 };
+    }),
+    uploadStudents: jest.fn().mockImplementation(async (progressCallback) => {
+        if (progressCallback) progressCallback('Uploading students...');
+        return { success: [{ id: 1 }], errors: [] };
+    }),
+    uploadProfessors: jest.fn().mockImplementation(async (progressCallback) => {
+        if (progressCallback) progressCallback('Uploading professors...');
+        return { success: [{ id: 1 }], errors: [] };
     })
 };
 const mockMoodle = jest.fn().mockImplementation(() => mockMoodleInstance);
@@ -174,27 +186,7 @@ describe('Moodle Route', () => {
     });
 
     describe('POST /courses', () => {
-        it('should return skipped response in development mode', async () => {
-            process.env.NODE_ENV = 'development';
-
-            const handler = getRouteHandler('post', '/courses');
-            const req = createMockRequest({
-                body: {},
-                app: { locals: { jobQueue: { queue: jest.fn() } } }
-            });
-            const res = createMockResponse();
-
-            await handler(req, res);
-
-            expect(res.statusCode).toBe(200);
-            expect(res._data.success).toBe(true);
-            expect(res._data.skipped).toBe(true);
-            expect(res._data.message).toBe('Moodle upload is disabled in development mode');
-        });
-
-        it('should return 202 with jobId when starting course upload in production', async () => {
-            process.env.NODE_ENV = 'production';
-
+        it('should return 202 with jobId when starting course upload', async () => {
             const mockJobQueue = {
                 queue: jest.fn().mockReturnValue('test-job-123')
             };
@@ -211,6 +203,7 @@ describe('Moodle Route', () => {
             expect(res.statusCode).toBe(202);
             expect(res._data.success).toBe(true);
             expect(res._data.jobId).toBe('test-job-123');
+            expect(res._data.message).toBe('Course upload job started');
         });
 
         it('should handle errors and return 500 in production', async () => {
@@ -275,6 +268,126 @@ describe('Moodle Route', () => {
         });
     });
 
+    describe('POST /professors-csv', () => {
+        it('should return 202 with jobId when starting professors CSV generation', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/professors-csv');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data.success).toBe(true);
+            expect(res._data.message).toBe('Professors CSV generation job started');
+        });
+
+        it('should handle errors and return 500', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation(() => {
+                    throw new Error('Generation error');
+                })
+            };
+
+            const handler = getRouteHandler('post', '/professors-csv');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(500);
+        });
+    });
+
+    describe('POST /students', () => {
+        it('should return 202 with jobId when starting student upload', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/students');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data.success).toBe(true);
+            expect(res._data.message).toBe('Student upload job started');
+        });
+
+        it('should handle errors and return 500', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation(() => {
+                    throw new Error('Upload error');
+                })
+            };
+
+            const handler = getRouteHandler('post', '/students');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(500);
+        });
+    });
+
+    describe('POST /professors', () => {
+        it('should return 202 with jobId when starting professor upload', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/professors');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data.success).toBe(true);
+            expect(res._data.message).toBe('Professor upload job started');
+        });
+
+        it('should handle errors and return 500', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation(() => {
+                    throw new Error('Upload error');
+                })
+            };
+
+            const handler = getRouteHandler('post', '/professors');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(500);
+        });
+    });
+
     describe('Job callback execution', () => {
         it('should execute CSV generation job callback correctly', async () => {
             let capturedCallback;
@@ -325,7 +438,7 @@ describe('Moodle Route', () => {
             const updateProgress = jest.fn();
             const result = await capturedCallback('job-123', updateProgress);
 
-            expect(result.message).toBe('Courses uploaded successfully');
+            expect(result.message).toContain('courses uploaded successfully');
             expect(result.results).toBeDefined();
             expect(updateProgress).toHaveBeenCalledWith({ message: 'Starting course upload...' });
         });
@@ -357,6 +470,263 @@ describe('Moodle Route', () => {
             expect(result.totalStudents).toBeDefined();
             expect(result.processedSubjects).toBeDefined();
             expect(updateProgress).toHaveBeenCalledWith({ message: 'Starting students CSV generation...' });
+        });
+
+        it('should execute professors CSV job callback correctly', async () => {
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/professors-csv');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            // Execute the captured callback
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('Professors CSV generated successfully');
+            expect(result.file).toBe('files/moodle_professors.csv');
+            expect(result.totalProfessors).toBeDefined();
+            expect(result.processedSubjects).toBeDefined();
+            expect(updateProgress).toHaveBeenCalledWith({ message: 'Starting professors CSV generation...' });
+        });
+
+        it('should execute student upload job callback correctly', async () => {
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/students');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            // Execute the captured callback
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('students enrolled successfully');
+            expect(result.results).toBeDefined();
+            expect(updateProgress).toHaveBeenCalledWith({ message: 'Starting student upload...' });
+        });
+
+        it('should execute professor upload job callback correctly', async () => {
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/professors');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            // Execute the captured callback
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('professors enrolled successfully');
+            expect(result.results).toBeDefined();
+            expect(updateProgress).toHaveBeenCalledWith({ message: 'Starting professor upload...' });
+        });
+
+        it('should handle course upload with errors', async () => {
+            mockMoodleInstance.uploadCourses.mockResolvedValueOnce({
+                success: [],
+                errors: [{ error: 'Course already exists' }]
+            });
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/courses');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('failed');
+        });
+
+        it('should handle course upload with partial errors', async () => {
+            mockMoodleInstance.uploadCourses.mockResolvedValueOnce({
+                success: [{ id: 1 }],
+                errors: [{ error: 'Course already exists' }]
+            });
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/courses');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('with errors');
+        });
+
+        it('should handle student upload with errors', async () => {
+            mockMoodleInstance.uploadStudents.mockResolvedValueOnce({
+                success: [],
+                errors: [{ error: 'User already exists' }]
+            });
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/students');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('failed');
+        });
+
+        it('should handle student upload with partial errors', async () => {
+            mockMoodleInstance.uploadStudents.mockResolvedValueOnce({
+                success: [{ id: 1 }],
+                errors: [{ error: 'User already exists' }]
+            });
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/students');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('errors');
+        });
+
+        it('should handle professor upload with errors', async () => {
+            mockMoodleInstance.uploadProfessors.mockResolvedValueOnce({
+                success: [],
+                errors: [{ error: 'User already exists' }]
+            });
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/professors');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('failed');
+        });
+
+        it('should handle professor upload with partial errors', async () => {
+            mockMoodleInstance.uploadProfessors.mockResolvedValueOnce({
+                success: [{ id: 1 }],
+                errors: [{ error: 'User already exists' }]
+            });
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/professors');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('errors');
         });
     });
 });

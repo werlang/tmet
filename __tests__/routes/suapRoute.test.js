@@ -35,7 +35,15 @@ const mockSuapInstance = {
     }),
     scrapeStudents: jest.fn().mockImplementation(async (subjectId, progressCallback) => {
         if (progressCallback) progressCallback('Scraping students...');
-        return [{ enrollment: '2021001', name: 'Test Student', email: 'test@email.com' }];
+        return { students: [{ enrollment: '2021001', name: 'Test Student' }], professors: [{ siape: '1234567', name: 'Prof Test' }] };
+    }),
+    scrapeStudentsOnly: jest.fn().mockImplementation(async (subjectId, progressCallback) => {
+        if (progressCallback) progressCallback('Scraping students only...');
+        return [{ enrollment: '2021001', name: 'Test Student' }];
+    }),
+    scrapeProfessors: jest.fn().mockImplementation(async (subjectId, progressCallback) => {
+        if (progressCallback) progressCallback('Scraping professors...');
+        return [{ siape: '1234567', name: 'Test Professor' }];
     })
 };
 const mockSUAP = jest.fn().mockImplementation(() => mockSuapInstance);
@@ -215,14 +223,7 @@ describe('SUAP Route', () => {
         });
 
         it('should return students for a subject', async () => {
-            mockSUAPScraper.evaluate
-                .mockResolvedValueOnce([
-                    { enrollment: "2021001", name: "João Silva" }
-                ])
-                .mockResolvedValue("joao.silva@email.com");
-
-            mockFs.existsSync.mockReturnValue(false);
-
+            // scrapeStudents returns { students: [], professors: [] }
             const handler = getRouteHandler('get', '/subjects/:id/students');
             const req = createMockRequest({
                 params: { id: '60244' }
@@ -234,7 +235,8 @@ describe('SUAP Route', () => {
             expect(res.json).toHaveBeenCalled();
             expect(res._data.success).toBe(true);
             expect(res._data.subjectId).toBe('60244');
-            expect(res._data.students).toHaveLength(1);
+            // Route passes through whatever scrapeStudents returns
+            expect(res._data.students).toBeDefined();
         });
 
         it('should handle scraping errors', async () => {
@@ -291,6 +293,40 @@ describe('SUAP Route', () => {
             expect(res.statusCode).toBe(400);
         });
 
+        it('should return 400 when extractType is invalid', async () => {
+            const handler = getRouteHandler('post', '/extract-students');
+            const req = createMockRequest({
+                body: { subjectIds: ['60244'], extractType: 'invalid' }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(400);
+            expect(res._data.error).toContain('Invalid extractType');
+        });
+
+        it('should accept valid extractType values', async () => {
+            const validTypes = ['students', 'professors', 'both'];
+            
+            for (const extractType of validTypes) {
+                const mockJobQueue = {
+                    queue: jest.fn().mockReturnValue('test-job-123')
+                };
+
+                const handler = getRouteHandler('post', '/extract-students');
+                const req = createMockRequest({
+                    body: { subjectIds: ['60244'], extractType },
+                    app: { locals: { jobQueue: mockJobQueue } }
+                });
+                const res = createMockResponse();
+
+                await handler(req, res);
+
+                expect(res.statusCode).toBe(202);
+            }
+        });
+
         it('should return 202 with jobId when valid request', async () => {
             const mockJobQueue = {
                 queue: jest.fn().mockReturnValue('test-job-123')
@@ -318,6 +354,135 @@ describe('SUAP Route', () => {
             };
 
             const handler = getRouteHandler('post', '/extract-students');
+            const req = createMockRequest({
+                body: { subjectIds: ['60244'] },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(500);
+        });
+    });
+
+    describe('GET /professors', () => {
+        it('should return professors data from file', async () => {
+            const professorsData = {
+                subjects: { "60244": ["1234567"] },
+                professors: { "1234567": { name: "João Professor", email: "joao@ifsul.edu.br" } }
+            };
+
+            mockFsPromises.readFile.mockResolvedValue(JSON.stringify(professorsData));
+
+            const handler = getRouteHandler('get', '/professors');
+            const req = createMockRequest();
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.json).toHaveBeenCalled();
+            expect(res._data.success).toBe(true);
+            expect(res._data.data.subjects).toEqual(professorsData.subjects);
+            expect(res._data.data.professors).toEqual(professorsData.professors);
+        });
+
+        it('should return empty data when file does not exist', async () => {
+            const error = new Error('File not found');
+            error.code = 'ENOENT';
+            mockFsPromises.readFile.mockRejectedValue(error);
+
+            const handler = getRouteHandler('get', '/professors');
+            const req = createMockRequest();
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res._data.success).toBe(true);
+            expect(res._data.data).toEqual({ subjects: {}, professors: {} });
+        });
+
+        it('should handle legacy file format', async () => {
+            const legacyData = { oldFormat: true };
+            mockFsPromises.readFile.mockResolvedValue(JSON.stringify(legacyData));
+
+            const handler = getRouteHandler('get', '/professors');
+            const req = createMockRequest();
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res._data.success).toBe(true);
+            expect(res._data.data).toEqual({ subjects: {}, professors: {} });
+        });
+
+        it('should handle read errors and return 500', async () => {
+            mockFsPromises.readFile.mockRejectedValue(new Error('Read error'));
+
+            const handler = getRouteHandler('get', '/professors');
+            const req = createMockRequest();
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(500);
+            expect(res._data.success).toBe(false);
+        });
+    });
+
+    describe('POST /extract-professors', () => {
+        it('should return 400 when subjectIds is missing', async () => {
+            const handler = getRouteHandler('post', '/extract-professors');
+            const req = createMockRequest({
+                body: {}
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(400);
+            expect(res._data.error).toBe('Array of subject IDs is required');
+        });
+
+        it('should return 400 when subjectIds is not an array', async () => {
+            const handler = getRouteHandler('post', '/extract-professors');
+            const req = createMockRequest({
+                body: { subjectIds: '60244' }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(400);
+        });
+
+        it('should return 202 with jobId when valid request', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/extract-professors');
+            const req = createMockRequest({
+                body: { subjectIds: ['60244', '60245'] },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data.success).toBe(true);
+            expect(res._data.jobId).toBe('test-job-123');
+        });
+
+        it('should handle errors and return 500', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation(() => {
+                    throw new Error('Queue error');
+                })
+            };
+
+            const handler = getRouteHandler('post', '/extract-professors');
             const req = createMockRequest({
                 body: { subjectIds: ['60244'] },
                 app: { locals: { jobQueue: mockJobQueue } }
@@ -427,5 +592,152 @@ describe('SUAP Route', () => {
             expect(result.results['60244']).toBeDefined();
             expect(result.results['60245'].error).toBe('Scrape error');
         });
+
+        it('should execute professor extraction job callback correctly', async () => {
+            mockSuapInstance.scrapeProfessors.mockResolvedValue([
+                { siape: '1234567', name: 'Professor Test' }
+            ]);
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/extract-professors');
+            const req = createMockRequest({
+                body: { subjectIds: ['60244'] },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            // Execute the captured callback
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('extraction completed');
+            expect(result.results).toBeDefined();
+            expect(mockSuapInstance.scrapeProfessors).toHaveBeenCalled();
+        });
+
+        it('should extract with students-only extractType', async () => {
+            mockSuapInstance.scrapeStudents.mockResolvedValue({
+                students: [{ enrollment: '2021001', name: 'Test' }],
+                professors: []
+            });
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/extract-students');
+            const req = createMockRequest({
+                body: { subjectIds: ['60244'], extractType: 'students' },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('Extraction completed');
+        });
+
+        it('should extract with professors-only extractType', async () => {
+            mockSuapInstance.scrapeStudents.mockResolvedValue({
+                students: [],
+                professors: [{ siape: '1234567', name: 'Test' }]
+            });
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/extract-students');
+            const req = createMockRequest({
+                body: { subjectIds: ['60244'], extractType: 'professors' },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('Extraction completed');
+        });
+
+        it('should extract with both extractType', async () => {
+            mockSuapInstance.scrapeStudents.mockResolvedValue({
+                students: [{ enrollment: '2021001', name: 'Student Test' }],
+                professors: [{ siape: '1234567', name: 'Test' }]
+            });
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/extract-students');
+            const req = createMockRequest({
+                body: { subjectIds: ['60244'], extractType: 'both' },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.message).toContain('Extraction completed');
+            expect(result.results['60244'].students).toBeDefined();
+            expect(result.results['60244'].professors).toBeDefined();
+        });
+
+        it('should handle professor extraction errors gracefully', async () => {
+            mockSuapInstance.scrapeProfessors.mockRejectedValueOnce(new Error('Professor scrape error'));
+
+            let capturedCallback;
+            const mockJobQueue = {
+                queue: jest.fn().mockImplementation((callback) => {
+                    capturedCallback = callback;
+                    return 'test-job-123';
+                })
+            };
+
+            const handler = getRouteHandler('post', '/extract-professors');
+            const req = createMockRequest({
+                body: { subjectIds: ['60244'] },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            const updateProgress = jest.fn();
+            const result = await capturedCallback('job-123', updateProgress);
+
+            expect(result.results['60244'].error).toBe('Professor scrape error');
+        });
     });
 });
+

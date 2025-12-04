@@ -328,5 +328,23 @@ null
             await expect(aiMatch.findMatches(sampleMoodleSubjects, sampleSuapSubjects, jest.fn()))
                 .rejects.toThrow('API Error');
         });
+
+        it('should throw error when response is undefined', async () => {
+            mockChatInstance.chat.mockResolvedValue(undefined);
+
+            const aiMatch = new AIMatch();
+            
+            await expect(aiMatch.findMatches(sampleMoodleSubjects, sampleSuapSubjects, jest.fn()))
+                .rejects.toThrow('AI returned invalid response format');
+        });
+
+        it('should throw error when response is not a string', async () => {
+            mockChatInstance.chat.mockResolvedValue({ invalid: 'object' });
+
+            const aiMatch = new AIMatch();
+            
+            await expect(aiMatch.findMatches(sampleMoodleSubjects, sampleSuapSubjects, jest.fn()))
+                .rejects.toThrow('AI returned invalid response format');
+        });
     });
 });

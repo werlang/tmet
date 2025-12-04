@@ -129,6 +129,37 @@ describe('Match Model', () => {
             }
         });
 
+        it('should handle single suapId that does not exist in SUAP subjects', () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('moodle_classes.csv')) {
+                    return sampleMoodleCsvContent;
+                }
+                if (path.includes('suap_subjects.json')) {
+                    return JSON.stringify(sampleSuapSubjects);
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([{
+                        moodleFullname: "[2025.1] INF-2AT-G2 - Programação Web I",
+                        suapId: "nonexistent-id",
+                        type: "manual"
+                    }]);
+                }
+                return '';
+            });
+
+            const match = new Match();
+            const result = match.getAll();
+
+            // Subject should be matched but suapMatch should be undefined since ID doesn't exist
+            const matchedSubject = result.subjects.find(s => 
+                s.fullname === "[2025.1] INF-2AT-G2 - Programação Web I"
+            );
+            expect(matchedSubject).toBeDefined();
+            expect(matchedSubject.suapId).toBe("nonexistent-id");
+            expect(matchedSubject.suapMatch).toBeUndefined();
+        });
+
         it('should auto-match subjects and save to matches.json', () => {
             mockFs.existsSync.mockReturnValue(true);
             mockFs.readFileSync.mockImplementation((path) => {
