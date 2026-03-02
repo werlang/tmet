@@ -33,7 +33,7 @@
 | Task | Title | Status | Inspector Notes |
 |------|-------|--------|-----------------|
 | 05 | Clean Root Docs and Remove Prompt Duplication | ✅ Completed | Inspector reconfirmed: root README is code-truth aligned (mounted routes/scripts/env/files), root prompt duplication removed, `.github/COMMIT.md` unchanged, and stale-term sweep clean |
-| 06 | Final Validation and Remove `.github-copy` | ⬜ Not Started | |
+| 06 | Final Validation and Remove `.github-copy` | ✅ Completed | Final retained-doc sweeps clean; consistency checks passed for routes/scripts/env/ports/paths; `.github-copy/` removed; `07-migration-summary.md` created |
 | 07 | Wrap-up Release Artifacts (`04-commit-msg.md`, `05-gitlab-mr.md`) | ⬜ Not Started | |
 
 **Phase Status**: 🔄 In Progress
@@ -53,10 +53,10 @@
 ## Completion Summary
 
 - **Total Tasks**: 7
-- **Completed**: 5
+- **Completed**: 6
 - **Incomplete**: 0
 - **In Progress**: 0
-- **Remaining**: 2
+- **Remaining**: 1
 
 ---
 
@@ -66,7 +66,7 @@
 |-------|-----------|------------------------|--------------|-----------------|--------|
 | Phase 1 | ✅ | Full Phase 1 audit passed: Task 01 baseline reproducibility reconfirmed (`7/18/24/51`), Task 02 mounted-endpoints-only contract reconfirmed, env/docker/scripts parity validated, no integration gaps found. Auto mode approval: READY FOR NEXT PHASE. | GitHub Copilot (Phase Inspector) | 2026-03-02 | READY FOR NEXT PHASE |
 | Phase 2 | ✅ | Full Phase 2 audit passed: Task 03 approved skills-only catalog reconfirmed (including required reference files), Task 04 exact 3-file TMET prompt set reconfirmed, and integration preflight (mounted routes/env/scripts/path checks) passed with clean stale-term sweep. Auto mode recommendation: READY FOR NEXT PHASE. | GitHub Copilot (Phase Inspector) | 2026-03-02 | READY FOR NEXT PHASE |
-| Phase 3 | 🔄 | Task 05 completed with root-doc cleanup and prompt dedup; awaiting Tasks 06-07 for full phase validation. | GitHub Copilot | 2026-03-02 | In Progress |
+| Phase 3 | 🔄 | Tasks 05-06 completed (root-doc cleanup + final validation/removal of `.github-copy`); awaiting Task 07 for full phase validation. | GitHub Copilot | 2026-03-02 | In Progress |
 
 ---
 
@@ -100,3 +100,5 @@
 | 2026-03-02 | 05 | Status set to In Progress | GitHub Copilot | Started root README cleanup and root prompt deduplication for Phase 3 Task 05 |
 | 2026-03-02 | 05 | Status set to Completed | GitHub Copilot | Rewrote root `README.md`, removed root `prompts/migrate-github-context.md` duplication, and passed stale-term + consistency sweeps for updated root docs |
 | 2026-03-02 | 05 | Completion reconfirmed | GitHub Copilot (Task Inspector) | Docs-focused validation passed: latest commit updates align README to mounted routes/scripts/env/files, root `prompts/*.md` count is `0`, `.github/COMMIT.md` untouched, and stale-term grep on README is clean |
+| 2026-03-02 | 06 | Status set to In Progress | GitHub Copilot | Started final validation sweeps for retained docs and `.github-copy` removal workflow |
+| 2026-03-02 | 06 | Status set to Completed | GitHub Copilot | Completed retained-doc stale-term and consistency sweeps, removed `.github-copy/`, and created `07-migration-summary.md` |
