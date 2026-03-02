@@ -24,9 +24,9 @@
 | Task | Title | Status | Inspector Notes |
 |------|-------|--------|-----------------|
 | 03 | Build Minimal TMET Skills Set | ✅ Completed | Inspector reconfirmed: approved skills-only catalog is exact, referenced TMET paths are valid, and stale-term sweep is clean |
-| 04 | Build TMET Prompt Set in `.github/prompts` | ⬜ Not Started | |
+| 04 | Build TMET Prompt Set in `.github/prompts` | ✅ Completed | TMET prompt suite created with approved set only; stale-term sweep and path checks passed |
 
-**Phase Status**: 🔄 In Progress
+**Phase Status**: ✅ Completed
 
 ### Phase 3: Root Docs, Validation, and Release Artifacts
 
@@ -53,10 +53,10 @@
 ## Completion Summary
 
 - **Total Tasks**: 7
-- **Completed**: 3
+- **Completed**: 4
 - **Incomplete**: 0
 - **In Progress**: 0
-- **Remaining**: 4
+- **Remaining**: 3
 
 ---
 
@@ -92,3 +92,5 @@
 | 2026-03-02 | 03 | Status set to In Progress | GitHub Copilot | Started building approved minimal `.github/skills` catalog for TMET |
 | 2026-03-02 | 03 | Status set to Completed | GitHub Copilot | Created approved skill catalog + references, confirmed excluded skill dirs absent, path checks passed, and legacy stale-term sweep clean |
 | 2026-03-02 | 03 | Completion reconfirmed | GitHub Copilot (Task Inspector) | Inspector run passed: skill-set exactness, stale-term sweep, and path validity checks all succeeded |
+| 2026-03-02 | 04 | Status set to In Progress | GitHub Copilot | Started Task 04 to create approved TMET prompt suite under `.github/prompts` |
+| 2026-03-02 | 04 | Status set to Completed | GitHub Copilot | Created three approved prompt files, validated prompt paths/routes/scripts references, and passed stale-term sweep for `.github/prompts/**` |
