@@ -15,7 +15,7 @@
 | Task | Title | Status | Inspector Notes |
 |------|-------|--------|-----------------|
 | 01 | Bootstrap Progress and Baseline Inventory | ✅ Completed | Inspector rework resolved: stale-term baseline counts are reproducible, command provenance documented, and scope kept explicit (`.github-copy/**/*.md`) |
-| 02 | Rewrite `.github/copilot-instructions.md` | ✅ Completed | Rewritten from code-truth (`server.js`, `routes/*.js`, `package.json`, `compose.yaml`, env usage grep); stale-term sweep passed for updated instructions |
+| 02 | Rewrite `.github/copilot-instructions.md` | ✅ Completed | Rework applied: removed implemented route-handler table and kept mounted endpoint list only; validation checks passed |
 
 **Phase Status**: ✅ Completed
 
@@ -64,7 +64,7 @@
 
 | Phase | Completed | Phase Inspector Report | Validated By | Validation Date | Status |
 |-------|-----------|------------------------|--------------|-----------------|--------|
-| Phase 1 | ✅ | Task 01 and Task 02 completed with documented validation evidence in change log | GitHub Copilot | 2026-03-02 | Completed |
+| Phase 1 | ✅ | Task 01 complete; Task 02 rework completed by removing implemented route-handler table and retaining mounted endpoint list only | GitHub Copilot | 2026-03-02 | Completed |
 | Phase 2 | ⬜ | (pending) | (pending) | (pending) | Not Started |
 | Phase 3 | ⬜ | (pending) | (pending) | (pending) | Not Started |
 
@@ -83,3 +83,6 @@
 | 2026-03-02 | 01 | Completion reconfirmed | GitHub Copilot (Inspector) | Post-rework inspection passed: reproducible stale-term baseline, explicit scope, and acceptance criteria confirmed |
 | 2026-03-02 | 02 | Status set to In Progress | GitHub Copilot | Started rewrite of `.github/copilot-instructions.md` using verified TMET runtime/source-of-truth files |
 | 2026-03-02 | 02 | Status set to Completed | GitHub Copilot | Instructions rewritten and validated for stale-term absence and code-truth alignment; Phase 1 marked complete |
+| 2026-03-02 | 02 | Status set to Incomplete | GitHub Copilot (Inspector) | Primary validation failed one explicit requirement: Task 02 requested mounted endpoint list only, but file also documents implemented route handlers table |
+| 2026-03-02 | 02 | Status set to In Progress | GitHub Copilot | Started inspector-requested rework for mounted-endpoints-only API Contracts section |
+| 2026-03-02 | 02 | Status set to Completed | GitHub Copilot | Rework complete: removed implemented route-handler table, revalidated mounted endpoints/env/stale-term checks |

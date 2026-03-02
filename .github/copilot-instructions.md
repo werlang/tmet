@@ -55,26 +55,6 @@ public/
 - `/api/ai`
 - `/api/jobs`
 
-### Implemented route handlers (`routes/*.js`)
-| Method | Path |
-|---|---|
-| GET | `/api/matches` |
-| POST | `/api/matches` |
-| POST | `/api/moodle/csv` |
-| POST | `/api/moodle/courses` |
-| POST | `/api/moodle/students-csv` |
-| POST | `/api/moodle/professors-csv` |
-| POST | `/api/moodle/students` |
-| POST | `/api/moodle/professors` |
-| GET | `/api/suap/students` |
-| POST | `/api/suap/extract` |
-| GET | `/api/suap/subjects/:id/students` |
-| POST | `/api/suap/extract-students` |
-| GET | `/api/suap/professors` |
-| POST | `/api/suap/extract-professors` |
-| POST | `/api/ai/match` |
-| GET | `/api/jobs/:jobId` |
-
 ## Docker-First Workflow
 ```bash
 docker compose up -d --build
