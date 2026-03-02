@@ -32,7 +32,7 @@
 
 | Task | Title | Status | Inspector Notes |
 |------|-------|--------|-----------------|
-| 05 | Clean Root Docs and Remove Prompt Duplication | ✅ Completed | README rewritten with code-verified routes/scripts/env/runtime facts; root `prompts/` duplicate removed; stale-term sweep clean for changed root docs |
+| 05 | Clean Root Docs and Remove Prompt Duplication | ✅ Completed | Inspector reconfirmed: root README is code-truth aligned (mounted routes/scripts/env/files), root prompt duplication removed, `.github/COMMIT.md` unchanged, and stale-term sweep clean |
 | 06 | Final Validation and Remove `.github-copy` | ⬜ Not Started | |
 | 07 | Wrap-up Release Artifacts (`04-commit-msg.md`, `05-gitlab-mr.md`) | ⬜ Not Started | |
 
@@ -99,3 +99,4 @@
 | 2026-03-02 | Phase 3 | Phase started | Ralph Orchestrator | Auto-proceeded after Phase 2 validation (HITL disabled) |
 | 2026-03-02 | 05 | Status set to In Progress | GitHub Copilot | Started root README cleanup and root prompt deduplication for Phase 3 Task 05 |
 | 2026-03-02 | 05 | Status set to Completed | GitHub Copilot | Rewrote root `README.md`, removed root `prompts/migrate-github-context.md` duplication, and passed stale-term + consistency sweeps for updated root docs |
+| 2026-03-02 | 05 | Completion reconfirmed | GitHub Copilot (Task Inspector) | Docs-focused validation passed: latest commit updates align README to mounted routes/scripts/env/files, root `prompts/*.md` count is `0`, `.github/COMMIT.md` untouched, and stale-term grep on README is clean |
