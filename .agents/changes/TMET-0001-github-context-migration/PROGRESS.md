@@ -33,7 +33,7 @@
 | Task | Title | Status | Inspector Notes |
 |------|-------|--------|-----------------|
 | 05 | Clean Root Docs and Remove Prompt Duplication | ✅ Completed | Inspector reconfirmed: root README is code-truth aligned (mounted routes/scripts/env/files), root prompt duplication removed, `.github/COMMIT.md` unchanged, and stale-term sweep clean |
-| 06 | Final Validation and Remove `.github-copy` | ✅ Completed | Final retained-doc sweeps clean; consistency checks passed for routes/scripts/env/ports/paths; `.github-copy/` removed; `07-migration-summary.md` created |
+| 06 | Final Validation and Remove `.github-copy` | ✅ Completed | Inspector reconfirmed: stale-term scans clean across retained docs, consistency checks pass for routes/scripts/env/ports/paths, `.github-copy/` is absent, and `07-migration-summary.md` is present |
 | 07 | Wrap-up Release Artifacts (`04-commit-msg.md`, `05-gitlab-mr.md`) | ⬜ Not Started | |
 
 **Phase Status**: 🔄 In Progress
@@ -102,3 +102,4 @@
 | 2026-03-02 | 05 | Completion reconfirmed | GitHub Copilot (Task Inspector) | Docs-focused validation passed: latest commit updates align README to mounted routes/scripts/env/files, root `prompts/*.md` count is `0`, `.github/COMMIT.md` untouched, and stale-term grep on README is clean |
 | 2026-03-02 | 06 | Status set to In Progress | GitHub Copilot | Started final validation sweeps for retained docs and `.github-copy` removal workflow |
 | 2026-03-02 | 06 | Status set to Completed | GitHub Copilot | Completed retained-doc stale-term and consistency sweeps, removed `.github-copy/`, and created `07-migration-summary.md` |
+| 2026-03-02 | 06 | Completion reconfirmed | GitHub Copilot (Task Inspector) | Independent inspector rerun passed: stale-term scans clean (`.github/**`, `README.md`, `prompts/**`), route/script/env/port/path checks align with `server.js`/`package.json`/`compose.yaml`, and `.github-copy/` remains absent |
