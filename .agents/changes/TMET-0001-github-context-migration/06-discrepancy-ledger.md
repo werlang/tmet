@@ -50,15 +50,23 @@ Task: 01 — Bootstrap Progress and Baseline Inventory
 
 Baseline grep terms: `TrocaAula`, `Redis`, `Playwright`, `proposals|cards|compose.dev`.
 
+Scope (explicit and unchanged): `.github-copy/**/*.md` only.
+
+Deterministic command set used for counts:
+- `grep -RIn --include='*.md' 'TrocaAula' .github-copy | wc -l`
+- `grep -RIn --include='*.md' 'Redis' .github-copy | wc -l`
+- `grep -RIn --include='*.md' 'Playwright' .github-copy | wc -l`
+- `grep -REIn --include='*.md' 'proposals|cards|compose\.dev' .github-copy | wc -l`
+
 ### Primary hotspot (`.github-copy/**/*.md`)
 - `TrocaAula`: 7 matches
-- `Redis`: 33 matches
-- `Playwright`: 43 matches
-- `proposals|cards|compose.dev`: 119 matches
+- `Redis`: 18 matches
+- `Playwright`: 24 matches
+- `proposals|cards|compose.dev`: 51 matches
 
 Notes:
 - Counts are baseline line-match counts from repository grep and are sufficient to track reduction trend in later tasks.
-- `proposals|cards|compose.dev` is broad and expected to over-count in copied legacy docs.
+- `proposals|cards|compose.dev` intentionally uses alternation and therefore may include broader legacy mentions.
 
 ### Active root prompt (`prompts/migrate-github-context.md`)
 - Contains generic migration examples mentioning `Redis` (contextual, not runtime claim).

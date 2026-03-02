@@ -14,7 +14,7 @@
 
 | Task | Title | Status | Inspector Notes |
 |------|-------|--------|-----------------|
-| 01 | Bootstrap Progress and Baseline Inventory | ✅ Completed | Baseline inventory + discrepancy ledger created (`06-discrepancy-ledger.md`) |
+| 01 | Bootstrap Progress and Baseline Inventory | ✅ Completed | Inspector rework resolved: stale-term baseline counts are reproducible, command provenance documented, and scope kept explicit (`.github-copy/**/*.md`) |
 | 02 | Rewrite `.github/copilot-instructions.md` | ⬜ Not Started | |
 
 **Phase Status**: 🔄 In Progress
@@ -53,6 +53,7 @@
 ## Completion Summary
 
 - **Total Tasks**: 7
+- **Completed**: 0
 - **Completed**: 1
 - **Incomplete**: 0
 - **In Progress**: 0
@@ -77,3 +78,6 @@
 | 2026-03-02 | - | Progress file created | Ralph Orchestrator | Initial setup from planned tasks |
 | 2026-03-02 | 01 | Status set to In Progress | GitHub Copilot | Began Task 01 bootstrap and baseline inventory |
 | 2026-03-02 | 01 | Status set to Completed | GitHub Copilot | Inventory complete, stale-term baseline captured, and discrepancy ledger delivered |
+| 2026-03-02 | 01 | Status set to Incomplete | GitHub Copilot (Inspector) | Repro check failed: stale-term counts in ledger (`Redis/Playwright/proposals|cards|compose.dev`) do not match reproducible grep baseline |
+| 2026-03-02 | 01 | Status set to In Progress | GitHub Copilot | Started inspector rework to make stale-term baseline counts reproducible and scope-explicit |
+| 2026-03-02 | 01 | Status set to Completed | GitHub Copilot | Rework complete: corrected stale-term counts (`7/18/24/51`), added deterministic grep commands, and validated ledger file paths |
