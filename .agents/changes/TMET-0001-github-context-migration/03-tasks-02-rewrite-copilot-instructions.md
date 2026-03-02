@@ -3,10 +3,10 @@
 ## INSPECTOR FEEDBACK
 
 ### Verdict
-🔴 Incomplete
+✅ Completed (Re-inspection)
 
-### Why it fails
-Task step 3 explicitly requires a **route list for mounted endpoints only**. The rewritten `.github/copilot-instructions.md` still includes an additional section, **Implemented route handlers (`routes/*.js`)**, which exceeds the requirement.
+### Re-inspection outcome
+Previous blocking issue is resolved. The extra **Implemented route handlers (`routes/*.js`)** section was removed, and API contracts now list mounted route bases only.
 
 ### Primary validation evidence
 1. Mounted endpoints in `server.js` are only:
@@ -15,17 +15,14 @@ Task step 3 explicitly requires a **route list for mounted endpoints only**. The
   - `/api/suap`
   - `/api/ai`
   - `/api/jobs`
-2. `.github/copilot-instructions.md` includes both:
-  - Mounted route bases (`server.js`) ✅
-  - Implemented route handlers table ❌ (extra for this task requirement)
+2. `.github/copilot-instructions.md` API Contracts section includes only mounted route bases (`server.js`) ✅
 3. Other acceptance checks pass:
   - Docker/test commands match `compose.yaml` and `package.json` scripts
   - Env vars listed are verified in code only
   - Stale-term grep returns no matches in `.github/copilot-instructions.md`
 
-### Required fix to pass
-- Remove the **Implemented route handlers (`routes/*.js`)** table from `.github/copilot-instructions.md`.
-- Keep only the mounted endpoint list in the API Contracts section.
+### Resolution status
+- No further fix required for Task 02.
 
 ### Evidence commands
 - `grep -n "app.use('/api/" server.js`
