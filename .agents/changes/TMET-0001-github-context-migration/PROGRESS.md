@@ -4,7 +4,7 @@
 **Started**: 2026-03-02
 **Last Updated**: 2026-03-02
 **HITL Mode**: false
-**Current Phase**: Phase 1
+**Current Phase**: Phase 2
 
 ---
 
@@ -23,10 +23,10 @@
 
 | Task | Title | Status | Inspector Notes |
 |------|-------|--------|-----------------|
-| 03 | Build Minimal TMET Skills Set | ⬜ Not Started | |
+| 03 | Build Minimal TMET Skills Set | ✅ Completed | Created approved skills only, validated path references, and confirmed clean stale-term sweep for legacy residue |
 | 04 | Build TMET Prompt Set in `.github/prompts` | ⬜ Not Started | |
 
-**Phase Status**: ⬜ Not Started
+**Phase Status**: 🔄 In Progress
 
 ### Phase 3: Root Docs, Validation, and Release Artifacts
 
@@ -53,10 +53,10 @@
 ## Completion Summary
 
 - **Total Tasks**: 7
-- **Completed**: 2
+- **Completed**: 3
 - **Incomplete**: 0
 - **In Progress**: 0
-- **Remaining**: 5
+- **Remaining**: 4
 
 ---
 
@@ -88,3 +88,6 @@
 | 2026-03-02 | 02 | Status set to Completed | GitHub Copilot | Rework complete: removed implemented route-handler table, revalidated mounted endpoints/env/stale-term checks |
 | 2026-03-02 | 02 | Completion reconfirmed | GitHub Copilot (Inspector) | Re-inspection passed: Task 02 now satisfies mounted-endpoints-only requirement and all validation checks |
 | 2026-03-02 | Phase 1 | Phase validated | GitHub Copilot (Phase Inspector) | Auto-mode phase audit complete; recommendation: READY FOR NEXT PHASE |
+| 2026-03-02 | Phase 2 | Phase started | Ralph Orchestrator | Auto-proceeded after Phase 1 validation (HITL disabled) |
+| 2026-03-02 | 03 | Status set to In Progress | GitHub Copilot | Started building approved minimal `.github/skills` catalog for TMET |
+| 2026-03-02 | 03 | Status set to Completed | GitHub Copilot | Created approved skill catalog + references, confirmed excluded skill dirs absent, path checks passed, and legacy stale-term sweep clean |
