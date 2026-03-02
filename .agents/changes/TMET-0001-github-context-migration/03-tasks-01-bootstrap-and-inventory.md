@@ -3,21 +3,25 @@
 ## INSPECTOR FEEDBACK
 
 ### Verdict
-🔴 Incomplete
+✅ Complete
 
-### Blocking Findings
-1. **Stale-term baseline counts are not reproducible**
-   - `06-discrepancy-ledger.md` reports (for `.github-copy/**/*.md`):
-     - `TrocaAula`: 7
-     - `Redis`: 33
-     - `Playwright`: 43
-     - `proposals|cards|compose.dev`: 119
-   - Reproducible repository check (current HEAD) returns:
-     - `TrocaAula`: 7
-     - `Redis`: 18
-     - `Playwright`: 24
-     - `proposals|cards|compose.dev`: 51
-   - Acceptance test requires stale terms to be reproducible by grep; this currently fails.
+### Inspector Note
+Rework verified complete. Prior reproducibility gap is resolved and acceptance checks now pass.
+
+### Resolution Evidence
+1. **Stale-term baseline counts are reproducible**
+  - `06-discrepancy-ledger.md` reports (scope: `.github-copy/**/*.md`):
+    - `TrocaAula`: 7
+    - `Redis`: 18
+    - `Playwright`: 24
+    - `proposals|cards|compose.dev`: 51
+  - Fresh reproducibility check at current HEAD returns the same values.
+
+2. **Command provenance is documented**
+  - Ledger includes deterministic grep commands used for each count.
+
+3. **Scope remains explicit and unchanged**
+  - Ledger states scope as `.github-copy/**/*.md` only.
 
 ### Evidence Commands (repro)
 - `grep -RIn --include='*.md' 'TrocaAula' .github-copy | wc -l`
@@ -25,10 +29,12 @@
 - `grep -RIn --include='*.md' 'Playwright' .github-copy | wc -l`
 - `grep -REIn --include='*.md' 'proposals|cards|compose\.dev' .github-copy | wc -l`
 
-### Required Fixes
-1. Recompute stale-term summary counts in `06-discrepancy-ledger.md` from deterministic commands and paste exact command patterns used.
-2. Keep the search scope explicit and unchanged (currently `.github-copy/**/*.md`) or rename the section if broader scope is intended.
-3. Re-run acceptance checks and update this task status only after reproducibility passes.
+### Acceptance Confirmation
+- `PROGRESS.md` exists with task tracking rows.
+- `06-discrepancy-ledger.md` exists with actionable mismatches.
+- Baseline stale-term sweep summary is captured and reproducible.
+- Inventory covers `.github`, root prompts, and `README.md`.
+- Documentation updates for Task 01 are present.
 
 **Depends on**: None  
 **Estimated complexity**: Low  
