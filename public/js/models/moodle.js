@@ -1,12 +1,12 @@
-import Toast from '../components/toast.js';
-import Request from '../helpers/request.js';
+import { Toast } from '../components/toast.js';
+import { Request } from '../helpers/request.js';
 
 /**
  * Moodle Model
  * Represents the Moodle system and handles all Moodle-related API operations
  * Manages Moodle courses/subjects data and operations
  */
-export default class Moodle {
+class Moodle {
     #subjects = [];
     #matchedSubjects = [];
 
@@ -302,3 +302,5 @@ export default class Moodle {
         };
     }
 }
+
+export { Moodle };

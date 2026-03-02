@@ -9,7 +9,7 @@ import { createMockJobQueue } from '../fixtures.js';
 
 // Import routes
 const jobsModule = await import('../../routes/jobs.js');
-const jobsRouter = jobsModule.default;
+const jobsRouter = jobsModule.router;
 
 // Get the route handlers directly
 function getRouteHandler(method, path) {

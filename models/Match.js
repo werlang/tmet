@@ -6,7 +6,7 @@ import fs from 'fs';
  * Handles matching operations between Moodle and SUAP subjects
  * Uses unified matches.json for both auto and manual matches
  */
-export default class Match {
+class Match {
     #matchesPath;
     #moodleClassesPath;
     #suapSubjectsPath;
@@ -212,3 +212,5 @@ export default class Match {
         this.#saveMatches(matches);
     }
 }
+
+export { Match };

@@ -1,6 +1,6 @@
 import express from 'express';
-import SUAP from '../models/SUAP.js';
-import suapConfig from '../config/suap-config.js';
+import { SUAP } from '../models/SUAP.js';
+import { suapConfig } from '../config/suap-config.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -481,4 +481,4 @@ async function processExtractProfessors(jobId, subjectIds, updateProgress) {
     };
 }
 
-export default router;
+export { router };

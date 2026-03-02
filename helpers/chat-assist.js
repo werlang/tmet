@@ -1,12 +1,12 @@
-import config from '../config/chat-assist.js';
+import { chatAssistConfig } from '../config/chat-assist.js';
 
-export default class ChatAssist {
-    #url = config.url;
+class ChatAssist {
+    #url = chatAssistConfig.url;
     #apiKey;
     #model;
     #conversationHistory = [];
 
-    constructor(model = config.model) {
+    constructor(model = chatAssistConfig.model) {
         this.#apiKey = process.env.CHAT_ASSIST_API_KEY;
         if (!this.#apiKey) {
             throw new Error('API_KEY environment variable is required');
@@ -26,8 +26,8 @@ export default class ChatAssist {
      */
     async chat(userMessage, systemPrompt = 'You are a helpful assistant.', options = {}) {
         const {
-            temperature = config.temperature,
-            maxTokens = config.maxTokens,
+            temperature = chatAssistConfig.temperature,
+            maxTokens = chatAssistConfig.maxTokens,
             keepHistory = false,
         } = options;
 
@@ -145,4 +145,6 @@ export default class ChatAssist {
         this.#conversationHistory = history;
     }
 }
+
+export { ChatAssist };
 

@@ -1,9 +1,9 @@
-import Toast from './components/toast.js';
-import Moodle from './models/moodle.js';
-import SUAP from './models/suap.js';
-import PipelineSection from './sections/pipeline.js';
-import MatchingSection from './sections/matching.js';
-import StudentsSection from './sections/students.js';
+import { Toast } from './components/toast.js';
+import { Moodle } from './models/moodle.js';
+import { SUAP } from './models/suap.js';
+import { PipelineSection } from './sections/pipeline.js';
+import { MatchingSection } from './sections/matching.js';
+import { StudentsSection } from './sections/students.js';
 
 /**
  * Subject Matcher Application

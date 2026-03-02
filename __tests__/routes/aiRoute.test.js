@@ -23,16 +23,16 @@ const mockAIMatchInstance = {
 const mockAIMatch = jest.fn().mockImplementation(() => mockAIMatchInstance);
 
 jest.unstable_mockModule('../../helpers/chat-assist.js', () => ({
-    default: mockChatAssist
+    ChatAssist: mockChatAssist
 }));
 
 jest.unstable_mockModule('../../models/AIMatch.js', () => ({
-    default: mockAIMatch
+    AIMatch: mockAIMatch
 }));
 
 // Import routes after mocking
 const aiModule = await import('../../routes/ai.js');
-const aiRouter = aiModule.default;
+const aiRouter = aiModule.router;
 
 // Get the route handlers directly
 function getRouteHandler(method, path) {

@@ -1,4 +1,4 @@
-export default class Request {
+class Request {
     static #baseURL = '';
     static #defaultHeaders = {
         'Content-Type': 'application/json'
@@ -109,3 +109,5 @@ export default class Request {
         });
     }
 }
+
+export { Request };

@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
  * JobQueue - Manages asynchronous job tracking and execution
  * Provides in-memory job status tracking with auto-cleanup
  */
-export default class JobQueue {
+class JobQueue {
     #cleanupTimeout = 5 * 60 * 1000; // 5 minutes default
     #jobs = [];
     #maxConcurrentJobs = process.env.MAX_CONCURRENT_JOBS || 1;
@@ -170,3 +170,5 @@ export default class JobQueue {
         this.#jobs = [];
     }
 }
+
+export { JobQueue };

@@ -1,11 +1,11 @@
-import Toast from '../components/toast.js';
-import Request from '../helpers/request.js';
+import { Toast } from '../components/toast.js';
+import { Request } from '../helpers/request.js';
 
 /**
  * Matching Service
  * Handles matching operations between Moodle and SUAP subjects
  */
-export default class Matching {
+class Matching {
     /**
      * Save manual match between Moodle subject and SUAP subject(s)
      * @param {string} moodleFullname - Moodle subject fullname
@@ -73,3 +73,5 @@ export default class Matching {
         }
     }
 }
+
+export { Matching };

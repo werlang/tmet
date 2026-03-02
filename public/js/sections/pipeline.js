@@ -1,5 +1,5 @@
-import Toast from '../components/toast.js';
-import ProgressModal from '../components/progress-modal.js';
+import { Toast } from '../components/toast.js';
+import { ProgressModal } from '../components/progress-modal.js';
 import { getDefaultYearSemester } from '../helpers/date.js';
 
 /**
@@ -9,7 +9,7 @@ import { getDefaultYearSemester } from '../helpers/date.js';
  * - Extract subjects from SUAP
  * - Upload courses to Moodle
  */
-export default class PipelineSection {
+class PipelineSection {
     #elements = {};
     #moodle;
     #suap;
@@ -263,3 +263,5 @@ export default class PipelineSection {
         button.textContent = text;
     }
 }
+
+export { PipelineSection };

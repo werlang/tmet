@@ -134,5 +134,3 @@ export class ProgressModal {
         return this.#modal.classList.contains('show');
     }
 }
-
-export default ProgressModal;

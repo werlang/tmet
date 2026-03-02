@@ -1,6 +1,6 @@
-import Request from './request.js';
+import { Request } from './request.js';
 
-export default class MoodleUploader {
+class MoodleUploader {
     constructor(moodleUrl, token) {
         this.baseUrl = moodleUrl.replace(/\/$/, '');
         this.token = token;
@@ -29,7 +29,11 @@ export default class MoodleUploader {
             params[`courses[${i}][categoryid]`] = course.category;   
         }
 
-        const response = await Request.post(`${this.webserviceUrl}?${new URLSearchParams(params).toString()}`);
+        const body = new URLSearchParams(params).toString();
+        const response = await Request.post(this.webserviceUrl, {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body
+        });
         console.log(response);
 
         // Handle Moodle API error response
@@ -360,3 +364,5 @@ export default class MoodleUploader {
     }
 
 }
+
+export { MoodleUploader };

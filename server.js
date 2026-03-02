@@ -1,18 +1,18 @@
 import express from 'express';
-import Queue from './helpers/queue.js';
+import { JobQueue } from './helpers/queue.js';
 
 // Import routers
-import matchesRouter from './routes/matches.js';
-import moodleRouter from './routes/moodle.js';
-import suapRouter from './routes/suap.js';
-import aiRouter from './routes/ai.js';
-import jobsRouter from './routes/jobs.js';
+import { router as matchesRouter } from './routes/matches.js';
+import { router as moodleRouter } from './routes/moodle.js';
+import { router as suapRouter } from './routes/suap.js';
+import { router as aiRouter } from './routes/ai.js';
+import { router as jobsRouter } from './routes/jobs.js';
 
 const app = express();
 const port = 3000;
 
 // Single job queue for all operations
-const jobQueue = new Queue();
+const jobQueue = new JobQueue();
 
 // Make jobQueue available to routes
 app.locals.jobQueue = jobQueue;

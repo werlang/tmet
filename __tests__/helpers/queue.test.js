@@ -7,7 +7,7 @@ import { jest } from '@jest/globals';
 import { suppressConsole, wait } from '../setup.js';
 
 // Import Queue directly (no external dependencies to mock)
-const Queue = (await import('../../helpers/queue.js')).default;
+const { JobQueue } = await import('../../helpers/queue.js');
 
 describe('Queue Helper', () => {
     suppressConsole();
@@ -15,7 +15,7 @@ describe('Queue Helper', () => {
     let queue;
 
     beforeEach(() => {
-        queue = new Queue(100); // Short cleanup timeout for tests
+        queue = new JobQueue(100); // Short cleanup timeout for tests
     });
 
     afterEach(() => {

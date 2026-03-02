@@ -1,7 +1,7 @@
 import puppeteer from 'puppeteer-core';
-import suapConfig from '../config/suap-config.js';
+import { suapConfig } from '../config/suap-config.js';
 
-export default class SUAPScraper {
+class SUAPScraper {
     
     static browser = null;
     static page = null;
@@ -222,3 +222,5 @@ export default class SUAPScraper {
         }
     }
 }
+
+export { SUAPScraper };

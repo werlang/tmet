@@ -1,4 +1,4 @@
-export default {
+const chatAssistConfig = {
     url: 'https://api.deepseek.com/chat/completions',
     model: 'deepseek-chat',
     temperature: 1.0,
@@ -27,4 +27,6 @@ Respond ONLY with a valid JSONL, where each line is a JSON object in this format
 }
 
 If you cannot find any confident matches, respond with null.`,
-}
+};
+
+export { chatAssistConfig };

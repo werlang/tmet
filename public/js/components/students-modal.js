@@ -172,5 +172,3 @@ export class StudentsModal {
         return card;
     }
 }
-
-export default StudentsModal;

@@ -1,13 +1,13 @@
 import path from 'path';
 import fs from 'fs';
-import SUAPScraper from '../helpers/scraper.js';
-import suapConfig from '../config/suap-config.js';
+import { SUAPScraper } from '../helpers/scraper.js';
+import { suapConfig } from '../config/suap-config.js';
 
 /**
  * SUAP Model
  * Handles SUAP extraction operations
  */
-export default class SUAP {
+class SUAP {
     #dataPath;
     #studentsPath;
     #professorsPath;
@@ -532,3 +532,5 @@ export default class SUAP {
         console.log(`Saved ${professors.length} professors to ${this.#professorsPath}`);
     }
 }
+
+export { SUAP };

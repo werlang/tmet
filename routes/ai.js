@@ -1,5 +1,5 @@
 import express from 'express';
-import AIMatch from '../models/AIMatch.js';
+import { AIMatch } from '../models/AIMatch.js';
 
 const router = express.Router();
 
@@ -59,4 +59,4 @@ async function processAIMatching(jobId, moodleSubjects, suapSubjects, updateProg
     };
 }
 
-export default router;
+export { router };

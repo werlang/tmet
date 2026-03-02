@@ -175,5 +175,3 @@ export class ProfessorsModal {
         return card;
     }
 }
-
-export default ProfessorsModal;

@@ -1,11 +1,11 @@
-import ChatAssist from '../helpers/chat-assist.js';
-import chatConfig from '../config/chat-assist.js';
+import { ChatAssist } from '../helpers/chat-assist.js';
+import { chatAssistConfig } from '../config/chat-assist.js';
 
 /**
  * AIMatch Model
  * Handles AI-powered matching operations
  */
-export default class AIMatch {
+class AIMatch {
     #chatAssist;
 
     constructor() {
@@ -23,7 +23,7 @@ export default class AIMatch {
         // Update progress
         progressCallback?.({ message: 'Preparing AI prompt...' });
 
-        const systemPrompt = chatConfig.systemPrompt;
+        const systemPrompt = chatAssistConfig.systemPrompt;
         const userMessage = this.#buildPrompt(moodleSubjects, suapSubjects);
 
         // Call AI
@@ -102,3 +102,5 @@ ${suapList}`;
         return matches;
     }
 }
+
+export { AIMatch };

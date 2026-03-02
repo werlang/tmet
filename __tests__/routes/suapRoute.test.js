@@ -59,16 +59,16 @@ jest.unstable_mockModule('fs', () => ({
 }));
 
 jest.unstable_mockModule('../../helpers/scraper.js', () => ({
-    default: mockSUAPScraper
+    SUAPScraper: mockSUAPScraper
 }));
 
 jest.unstable_mockModule('../../models/SUAP.js', () => ({
-    default: mockSUAP
+    SUAP: mockSUAP
 }));
 
 // Import routes after mocking
 const suapModule = await import('../../routes/suap.js');
-const suapRouter = suapModule.default;
+const suapRouter = suapModule.router;
 
 // Get the route handlers directly
 function getRouteHandler(method, path) {

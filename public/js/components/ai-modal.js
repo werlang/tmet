@@ -1,7 +1,7 @@
 import { escapeHtml } from '../helpers/text.js';
-import Matching from '../models/matching.js';
-import Toast from './toast.js';
-import ProgressModal from './progress-modal.js';
+import { Matching } from '../models/matching.js';
+import { Toast } from './toast.js';
+import { ProgressModal } from './progress-modal.js';
 
 /**
  * AI Match Modal Component

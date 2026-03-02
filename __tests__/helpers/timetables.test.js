@@ -12,11 +12,11 @@ const mockRequest = {
 };
 
 jest.unstable_mockModule('../../helpers/request.js', () => ({
-    default: mockRequest
+    Request: mockRequest
 }));
 
 // Import after mocking
-const { default: TimeTables } = await import('../../helpers/timetables.js');
+const { TimeTables } = await import('../../helpers/timetables.js');
 
 describe('TimeTables Helper', () => {
     suppressConsole();

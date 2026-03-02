@@ -15,7 +15,7 @@ global.fetch = mockFetch;
 
 // Mock config
 jest.unstable_mockModule('../../config/chat-assist.js', () => ({
-    default: {
+    chatAssistConfig: {
         url: 'https://api.example.com/chat',
         model: 'gpt-4',
         temperature: 0.7,
@@ -28,7 +28,7 @@ jest.unstable_mockModule('../../config/chat-assist.js', () => ({
 process.env.CHAT_ASSIST_API_KEY = 'test-api-key';
 
 // Import after mocking
-const { default: ChatAssist } = await import('../../helpers/chat-assist.js');
+const { ChatAssist } = await import('../../helpers/chat-assist.js');
 
 describe('ChatAssist Helper', () => {
     suppressConsole();

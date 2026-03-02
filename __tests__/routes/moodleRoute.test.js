@@ -66,20 +66,20 @@ jest.unstable_mockModule('fs', () => ({
 }));
 
 jest.unstable_mockModule('../../helpers/timetables.js', () => ({
-    default: mockTimeTables
+    TimeTables: mockTimeTables
 }));
 
 jest.unstable_mockModule('../../helpers/moodle-uploader.js', () => ({
-    default: mockMoodleUploader
+    MoodleUploader: mockMoodleUploader
 }));
 
 jest.unstable_mockModule('../../models/Moodle.js', () => ({
-    default: mockMoodle
+    Moodle: mockMoodle
 }));
 
 // Import routes after mocking
 const moodleModule = await import('../../routes/moodle.js');
-const moodleRouter = moodleModule.default;
+const moodleRouter = moodleModule.router;
 
 // Get the route handlers directly
 function getRouteHandler(method, path) {

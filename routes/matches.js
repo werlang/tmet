@@ -1,5 +1,5 @@
 import express from 'express';
-import Match from '../models/Match.js';
+import { Match } from '../models/Match.js';
 
 const router = express.Router();
 
@@ -50,4 +50,4 @@ router.post('/', (req, res) => {
     }
 });
 
-export default router;
+export { router };

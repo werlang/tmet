@@ -1,12 +1,12 @@
-import Toast from '../components/toast.js';
-import Request from '../helpers/request.js';
+import { Toast } from '../components/toast.js';
+import { Request } from '../helpers/request.js';
 
 /**
  * SUAP Model
  * Represents the SUAP system and handles all SUAP-related API operations
  * Manages SUAP subjects/courses data and extraction
  */
-export default class SUAP {
+class SUAP {
     #subjects = [];
     #matchedSubjects = [];
 
@@ -154,3 +154,5 @@ export default class SUAP {
         return this.#subjects.length;
     }
 }
+
+export { SUAP };

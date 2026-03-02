@@ -20,7 +20,7 @@ jest.unstable_mockModule('fs', () => ({
 }));
 
 // Import Match after mocking
-const { default: Match } = await import('../../models/Match.js');
+const { Match } = await import('../../models/Match.js');
 
 describe('Match Model', () => {
     suppressConsole();

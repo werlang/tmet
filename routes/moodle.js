@@ -1,5 +1,5 @@
 import express from 'express';
-import Moodle from '../models/Moodle.js';
+import { Moodle } from '../models/Moodle.js';
 
 const router = express.Router();
 
@@ -373,4 +373,4 @@ async function processUploadProfessors(jobId, updateProgress) {
     };
 }
 
-export default router;
+export { router };

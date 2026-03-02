@@ -1,4 +1,4 @@
-export default class Toast {
+class Toast {
     static #container = null;
 
     static #init() {
@@ -174,3 +174,5 @@ export default class Toast {
         return toast;
     }
 }
+
+export { Toast };

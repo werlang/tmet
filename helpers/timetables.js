@@ -1,6 +1,6 @@
-import Request from "./request.js";
+import { Request } from "./request.js";
 
-export default class TimeTables {
+class TimeTables {
 
     constructor({ year, dateFrom, dateTo }) {
         this.year = year;
@@ -114,3 +114,5 @@ export default class TimeTables {
         return { ...this.entities };
     }
 }
+
+export { TimeTables };

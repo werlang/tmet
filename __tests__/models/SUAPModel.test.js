@@ -44,11 +44,11 @@ jest.unstable_mockModule('fs', () => ({
 }));
 
 jest.unstable_mockModule('../../helpers/scraper.js', () => ({
-    default: mockSUAPScraper
+    SUAPScraper: mockSUAPScraper
 }));
 
 // Import SUAP after mocking
-const { default: SUAP } = await import('../../models/SUAP.js');
+const { SUAP } = await import('../../models/SUAP.js');
 
 describe('SUAP Model', () => {
     suppressConsole();

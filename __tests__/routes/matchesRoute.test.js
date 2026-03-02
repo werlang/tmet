@@ -21,7 +21,7 @@ jest.unstable_mockModule('fs', () => ({
 
 // Import routes after mocking
 const matchesModule = await import('../../routes/matches.js');
-const matchesRouter = matchesModule.default;
+const matchesRouter = matchesModule.router;
 
 // Get the route handlers directly
 function getRouteHandler(method, path) {

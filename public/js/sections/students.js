@@ -1,8 +1,8 @@
-import Toast from '../components/toast.js';
-import ProgressModal from '../components/progress-modal.js';
-import StudentsModal from '../components/students-modal.js';
-import ProfessorsModal from '../components/professors-modal.js';
-import Request from '../helpers/request.js';
+import { Toast } from '../components/toast.js';
+import { ProgressModal } from '../components/progress-modal.js';
+import { StudentsModal } from '../components/students-modal.js';
+import { ProfessorsModal } from '../components/professors-modal.js';
+import { Request } from '../helpers/request.js';
 
 /**
  * Students Section
@@ -12,7 +12,7 @@ import Request from '../helpers/request.js';
  * - Student viewing modal
  * - Generate students CSV for Moodle enrollment
  */
-export default class StudentsSection {
+class StudentsSection {
     #elements = {};
     #moodle;
     #suap;
@@ -696,3 +696,5 @@ export default class StudentsSection {
         button.textContent = text;
     }
 }
+
+export { StudentsSection };

@@ -1,14 +1,14 @@
 import path from 'path';
 import fs from 'fs';
-import TimeTables from '../helpers/timetables.js';
-import MoodleUploader from '../helpers/moodle-uploader.js';
-import moodleConfig from '../config/moodle-config.js';
+import { TimeTables } from '../helpers/timetables.js';
+import { MoodleUploader } from '../helpers/moodle-uploader.js';
+import { moodleConfig } from '../config/moodle-config.js';
 
 /**
  * Moodle Model
  * Handles Moodle-related operations (CSV generation, course uploads)
  */
-export default class Moodle {
+class Moodle {
     #csvPath;
 
     constructor() {
@@ -438,3 +438,5 @@ export default class Moodle {
         return results;
     }
 }
+
+export { Moodle };

@@ -14,7 +14,7 @@ const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 // Import after mocking
-const { default: Request } = await import('../../helpers/request.js');
+const { Request } = await import('../../helpers/request.js');
 
 describe('Request Helper', () => {
     suppressConsole();

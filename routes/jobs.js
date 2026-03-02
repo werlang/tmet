@@ -24,4 +24,4 @@ router.get('/:jobId', (req, res) => {
     });
 });
 
-export default router;
+export { router };

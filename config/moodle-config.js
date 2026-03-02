@@ -1,4 +1,4 @@
-export default {
+const moodleConfig = {
     categories: {
         ECA: 119,
         FMC: 117,
@@ -8,4 +8,6 @@ export default {
         PED: 3249,
         TSI: 120,
     },
-}
+};
+
+export { moodleConfig };

@@ -13,11 +13,11 @@ const mockRequest = {
 };
 
 jest.unstable_mockModule('../../helpers/request.js', () => ({
-    default: mockRequest
+    Request: mockRequest
 }));
 
 // Import after mocking
-const { default: MoodleUploader } = await import('../../helpers/moodle-uploader.js');
+const { MoodleUploader } = await import('../../helpers/moodle-uploader.js');
 
 describe('MoodleUploader Helper', () => {
     suppressConsole();

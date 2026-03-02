@@ -41,15 +41,15 @@ jest.unstable_mockModule('fs', () => ({
 }));
 
 jest.unstable_mockModule('../../helpers/timetables.js', () => ({
-    default: mockTimeTables
+    TimeTables: mockTimeTables
 }));
 
 jest.unstable_mockModule('../../helpers/moodle-uploader.js', () => ({
-    default: mockMoodleUploader
+    MoodleUploader: mockMoodleUploader
 }));
 
 // Import Moodle after mocking
-const { default: Moodle } = await import('../../models/Moodle.js');
+const { Moodle } = await import('../../models/Moodle.js');
 
 describe('Moodle Model', () => {
     suppressConsole();

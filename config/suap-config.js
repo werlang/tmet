@@ -1,4 +1,4 @@
-export default {
+const suapConfig = {
     baseUrl: 'https://suap.ifsul.edu.br',
     login: {
         url: 'accounts/login/',
@@ -56,4 +56,6 @@ export default {
             label: 'Nome',
         }
     },
-}
+};
+
+export { suapConfig };

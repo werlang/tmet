@@ -15,11 +15,11 @@ const mockChatInstance = {
 const mockChatAssist = jest.fn().mockImplementation(() => mockChatInstance);
 
 jest.unstable_mockModule('../../helpers/chat-assist.js', () => ({
-    default: mockChatAssist
+    ChatAssist: mockChatAssist
 }));
 
 // Import AIMatch after mocking
-const { default: AIMatch } = await import('../../models/AIMatch.js');
+const { AIMatch } = await import('../../models/AIMatch.js');
 
 describe('AIMatch Model', () => {
     suppressConsole();

@@ -1,6 +1,6 @@
 import { SubjectListUI } from '../components/subject-list.js';
 import { AIMatchModal } from '../components/ai-modal.js';
-import Matching from '../models/matching.js';
+import { Matching } from '../models/matching.js';
 
 /**
  * Matching Section
@@ -8,7 +8,7 @@ import Matching from '../models/matching.js';
  * - Manual matching with search and selection
  * - AI-powered automatic matching
  */
-export default class MatchingSection {
+class MatchingSection {
     #elements = {};
     #moodle;
     #suap;
@@ -185,3 +185,5 @@ export default class MatchingSection {
         button.textContent = text;
     }
 }
+
+export { MatchingSection };

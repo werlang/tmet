@@ -6,7 +6,7 @@
 import { jest, describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
-import Queue from '../../helpers/queue.js';
+import { JobQueue } from '../../helpers/queue.js';
 
 // Create a minimal test app with the actual routes
 function createTestApp() {
@@ -15,7 +15,7 @@ function createTestApp() {
     
     // Create a real job queue for testing
     // Use 5000ms cleanup timeout to prevent race conditions in tests
-    const jobQueue = new Queue(5000);
+    const jobQueue = new JobQueue(5000);
     app.locals.jobQueue = jobQueue;
     
     // Simple mock routes that mimic the actual routes
