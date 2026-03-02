@@ -37,7 +37,6 @@ export default class SUAP {
         semester = semester || (new Date().getMonth() < 6 ? 1 : 2);
 
         const courses = suapConfig.courses;
-        const yearList = suapConfig.yearList;
 
         // Filter courses if selectedCourses array is provided
         const coursesToExtract = selectedCourses && selectedCourses.length > 0
@@ -55,13 +54,14 @@ export default class SUAP {
 
             const query = new URLSearchParams({
                 ...suapConfig.bookSearch.url.query,
-                ano_letivo: yearList[year],
+                ano_letivo: this.#getYearOffset(year),
                 periodo_letivo__exact: semester,
                 turma__curso_campus: courses[courseName],
                 tab: 'tab_any_data',
                 all: 'true',
             }).toString();
             const url = `${suapConfig.baseUrl}/${suapConfig.bookSearch.url.base}/?${query}`;
+            console.log(url);
             await SUAPScraper.goto(url, suapConfig.bookSearch.ready);
 
             console.log(`Extracting data for course ${courseName}...`);
@@ -227,6 +227,11 @@ export default class SUAP {
         await this.#saveProfessors(subjectId, professors);
 
         return { students, professors };
+    }
+
+    #getYearOffset(year) {
+        // 2018 === 65
+        return parseInt(year) - 1953;
     }
 
     /**

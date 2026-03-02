@@ -31,9 +31,6 @@ export default {
         ECA: 269,
         PED: 815,
     },
-    yearList: {
-        2025: 72,
-    },
     subjectDetail: {
         url: 'edu/diario',
         tab: 'notas_faltas',
