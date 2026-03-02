@@ -1,24 +1,51 @@
-export default class Request {
+export class Request {
 
-    static async post(url, body = {}, retry = true) {
-        return await Request.fetch('POST', url, {
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        }, retry);
+    constructor({ url, headers, timeout = 5000, format = 'json' }) {
+        this.url = url;
+        this.headers = new Headers(headers || {});
+        this.timeout = timeout;
+        this.body = null;
+        this.format = format;
     }
 
-    static async get(url, query = {}, retry = true) {
-        const queryString = new URLSearchParams(query).toString();
-        const fullUrl = queryString ? `${url}?${queryString}` : url;
-        return await Request.fetch('GET', fullUrl, {}, retry);
+    setHeader(key, value) {
+        this.headers.set(key, value);
     }
 
-    static async fetch(method, url, options = {}, retry = true, timeout = 10000) {
+    setHeaders(headers) {
+        for (const [key, value] of Object.entries(headers)) {
+            this.headers.set(key, value);
+        }
+    }
+
+    async get(endpoint, data = {}) {
+        const query = new URLSearchParams(data).toString();
+        return this.fetch('GET', `${endpoint}?${query}`);
+    }
+
+    async post(endpoint, data = {}) {
+        if (this.format === 'json') {
+            this.setHeader('Content-Type', 'application/json');
+            this.body = JSON.stringify(data);
+        }
+        else if (this.format === 'form') {
+            this.setHeader('Content-Type', 'application/x-www-form-urlencoded');
+            this.body = new URLSearchParams(data).toString();
+        }
+        return this.fetch('POST', endpoint);
+    }
+
+    async fetch(method, endpoint, args = {}, {
+        retry = true,
+        timeout = 10000,
+    } = {}) {
         try {
-            const response = await fetch(url, {
+            const response = await fetch(`${this.url}${endpoint}`, {
                 method,
-                ...options,
+                headers: this.headers,
+                body: this.body,
                 signal: AbortSignal.timeout(timeout),
+                ...args,
             });
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -29,8 +56,8 @@ export default class Request {
         catch (error) {
             console.error('Error fetching data:', error);
             if (!retry) throw error;
-            await new Promise(r => setTimeout(() => r(), 1000));
-            return Request.fetch(method, url, options);
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return this.fetch(method, endpoint, args, { retry, timeout });
         }
     }
 
