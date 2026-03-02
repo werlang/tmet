@@ -1,0 +1,40 @@
+JIRA: TMET-0001
+Title: Migrate .github docs and AI context data from copied source to TMET
+Date: 2026-03-02
+Status: Input captured from user chat
+
+Request:
+- Migrate .github docs/skills/prompts using the copied folder as source material.
+- Keep only what is relevant to this TMET project; discard the rest.
+- Rewrite and place files correctly under .github.
+- Remove legacy/source-project concepts and stale claims.
+- Include root documentation cleanup (README and related prompts) where inconsistent.
+
+User constraints and decisions:
+1) JIRA ID can be chosen by agent.
+2) Include root docs in scope.
+3) Delete .github-copy after migration artifacts are finalized.
+4) Keep minimal useful skills; add only if truly relevant.
+5) .github should contain TMET-relevant content only.
+6) Remove non-relevant copied skills/content.
+7) Document only current implemented behavior.
+8) Source code is the source of truth.
+9) Enforce strict stale-term removal.
+10) Prefer Docker-based commands in docs.
+11) Document verified environment variables only.
+12) Prompts should be TMET-specific.
+
+Follow-up confirmations:
+- Keep/rewrite minimal skills: api-development, api-unit-testing-jest, api-functional-testing,
+  docker-deployment, web-frontend, debugging-operations, and skill-creator.
+- Exclude/delete: frontend-testing-playwright, internationalization, entity-models,
+  refactor-feature-additions.
+- .github/prompts should include TMET-adapted: migrate-github-context.md,
+  audit-documentation.md, api-testing-coverage.md.
+- Clean/reduce root prompts to avoid duplication.
+- README cleanup can include additions/modifications to fit TMET.
+- Keep .github/COMMIT.md.
+- Env var grouping:
+  Required: SUAP_USERNAME, SUAP_PASSWORD, MOODLE_URL, MOODLE_TOKEN
+  Optional: CHAT_ASSIST_API_KEY, CHROME_PORT, MAX_CONCURRENT_JOBS
+- Route docs must include only mounted /api/{moodle,suap,matches,ai,jobs} contracts.
