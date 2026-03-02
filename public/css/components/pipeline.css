@@ -8,7 +8,9 @@
     padding: 24px;
     border-radius: var(--border-radius);
     box-shadow: var(--box-shadow);
+    margin: auto;
     margin-bottom: 24px;
+    max-width: 1600px;
 
     h2 {
         font-size: 1.5rem;
