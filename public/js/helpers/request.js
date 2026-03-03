@@ -1,113 +1,64 @@
-class Request {
-    static #baseURL = '';
-    static #defaultHeaders = {
-        'Content-Type': 'application/json'
-    };
-    static #timeout = 30000; // 30 seconds default timeout
+export class Request {
 
-    /**
-     * Configure global request settings
-     */
-    static configure({ baseURL, headers, timeout } = {}) {
-        if (baseURL !== undefined) this.#baseURL = baseURL;
-        if (headers !== undefined) this.#defaultHeaders = { ...this.#defaultHeaders, ...headers };
-        if (timeout !== undefined) this.#timeout = timeout;
+    constructor({ url, headers, timeout = 5000, format = 'json' }) {
+        this.url = url;
+        this.headers = new Headers(headers || {});
+        this.timeout = timeout;
+        this.body = null;
+        this.format = format;
     }
 
-    /**
-     * Make a request with automatic error handling
-     */
-    static async #request(url, options = {}) {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.#timeout);
+    setHeader(key, value) {
+        this.headers.set(key, value);
+    }
 
-        try {
-            const fullURL = this.#baseURL + url;
-            const config = {
-                ...options,
-                headers: {
-                    ...this.#defaultHeaders,
-                    ...options.headers
-                },
-                signal: controller.signal
-            };
-
-            const response = await fetch(fullURL, config);
-            clearTimeout(timeoutId);
-
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            // Parse response based on content type
-            const contentType = response.headers.get('content-type');
-            if (contentType?.includes('application/json')) {
-                return await response.json();
-            }
-            return await response.text();
-
-        } catch (error) {
-            clearTimeout(timeoutId);
-            
-            if (error.name === 'AbortError') {
-                throw new Error('Request timeout');
-            }
-            throw error;
+    setHeaders(headers) {
+        for (const [key, value] of Object.entries(headers)) {
+            this.headers.set(key, value);
         }
     }
 
-    /**
-     * GET request
-     */
-    static async get(url, options = {}) {
-        return this.#request(url, {
-            ...options,
-            method: 'GET'
-        });
+    async get(endpoint, data = {}) {
+        const query = new URLSearchParams(data).toString();
+        return this.fetch('GET', `${endpoint}?${query}`);
     }
 
-    /**
-     * POST request
-     */
-    static async post(url, data, options = {}) {
-        return this.#request(url, {
-            ...options,
-            method: 'POST',
-            body: JSON.stringify(data)
-        });
+    async post(endpoint, data = {}) {
+        if (this.format === 'json') {
+            this.setHeader('Content-Type', 'application/json');
+            this.body = JSON.stringify(data);
+        }
+        else if (this.format === 'form') {
+            this.setHeader('Content-Type', 'application/x-www-form-urlencoded');
+            this.body = new URLSearchParams(data).toString();
+        }
+        return this.fetch('POST', endpoint);
     }
 
-    /**
-     * PUT request
-     */
-    static async put(url, data, options = {}) {
-        return this.#request(url, {
-            ...options,
-            method: 'PUT',
-            body: JSON.stringify(data)
-        });
+    async fetch(method, endpoint, args = {}, {
+        retry = true,
+        timeout = 10000,
+    } = {}) {
+        try {
+            const response = await fetch(`${this.url}${endpoint}`, {
+                method,
+                headers: this.headers,
+                body: this.body,
+                signal: AbortSignal.timeout(timeout),
+                ...args,
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            return data;
+        }
+        catch (error) {
+            console.error('Error fetching data:', error);
+            if (!retry) throw error;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return this.fetch(method, endpoint, args, { retry, timeout });
+        }
     }
 
-    /**
-     * PATCH request
-     */
-    static async patch(url, data, options = {}) {
-        return this.#request(url, {
-            ...options,
-            method: 'PATCH',
-            body: JSON.stringify(data)
-        });
-    }
-
-    /**
-     * DELETE request
-     */
-    static async delete(url, options = {}) {
-        return this.#request(url, {
-            ...options,
-            method: 'DELETE'
-        });
-    }
 }
-
-export { Request };
