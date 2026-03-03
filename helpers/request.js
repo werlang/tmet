@@ -1,11 +1,11 @@
 export class Request {
 
-    constructor({ url, headers, timeout = 5000, format = 'json' }) {
-        this.url = url;
+    constructor({ url, headers, timeout, format } = {}) {
+        this.url = url || '';
         this.headers = new Headers(headers || {});
-        this.timeout = timeout;
+        this.timeout = timeout || 5000;
         this.body = null;
-        this.format = format;
+        this.format = format || 'json';
     }
 
     setHeader(key, value) {
@@ -40,17 +40,25 @@ export class Request {
         timeout = 10000,
     } = {}) {
         try {
-            const response = await fetch(`${this.url}${endpoint}`, {
+            const options = {
                 method,
                 headers: this.headers,
-                body: this.body,
-                signal: AbortSignal.timeout(timeout),
                 ...args,
-            });
+            };
+            if (this.body) {
+                options.body = this.body;
+            }
+            if (timeout) {
+                options.signal = AbortSignal.timeout(timeout);
+            }
+
+            // console.log(`${method} ${this.url}${endpoint}`, options, this.body);
+            const response = await fetch(`${this.url}${endpoint}`, options);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             const data = await response.json();
+            // console.log(data);
             return data;
         }
         catch (error) {

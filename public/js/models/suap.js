@@ -1,8 +1,6 @@
 import { Toast } from '../components/toast.js';
 import { Request } from '../helpers/request.js';
 
-const request = new Request({ url: '' });
-
 /**
  * SUAP Model
  * Represents the SUAP system and handles all SUAP-related API operations
@@ -25,7 +23,7 @@ class SUAP {
      */
     async extractSubjects(params, progressCallback) {
         try {
-            const result = await request.post('/api/suap/extract', params);
+            const result = await new Request().post('/api/suap/extract', params);
             
             if (!result.jobId) {
                 throw new Error('No job ID returned from server');
@@ -63,7 +61,7 @@ class SUAP {
             const poll = async () => {
                 try {
                     attempts++;
-                    const status = await request.get(`${endpoint}/${jobId}`);
+                    const status = await new Request().get(`${endpoint}/${jobId}`);
 
                     if (progressCallback && status.message) {
                         progressCallback(status.message);
@@ -100,7 +98,7 @@ class SUAP {
      */
     async loadSubjects() {
         try {
-            const data = await request.get('/api/matches');
+            const data = await new Request().get('/api/matches');
             const allSubjects = data.subjects || [];
             const suapSubjects = data.suapSubjects || [];
             

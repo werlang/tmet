@@ -4,8 +4,6 @@ import { StudentsModal } from '../components/students-modal.js';
 import { ProfessorsModal } from '../components/professors-modal.js';
 import { Request } from '../helpers/request.js';
 
-const request = new Request({ url: '' });
-
 /**
  * Students Section
  * Handles student extraction and management:
@@ -81,8 +79,8 @@ class StudentsSection {
     async loadStudentsData() {
         try {
             const [studentsResponse, professorsResponse] = await Promise.all([
-                request.get('/api/suap/students'),
-                request.get('/api/suap/professors')
+                new Request().get('/api/suap/students'),
+                new Request().get('/api/suap/professors')
             ]);
             // format: {subjects: {id: [enrollments]}, students: {enrollment: info}}
             this.#studentsData = studentsResponse.data || { subjects: {}, students: {} };
@@ -404,7 +402,7 @@ class StudentsSection {
             const subjectIds = Array.from(this.#selectedSubjectIds);
 
             // Start extraction job with extractType
-            const response = await request.post('/api/suap/extract-students', { 
+            const response = await new Request().post('/api/suap/extract-students', { 
                 subjectIds,
                 extractType 
             });
@@ -662,7 +660,7 @@ class StudentsSection {
 
         while (attempts < maxAttempts) {
             try {
-                const status = await request.get(`/api/jobs/${jobId}`);
+                const status = await new Request().get(`/api/jobs/${jobId}`);
 
                 // Fire progress callback if there's any progress info (message, current, total)
                 if (onProgress && (status.message || status.current !== undefined)) {

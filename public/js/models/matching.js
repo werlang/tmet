@@ -1,8 +1,6 @@
 import { Toast } from '../components/toast.js';
 import { Request } from '../helpers/request.js';
 
-const request = new Request({ url: '' });
-
 /**
  * Matching Service
  * Handles matching operations between Moodle and SUAP subjects
@@ -16,7 +14,7 @@ class Matching {
      */
     static async saveMatch(moodleFullname, suapIds) {
         try {
-            const result = await request.post('/api/matches', {
+            const result = await new Request().post('/api/matches', {
                 moodleFullname,
                 suapIds
             });
@@ -37,7 +35,7 @@ class Matching {
      */
     static async startAIMatching(moodleSubjects, suapSubjects) {
         try {
-            const result = await request.post('/api/ai/match', {
+            const result = await new Request().post('/api/ai/match', {
                 moodleSubjects,
                 suapSubjects
             });
@@ -61,7 +59,7 @@ class Matching {
      */
     static async getAIMatchingStatus(jobId) {
         try {
-            const status = await request.get(`/api/jobs/${jobId}`);
+            const status = await new Request().get(`/api/jobs/${jobId}`);
             
             if (!status.success) {
                 throw new Error('Failed to fetch job status');

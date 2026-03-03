@@ -1,8 +1,6 @@
 import { Toast } from '../components/toast.js';
 import { Request } from '../helpers/request.js';
 
-const request = new Request({ url: '' });
-
 /**
  * Moodle Model
  * Represents the Moodle system and handles all Moodle-related API operations
@@ -26,7 +24,7 @@ class Moodle {
      */
     async generateCSV(params, progressCallback) {
         try {
-            const result = await request.post('/api/moodle/csv', params);
+            const result = await new Request().post('/api/moodle/csv', params);
             
             if (!result.jobId) {
                 throw new Error('No job ID returned from server');
@@ -54,7 +52,7 @@ class Moodle {
      */
     async uploadCourses(progressCallback) {
         try {
-            const result = await request.post('/api/moodle/courses');
+            const result = await new Request().post('/api/moodle/courses');
             
             if (!result.jobId) {
                 throw new Error('No job ID returned from server');
@@ -82,7 +80,7 @@ class Moodle {
      */
     async generateStudentsCSV(progressCallback) {
         try {
-            const result = await request.post('/api/moodle/students-csv');
+            const result = await new Request().post('/api/moodle/students-csv');
             
             if (!result.jobId) {
                 throw new Error('No job ID returned from server');
@@ -110,7 +108,7 @@ class Moodle {
      */
     async generateProfessorsCSV(progressCallback) {
         try {
-            const result = await request.post('/api/moodle/professors-csv');
+            const result = await new Request().post('/api/moodle/professors-csv');
             
             if (!result.jobId) {
                 throw new Error('No job ID returned from server');
@@ -138,7 +136,7 @@ class Moodle {
      */
     async uploadStudents(progressCallback) {
         try {
-            const result = await request.post('/api/moodle/students');
+            const result = await new Request().post('/api/moodle/students');
             
             if (!result.jobId) {
                 throw new Error('No job ID returned from server');
@@ -166,7 +164,7 @@ class Moodle {
      */
     async uploadProfessors(progressCallback) {
         try {
-            const result = await request.post('/api/moodle/professors');
+            const result = await new Request().post('/api/moodle/professors');
             
             if (!result.jobId) {
                 throw new Error('No job ID returned from server');
@@ -204,7 +202,7 @@ class Moodle {
             const poll = async () => {
                 try {
                     attempts++;
-                    const status = await request.get(`${endpoint}/${jobId}`);
+                    const status = await new Request().get(`${endpoint}/${jobId}`);
 
                     if (progressCallback && status.message) {
                         progressCallback(status.message);
@@ -241,7 +239,7 @@ class Moodle {
      */
     async loadSubjects() {
         try {
-            const data = await request.get('/api/matches');
+            const data = await new Request().get('/api/matches');
             this.#subjects = data.noMatch || [];
             this.#matchedSubjects = data.subjects?.filter(s => s.suapId) || [];
         } catch (error) {
