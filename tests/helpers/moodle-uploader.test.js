@@ -12,8 +12,10 @@ const mockRequest = {
     get: jest.fn()
 };
 
+const MockRequest = jest.fn(() => mockRequest);
+
 jest.unstable_mockModule('../../helpers/request.js', () => ({
-    Request: mockRequest
+    Request: MockRequest
 }));
 
 // Import after mocking

@@ -18,10 +18,12 @@ const { Request } = await import('../../helpers/request.js');
 
 describe('Request Helper', () => {
     suppressConsole();
+    let request;
 
     beforeEach(() => {
         jest.clearAllMocks();
         mockFetch.mockReset();
+        request = new Request({ url: '' });
     });
 
     afterEach(() => {
@@ -35,13 +37,13 @@ describe('Request Helper', () => {
                 json: () => Promise.resolve({ success: true })
             });
 
-            const result = await Request.post('https://api.example.com', { data: 'test' });
+            const result = await request.post('https://api.example.com', { data: 'test' });
 
             expect(mockFetch).toHaveBeenCalledWith(
                 'https://api.example.com',
                 expect.objectContaining({
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: expect.any(Headers),
                     body: JSON.stringify({ data: 'test' })
                 })
             );
@@ -54,7 +56,7 @@ describe('Request Helper', () => {
                 json: () => Promise.resolve({ success: true })
             });
 
-            const result = await Request.post('https://api.example.com');
+            const result = await request.post('https://api.example.com');
 
             expect(result).toEqual({ success: true });
         });
@@ -67,10 +69,10 @@ describe('Request Helper', () => {
                 json: () => Promise.resolve({ data: 'test' })
             });
 
-            const result = await Request.get('https://api.example.com');
+            const result = await request.get('https://api.example.com');
 
             expect(mockFetch).toHaveBeenCalledWith(
-                'https://api.example.com',
+                'https://api.example.com?',
                 expect.objectContaining({ method: 'GET' })
             );
             expect(result).toEqual({ data: 'test' });
@@ -82,7 +84,7 @@ describe('Request Helper', () => {
                 json: () => Promise.resolve({ data: 'test' })
             });
 
-            const result = await Request.get('https://api.example.com', { key: 'value', foo: 'bar' });
+            const result = await request.get('https://api.example.com', { key: 'value', foo: 'bar' });
 
             expect(mockFetch).toHaveBeenCalledWith(
                 'https://api.example.com?key=value&foo=bar',
@@ -98,7 +100,7 @@ describe('Request Helper', () => {
                 json: () => Promise.resolve({ success: true })
             });
 
-            const result = await Request.fetch('GET', 'https://api.example.com');
+            const result = await request.fetch('GET', 'https://api.example.com');
 
             expect(result).toEqual({ success: true });
         });
@@ -114,7 +116,7 @@ describe('Request Helper', () => {
                     json: () => Promise.resolve({ success: true })
                 });
 
-            const result = await Request.fetch('GET', 'https://api.example.com');
+            const result = await request.fetch('GET', 'https://api.example.com');
 
             // Should retry and succeed
             expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -127,7 +129,7 @@ describe('Request Helper', () => {
                 status: 404
             });
 
-            await expect(Request.fetch('GET', 'https://api.example.com', {}, false))
+            await expect(request.fetch('GET', 'https://api.example.com', {}, { retry: false }))
                 .rejects.toThrow('HTTP error! status: 404');
             
             expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -141,7 +143,7 @@ describe('Request Helper', () => {
                     json: () => Promise.resolve({ success: true })
                 });
 
-            const result = await Request.fetch('GET', 'https://api.example.com');
+            const result = await request.fetch('GET', 'https://api.example.com');
 
             expect(mockFetch).toHaveBeenCalledTimes(2);
             expect(result).toEqual({ success: true });
@@ -150,7 +152,7 @@ describe('Request Helper', () => {
         it('should throw error when retry is disabled and error occurs', async () => {
             mockFetch.mockRejectedValue(new Error('Network error'));
 
-            await expect(Request.fetch('GET', 'https://api.example.com', {}, false))
+            await expect(request.fetch('GET', 'https://api.example.com', {}, { retry: false }))
                 .rejects.toThrow('Network error');
         });
 
@@ -160,7 +162,7 @@ describe('Request Helper', () => {
                 json: () => Promise.resolve({ success: true })
             });
 
-            await Request.fetch('GET', 'https://api.example.com', {}, true, 5000);
+            await request.fetch('GET', 'https://api.example.com', {}, { retry: true, timeout: 5000 });
 
             expect(mockFetch).toHaveBeenCalledWith(
                 'https://api.example.com',

@@ -4,7 +4,8 @@ class MoodleUploader {
     constructor(moodleUrl, token) {
         this.baseUrl = moodleUrl.replace(/\/$/, '');
         this.token = token;
-        this.webserviceUrl = `${this.baseUrl}/webservice/rest/server.php`;
+        this.webserviceUrl = `/webservice/rest/server.php`;
+        this.request = new Request({ url: this.baseUrl });
     }
 
     /**
@@ -29,11 +30,7 @@ class MoodleUploader {
             params[`courses[${i}][categoryid]`] = course.category;   
         }
 
-        const body = new URLSearchParams(params).toString();
-        const response = await Request.post(this.webserviceUrl, {
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body
-        });
+        const response = await this.request.post(`${this.webserviceUrl}?${new URLSearchParams(params).toString()}`);
         console.log(response);
 
         // Handle Moodle API error response
@@ -73,7 +70,7 @@ class MoodleUploader {
             params[`enrolments[${i}][courseid]`] = enrol.courseid;
         }
 
-        const response = await Request.post(`${this.webserviceUrl}?${new URLSearchParams(params).toString()}`);
+        const response = await this.request.post(`${this.webserviceUrl}?${new URLSearchParams(params).toString()}`);
         console.log(response);
 
         // Handle Moodle API error response
@@ -105,7 +102,7 @@ class MoodleUploader {
             'criteria[0][value]': username,
         }).toString();
 
-        const response = await Request.get(`${this.webserviceUrl}?${params}`);
+        const response = await this.request.get(`${this.webserviceUrl}?${params}`);
         
         if (response.users && response.users.length > 0) {
             return response.users[0].id;
@@ -127,7 +124,7 @@ class MoodleUploader {
             value: shortname,
         }).toString();
 
-        const response = await Request.get(`${this.webserviceUrl}?${params}`);
+        const response = await this.request.get(`${this.webserviceUrl}?${params}`);
         // console.log(response);
         
         if (response.courses && response.courses.length > 0) {
@@ -154,7 +151,7 @@ class MoodleUploader {
             'users[0][auth]': 'manual',
         };
 
-        const response = await Request.post(`${this.webserviceUrl}?${new URLSearchParams(params).toString()}`);
+        const response = await this.request.post(`${this.webserviceUrl}?${new URLSearchParams(params).toString()}`);
         
         if (response.exception || response.errorcode) {
             console.error(`Failed to create user ${user.username}:`, response.message || response.exception);

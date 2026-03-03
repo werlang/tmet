@@ -8,6 +8,7 @@ class TimeTables {
         this.dateFrom = dateFrom || new Date(Date.now() - 1000 * 60 * 60 * 24 * 7).toISOString().split('T')[0];
         this.database = null;
         this.entities = null;
+        this.request = new Request({ url: 'https://ifsulcharq.edupage.org' });
     }
 
     async fetchDatabase() {
@@ -15,7 +16,7 @@ class TimeTables {
             return this.database;
         }
 
-        const url = `https://ifsulcharq.edupage.org/rpr/server/maindbi.js?__func=mainDBIAccessor`;
+        const url = `/rpr/server/maindbi.js?__func=mainDBIAccessor`;
         const bodyObj = {
             "__args": [
                 null,
@@ -49,13 +50,13 @@ class TimeTables {
             ],
             "__gsh": "00000000"
         };
-        const response = await Request.post(url, bodyObj);
+        const response = await this.request.post(url, bodyObj);
         this.database = response;
         return response;
     }
 
     async fetchClass(classId) {
-        const url = `https://ifsulcharq.edupage.org/timetable/server/currenttt.js?__func=curentttGetData`;
+        const url = `/timetable/server/currenttt.js?__func=curentttGetData`;
         const bodyObj = {
             "__args": [
                 null,
@@ -73,7 +74,7 @@ class TimeTables {
             ],
             "__gsh": "00000000"
         };
-        const response = await Request.post(url, bodyObj);
+        const response = await this.request.post(url, bodyObj);
         return response;
     }
 
