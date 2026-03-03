@@ -73,6 +73,8 @@ class SubjectMatcherApp {
             selectAllProfessorsBtn: document.getElementById('select-all-professors-btn'),
             selectProfessorsNotScrapedBtn: document.getElementById('select-professors-not-scraped-btn'),
             deselectAllProfessorsBtn: document.getElementById('deselect-all-professors-btn'),
+            filterStudentsNotScrapedToggle: document.getElementById('filter-students-not-scraped-toggle'),
+            filterProfessorsNotScrapedToggle: document.getElementById('filter-professors-not-scraped-toggle'),
             studentsSelectedCount: document.getElementById('students-selected-count'),
             generateStudentsCsvBtn: document.getElementById('generate-students-csv-btn'),
             uploadStudentsBtn: document.getElementById('upload-students-btn'),

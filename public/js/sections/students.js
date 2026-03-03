@@ -25,6 +25,8 @@ class StudentsSection {
     #studentUrl = '';
     #professorUrl = '';
     #onDataChange;
+    #showStudentsNotScrapedOnly = false;
+    #showProfessorsNotScrapedOnly = false;
 
     /**
      * @param {Object} options
@@ -63,6 +65,16 @@ class StudentsSection {
         this.#elements.selectAllProfessorsBtn.addEventListener('click', () => this.#selectByType('professors', 'all'));
         this.#elements.selectProfessorsNotScrapedBtn.addEventListener('click', () => this.#selectByType('professors', 'not-scraped'));
         this.#elements.deselectAllProfessorsBtn.addEventListener('click', () => this.#selectByType('professors', 'none'));
+
+        // Filter toggles
+        this.#elements.filterStudentsNotScrapedToggle.addEventListener('change', (event) => {
+            this.#showStudentsNotScrapedOnly = event.target.checked;
+            this.#renderStudentsSubjectList();
+        });
+        this.#elements.filterProfessorsNotScrapedToggle.addEventListener('change', (event) => {
+            this.#showProfessorsNotScrapedOnly = event.target.checked;
+            this.#renderStudentsSubjectList();
+        });
         
         // CSV generation
         this.#elements.generateStudentsCsvBtn.addEventListener('click', () => this.#generateStudentsCSV());
@@ -134,6 +146,7 @@ class StudentsSection {
      */
     #renderStudentsSubjectList() {
         const matchedSubjects = this.#suap.getMatchedSubjects();
+        const filteredSubjects = this.#getFilteredSubjects(matchedSubjects);
         const container = this.#elements.studentsSubjectList;
 
         container.innerHTML = '';
@@ -146,9 +159,56 @@ class StudentsSection {
             return;
         }
 
-        matchedSubjects.forEach(subject => {
+        if (filteredSubjects.length === 0) {
+            const emptyState = document.createElement('div');
+            emptyState.className = 'students-empty-state';
+            emptyState.innerHTML = '<p><strong>No subjects match current filters</strong></p><p>Disable one or both toggles to show all matched subjects</p>';
+            container.appendChild(emptyState);
+            return;
+        }
+
+        filteredSubjects.forEach(subject => {
             const card = this.#createStudentSubjectCard(subject);
             container.appendChild(card);
+        });
+    }
+
+    /**
+     * Check if students are already scraped for a subject
+     * @param {string} subjectId - Subject ID
+     * @returns {boolean}
+     */
+    #hasStudentsScraped(subjectId) {
+        const enrollments = this.#studentsData.subjects?.[subjectId];
+        return !!enrollments && enrollments.length > 0;
+    }
+
+    /**
+     * Check if professors are already scraped for a subject
+     * @param {string} subjectId - Subject ID
+     * @returns {boolean}
+     */
+    #hasProfessorsScraped(subjectId) {
+        const siapes = this.#professorsData.subjects?.[subjectId];
+        return !!siapes && siapes.length > 0;
+    }
+
+    /**
+     * Apply list filters for not-scraped data
+     * @param {Array} subjects - Matched subjects
+     * @returns {Array}
+     */
+    #getFilteredSubjects(subjects) {
+        return subjects.filter(subject => {
+            if (this.#showStudentsNotScrapedOnly && this.#hasStudentsScraped(subject.id)) {
+                return false;
+            }
+
+            if (this.#showProfessorsNotScrapedOnly && this.#hasProfessorsScraped(subject.id)) {
+                return false;
+            }
+
+            return true;
         });
     }
 
