@@ -165,8 +165,8 @@ describe('Moodle Model', () => {
             const moodle = new Moodle();
             const result = await moodle.generateCourseCSV({ year: 2025, semester: 1 });
 
-            // Should contain comma-separated class names
-            expect(result).toContain('ECA-8AN,TSI-4AN');
+            // Should contain pipe-separated class names
+            expect(result).toContain('ECA-8AN|TSI-4AN');
         });
 
         it('should deduplicate subjects by fullname', async () => {
@@ -565,6 +565,76 @@ describe('Moodle Model', () => {
             const writtenCsv = mockFs.writeFileSync.mock.calls[0][1];
             expect(writtenCsv).toContain('joao');
         });
+
+        it('should fallback to enrollment username and empty name/email fields when missing', async () => {
+            const studentsData = {
+                subjects: {
+                    "60244": ["2021001"]
+                },
+                students: {
+                    "2021001": {}
+                }
+            };
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_students.json')) {
+                    return JSON.stringify(studentsData);
+                }
+                if (path.includes('moodle_classes.csv')) {
+                    return sampleMoodleCsvContent;
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([{
+                        moodleFullname: "[2025.1] INF-2AT-G2 - Programação Web I",
+                        suapId: "60244",
+                        type: "auto"
+                    }]);
+                }
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = await moodle.generateStudentCSV();
+
+            expect(result.totalStudents).toBe(1);
+
+            const writtenCsv = mockFs.writeFileSync.mock.calls[0][1];
+            expect(writtenCsv).toContain('2021001,2021001,,,,');
+        });
+
+        it('should continue processing when a matched SUAP subject has no student list', async () => {
+            const studentsData = {
+                subjects: {},
+                students: {
+                    "2021001": { name: 'João Silva', email: 'joao.silva@email.com' }
+                }
+            };
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_students.json')) {
+                    return JSON.stringify(studentsData);
+                }
+                if (path.includes('moodle_classes.csv')) {
+                    return sampleMoodleCsvContent;
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([{
+                        moodleFullname: "[2025.1] INF-2AT-G2 - Programação Web I",
+                        suapId: "99999",
+                        type: "manual"
+                    }]);
+                }
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = await moodle.generateStudentCSV();
+
+            expect(result.processedSubjects).toBe(1);
+            expect(result.totalStudents).toBe(0);
+        });
     });
 
     describe('edge cases', () => {
@@ -770,6 +840,41 @@ describe('Moodle Model', () => {
             expect(progressCallback).toHaveBeenCalledWith('Loading professors data');
         });
 
+        it('should report processed subjects progress when matched subject is found', async () => {
+            const professorsData = {
+                subjects: {
+                    "60244": ["1234567"]
+                },
+                professors: {
+                    "1234567": { name: 'João Silva', email: 'joao.silva@ifsul.edu.br' }
+                }
+            };
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_professors.json')) {
+                    return JSON.stringify(professorsData);
+                }
+                if (path.includes('moodle_classes.csv')) {
+                    return sampleMoodleCsvContent;
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([{
+                        moodleFullname: "[2025.1] INF-2AT-G2 - Programação Web I",
+                        suapId: '60244',
+                        type: 'manual'
+                    }]);
+                }
+                return '';
+            });
+
+            const progressCallback = jest.fn();
+            const moodle = new Moodle();
+            await moodle.generateProfessorCSV(progressCallback);
+
+            expect(progressCallback).toHaveBeenCalledWith('Processed 1/1 subjects');
+        });
+
         it('should handle array of suapIds in matches', async () => {
             const professorsData = {
                 subjects: {
@@ -914,6 +1019,115 @@ describe('Moodle Model', () => {
             expect(writtenCsv).toContain('123456');
             // Username should be email prefix
             expect(writtenCsv).toContain('joao.silva');
+        });
+
+        it('should skip professor row when username cannot be derived from email', async () => {
+            const professorsData = {
+                subjects: {
+                    "60244": ["1234567"]
+                },
+                professors: {
+                    "1234567": { name: 'Sem Email', email: '' }
+                }
+            };
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_professors.json')) {
+                    return JSON.stringify(professorsData);
+                }
+                if (path.includes('moodle_classes.csv')) {
+                    return sampleMoodleCsvContent;
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([{
+                        moodleFullname: "[2025.1] INF-2AT-G2 - Programação Web I",
+                        suapId: '60244',
+                        type: 'manual'
+                    }]);
+                }
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = await moodle.generateProfessorCSV();
+
+            expect(result.totalProfessors).toBe(0);
+            expect(result.processedSubjects).toBe(1);
+
+            const writtenCsv = mockFs.writeFileSync.mock.calls[0][1];
+            expect(writtenCsv.trim().split('\n')).toHaveLength(1);
+            expect(writtenCsv).toBe('username,password,firstname,lastname,email,course1,role1');
+        });
+
+        it('should fallback to empty professor names and still include row when email exists', async () => {
+            const professorsData = {
+                subjects: {
+                    "60244": ["1234567"]
+                },
+                professors: {
+                    "1234567": { email: 'anon.prof@if.edu.br' }
+                }
+            };
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_professors.json')) {
+                    return JSON.stringify(professorsData);
+                }
+                if (path.includes('moodle_classes.csv')) {
+                    return sampleMoodleCsvContent;
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([{
+                        moodleFullname: "[2025.1] INF-2AT-G2 - Programação Web I",
+                        suapId: '60244',
+                        type: 'auto'
+                    }]);
+                }
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = await moodle.generateProfessorCSV();
+
+            expect(result.totalProfessors).toBe(1);
+
+            const writtenCsv = mockFs.writeFileSync.mock.calls[0][1];
+            expect(writtenCsv).toContain('anon.prof,123456,,,anon.prof@if.edu.br');
+        });
+
+        it('should continue processing when a matched SUAP subject has no professor list', async () => {
+            const professorsData = {
+                subjects: {},
+                professors: {
+                    "1234567": { name: 'Prof Nome', email: 'prof.nome@if.edu.br' }
+                }
+            };
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_professors.json')) {
+                    return JSON.stringify(professorsData);
+                }
+                if (path.includes('moodle_classes.csv')) {
+                    return sampleMoodleCsvContent;
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([{
+                        moodleFullname: "[2025.1] INF-2AT-G2 - Programação Web I",
+                        suapId: '88888',
+                        type: 'manual'
+                    }]);
+                }
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = await moodle.generateProfessorCSV();
+
+            expect(result.processedSubjects).toBe(1);
+            expect(result.totalProfessors).toBe(0);
         });
     });
 

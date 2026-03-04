@@ -9,13 +9,13 @@ import request from 'supertest';
 import { JobQueue } from '../../helpers/queue.js';
 
 // Create a minimal test app with the actual routes
-function createTestApp() {
+function createTestApp(cleanupTimeout = 5000) {
     const app = express();
     app.use(express.json());
     
     // Create a real job queue for testing
     // Use 5000ms cleanup timeout to prevent race conditions in tests
-    const jobQueue = new JobQueue(5000);
+    const jobQueue = new JobQueue(cleanupTimeout);
     app.locals.jobQueue = jobQueue;
     
     // Simple mock routes that mimic the actual routes
@@ -106,6 +106,37 @@ function createTestApp() {
             success: true,
             jobId,
             message: 'SUAP extraction job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+    });
+
+    // POST /api/test/slow-job
+    app.post('/api/test/slow-job', (req, res) => {
+        const jobId = app.locals.jobQueue.queue(async (_jobId, updateProgress) => {
+            updateProgress({ message: 'Working...' });
+            await new Promise(resolve => setTimeout(resolve, 25));
+            return { message: 'Slow job completed' };
+        });
+
+        res.status(202).json({
+            success: true,
+            jobId,
+            message: 'Slow job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+    });
+
+    // POST /api/test/failing-job
+    app.post('/api/test/failing-job', (req, res) => {
+        const jobId = app.locals.jobQueue.queue(async (_jobId, updateProgress) => {
+            updateProgress({ message: 'About to fail...' });
+            throw new Error('Simulated job failure');
+        });
+
+        res.status(202).json({
+            success: true,
+            jobId,
+            message: 'Failing job started',
             statusUrl: `/api/jobs/${jobId}`
         });
     });
@@ -227,6 +258,72 @@ describe('Route Integration Tests', () => {
             expect(response.body.success).toBe(true);
             expect(response.body.id).toBe(jobId);
         });
+
+        it('should expose lifecycle transitions from queued/running to completed', async () => {
+            const createResponse = await request(app)
+                .post('/api/test/slow-job')
+                .send({});
+
+            const jobId = createResponse.body.jobId;
+
+            const earlyPoll = await request(app)
+                .get(`/api/jobs/${jobId}`);
+
+            expect(earlyPoll.status).toBe(200);
+            expect(earlyPoll.body.success).toBe(true);
+            expect(['queued', 'running', 'completed']).toContain(earlyPoll.body.status);
+
+            await new Promise(resolve => setTimeout(resolve, 40));
+
+            const finalPoll = await request(app)
+                .get(`/api/jobs/${jobId}`);
+
+            expect(finalPoll.status).toBe(200);
+            expect(finalPoll.body.success).toBe(true);
+            expect(finalPoll.body.status).toBe('completed');
+            expect(finalPoll.body.results.message).toBe('Slow job completed');
+            expect(finalPoll.body.completedAt).toBeDefined();
+        });
+
+        it('should expose failed lifecycle state with error details', async () => {
+            const createResponse = await request(app)
+                .post('/api/test/failing-job')
+                .send({});
+
+            const jobId = createResponse.body.jobId;
+
+            await new Promise(resolve => setTimeout(resolve, 20));
+
+            const pollResponse = await request(app)
+                .get(`/api/jobs/${jobId}`);
+
+            expect(pollResponse.status).toBe(200);
+            expect(pollResponse.body.success).toBe(true);
+            expect(pollResponse.body.status).toBe('failed');
+            expect(pollResponse.body.error).toBe('Simulated job failure');
+            expect(pollResponse.body.failedAt).toBeDefined();
+        });
+
+        it('should return 404 after completed job is auto-cleaned from memory', async () => {
+            const shortLivedApp = createTestApp(30);
+
+            const createResponse = await request(shortLivedApp)
+                .post('/api/test/slow-job')
+                .send({});
+
+            const jobId = createResponse.body.jobId;
+
+            await new Promise(resolve => setTimeout(resolve, 120));
+
+            const pollAfterCleanup = await request(shortLivedApp)
+                .get(`/api/jobs/${jobId}`);
+
+            expect(pollAfterCleanup.status).toBe(404);
+            expect(pollAfterCleanup.body.success).toBe(false);
+            expect(pollAfterCleanup.body.error).toBe('Job not found');
+
+            shortLivedApp.locals.jobQueue.clearAll();
+        });
     });
 
     describe('POST /api/moodle/csv', () => {
@@ -238,6 +335,8 @@ describe('Route Integration Tests', () => {
             expect(response.status).toBe(202);
             expect(response.body.success).toBe(true);
             expect(response.body.jobId).toBeDefined();
+            expect(response.body.message).toBe('CSV generation job started');
+            expect(response.body.statusUrl).toBe(`/api/jobs/${response.body.jobId}`);
         });
     });
 
@@ -250,6 +349,8 @@ describe('Route Integration Tests', () => {
             expect(response.status).toBe(202);
             expect(response.body.success).toBe(true);
             expect(response.body.jobId).toBeDefined();
+            expect(response.body.message).toBe('SUAP extraction job started');
+            expect(response.body.statusUrl).toBe(`/api/jobs/${response.body.jobId}`);
         });
     });
 });

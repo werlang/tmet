@@ -43,6 +43,7 @@ describe('Jobs Route', () => {
 
             handler(req, res);
 
+            expect(mockJobQueue.getJob).toHaveBeenCalledWith('non-existent');
             expect(res.statusCode).toBe(404);
             expect(res._data.success).toBe(false);
             expect(res._data.error).toBe('Job not found');
@@ -72,6 +73,7 @@ describe('Jobs Route', () => {
             expect(res._data.success).toBe(true);
             expect(res._data.id).toBe('test-job-123');
             expect(res._data.status).toBe('completed');
+            expect(res._data.results).toEqual({ success: true });
         });
 
         it('should return queued job status', () => {
@@ -143,6 +145,35 @@ describe('Jobs Route', () => {
 
             expect(res._data.status).toBe('failed');
             expect(res._data.error).toBe('Connection timeout');
+        });
+
+        it('should return completed lifecycle fields when present', () => {
+            const jobData = {
+                id: 'completed-job-321',
+                status: 'completed',
+                message: 'Done',
+                completedAt: '2025-01-01T00:00:05.000Z',
+                results: { file: 'files/moodle_classes.csv' }
+            };
+
+            const mockJobQueue = {
+                getJob: jest.fn().mockReturnValue(jobData)
+            };
+
+            const handler = getRouteHandler('get', '/:jobId');
+            const req = createMockRequest({
+                params: { jobId: 'completed-job-321' },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            handler(req, res);
+
+            expect(res.statusCode).toBe(200);
+            expect(res._data.success).toBe(true);
+            expect(res._data.status).toBe('completed');
+            expect(res._data.completedAt).toBe('2025-01-01T00:00:05.000Z');
+            expect(res._data.results.file).toBe('files/moodle_classes.csv');
         });
     });
 });

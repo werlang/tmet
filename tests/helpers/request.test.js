@@ -60,6 +60,38 @@ describe('Request Helper', () => {
 
             expect(result).toEqual({ success: true });
         });
+
+        it('should make POST request with form-urlencoded body', async () => {
+            const formRequest = new Request({ url: '', format: 'form' });
+            mockFetch.mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve({ success: true })
+            });
+
+            const result = await formRequest.post('https://api.example.com', { key: 'value', foo: 'bar' });
+
+            expect(mockFetch).toHaveBeenCalledWith(
+                'https://api.example.com',
+                expect.objectContaining({
+                    method: 'POST',
+                    body: 'key=value&foo=bar'
+                })
+            );
+            expect(formRequest.headers.get('Content-Type')).toBe('application/x-www-form-urlencoded');
+            expect(result).toEqual({ success: true });
+        });
+    });
+
+    describe('headers', () => {
+        it('should set multiple headers with setHeaders', () => {
+            request.setHeaders({
+                Authorization: 'Bearer token',
+                'X-Trace-Id': 'trace-123'
+            });
+
+            expect(request.headers.get('Authorization')).toBe('Bearer token');
+            expect(request.headers.get('X-Trace-Id')).toBe('trace-123');
+        });
     });
 
     describe('get()', () => {
@@ -169,6 +201,20 @@ describe('Request Helper', () => {
                 expect.objectContaining({
                     signal: expect.any(AbortSignal)
                 })
+            );
+        });
+
+        it('should skip AbortSignal when timeout is disabled', async () => {
+            mockFetch.mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve({ success: true })
+            });
+
+            await request.fetch('GET', 'https://api.example.com', {}, { retry: false, timeout: 0 });
+
+            expect(mockFetch).toHaveBeenCalledWith(
+                'https://api.example.com',
+                expect.not.objectContaining({ signal: expect.anything() })
             );
         });
     });

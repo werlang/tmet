@@ -25,7 +25,10 @@ describe('MoodleUploader Helper', () => {
     suppressConsole();
 
     beforeEach(() => {
+        jest.restoreAllMocks();
         jest.clearAllMocks();
+        mockRequest.get.mockReset();
+        mockRequest.post.mockReset();
     });
 
     describe('constructor', () => {
@@ -34,7 +37,7 @@ describe('MoodleUploader Helper', () => {
 
             expect(uploader.baseUrl).toBe('https://moodle.example.com');
             expect(uploader.token).toBe('test-token');
-            expect(uploader.webserviceUrl).toBe('https://moodle.example.com/webservice/rest/server.php');
+            expect(uploader.webserviceUrl).toBe('/webservice/rest/server.php');
         });
 
         it('should strip trailing slash from URL', () => {
@@ -59,10 +62,9 @@ describe('MoodleUploader Helper', () => {
 
     describe('uploadCourses()', () => {
         it('should upload multiple courses in batch', async () => {
-            mockRequest.post.mockResolvedValue([
-                { id: 1, shortname: 'TC1' },
-                { id: 2, shortname: 'TC2' }
-            ]);
+            mockRequest.post
+                .mockResolvedValueOnce([{ id: 1, shortname: 'TC1' }])
+                .mockResolvedValueOnce([{ id: 2, shortname: 'TC2' }]);
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
             const courses = [
@@ -74,7 +76,7 @@ describe('MoodleUploader Helper', () => {
 
             expect(result.success).toHaveLength(2);
             expect(result.errors).toHaveLength(0);
-            expect(mockRequest.post).toHaveBeenCalledTimes(1);
+            expect(mockRequest.post).toHaveBeenCalledTimes(2);
         });
 
         it('should include all course params in request', async () => {
@@ -85,12 +87,13 @@ describe('MoodleUploader Helper', () => {
                 { fullname: 'Test Course', shortname: 'TC1', category: '115' }
             ]);
 
-            const callUrl = mockRequest.post.mock.calls[0][0];
-            expect(callUrl).toContain('wstoken=test-token');
-            expect(callUrl).toContain('wsfunction=core_course_create_courses');
-            expect(callUrl).toContain('courses%5B0%5D%5Bfullname%5D=Test+Course');
-            expect(callUrl).toContain('courses%5B0%5D%5Bshortname%5D=TC1');
-            expect(callUrl).toContain('courses%5B0%5D%5Bcategoryid%5D=115');
+            const [callEndpoint, callParams] = mockRequest.post.mock.calls[0];
+            expect(callEndpoint).toBe('/webservice/rest/server.php');
+            expect(callParams.wstoken).toBe('test-token');
+            expect(callParams.wsfunction).toBe('core_course_create_courses');
+            expect(callParams['courses[0][fullname]']).toBe('Test Course');
+            expect(callParams['courses[0][shortname]']).toBe('TC1');
+            expect(callParams['courses[0][categoryid]']).toBe('115');
         });
 
         it('should handle Moodle API error response with exception', async () => {
@@ -107,7 +110,8 @@ describe('MoodleUploader Helper', () => {
 
             expect(result.success).toHaveLength(0);
             expect(result.errors).toHaveLength(1);
-            expect(result.errors[0].course).toBe('all');
+            expect(result.errors[0].batch).toBe(1);
+            expect(result.errors[0].courses).toEqual(['TC1']);
             expect(result.errors[0].error).toBe('Short name is already taken');
         });
 
@@ -173,11 +177,12 @@ describe('MoodleUploader Helper', () => {
                 { userid: 123, courseid: 456, roleid: 5 }
             ]);
 
-            const callUrl = mockRequest.post.mock.calls[0][0];
-            expect(callUrl).toContain('wsfunction=enrol_manual_enrol_users');
-            expect(callUrl).toContain('enrolments%5B0%5D%5Broleid%5D=5');
-            expect(callUrl).toContain('enrolments%5B0%5D%5Buserid%5D=123');
-            expect(callUrl).toContain('enrolments%5B0%5D%5Bcourseid%5D=456');
+            const [callEndpoint, callParams] = mockRequest.post.mock.calls[0];
+            expect(callEndpoint).toBe('/webservice/rest/server.php');
+            expect(callParams.wsfunction).toBe('enrol_manual_enrol_users');
+            expect(callParams['enrolments[0][roleid]']).toBe(5);
+            expect(callParams['enrolments[0][userid]']).toBe(123);
+            expect(callParams['enrolments[0][courseid]']).toBe(456);
         });
 
         it('should handle Moodle API error response', async () => {
@@ -226,10 +231,11 @@ describe('MoodleUploader Helper', () => {
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
             await uploader.getUserByUsername('testuser');
 
-            const callUrl = mockRequest.get.mock.calls[0][0];
-            expect(callUrl).toContain('wsfunction=core_user_get_users');
-            expect(callUrl).toContain('criteria%5B0%5D%5Bkey%5D=username');
-            expect(callUrl).toContain('criteria%5B0%5D%5Bvalue%5D=testuser');
+            const [callEndpoint, queryString] = mockRequest.get.mock.calls[0];
+            expect(callEndpoint).toBe('/webservice/rest/server.php');
+            expect(queryString).toContain('wsfunction=core_user_get_users');
+            expect(queryString).toContain('criteria%5B0%5D%5Bkey%5D=username');
+            expect(queryString).toContain('criteria%5B0%5D%5Bvalue%5D=testuser');
         });
 
         it('should return null when user not found', async () => {
@@ -283,10 +289,11 @@ describe('MoodleUploader Helper', () => {
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
             await uploader.getCourseByShortname('TEST_COURSE');
 
-            const callUrl = mockRequest.get.mock.calls[0][0];
-            expect(callUrl).toContain('wsfunction=core_course_get_courses_by_field');
-            expect(callUrl).toContain('field=shortname');
-            expect(callUrl).toContain('value=TEST_COURSE');
+            const [callEndpoint, queryString] = mockRequest.get.mock.calls[0];
+            expect(callEndpoint).toBe('/webservice/rest/server.php');
+            expect(queryString).toContain('wsfunction=core_course_get_courses_by_field');
+            expect(queryString).toContain('field=shortname');
+            expect(queryString).toContain('value=TEST_COURSE');
         });
 
         it('should return null when course not found', async () => {
@@ -336,14 +343,15 @@ describe('MoodleUploader Helper', () => {
                 email: 'jane@test.com'
             });
 
-            const callUrl = mockRequest.post.mock.calls[0][0];
-            expect(callUrl).toContain('wsfunction=core_user_create_users');
-            expect(callUrl).toContain('users%5B0%5D%5Busername%5D=jdoe');
-            expect(callUrl).toContain('users%5B0%5D%5Bpassword%5D=Secret123');
-            expect(callUrl).toContain('users%5B0%5D%5Bfirstname%5D=Jane');
-            expect(callUrl).toContain('users%5B0%5D%5Blastname%5D=Doe');
-            expect(callUrl).toContain('users%5B0%5D%5Bemail%5D=jane%40test.com');
-            expect(callUrl).toContain('users%5B0%5D%5Bauth%5D=manual');
+            const [callEndpoint, callParams] = mockRequest.post.mock.calls[0];
+            expect(callEndpoint).toBe('/webservice/rest/server.php');
+            expect(callParams.wsfunction).toBe('core_user_create_users');
+            expect(callParams['users[0][username]']).toBe('jdoe');
+            expect(callParams['users[0][password]']).toBe('Secret123');
+            expect(callParams['users[0][firstname]']).toBe('Jane');
+            expect(callParams['users[0][lastname]']).toBe('Doe');
+            expect(callParams['users[0][email]']).toBe('jane@test.com');
+            expect(callParams['users[0][auth]']).toBe('manual');
         });
 
         it('should return null on API error with exception', async () => {
@@ -482,7 +490,8 @@ describe('MoodleUploader Helper', () => {
             // Sequence: getUserByUsername (get), getCourseByShortname (get), enrollUsers (post)
             mockRequest.get
                 .mockResolvedValueOnce({ users: [{ id: 10 }] }) // student1 exists
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] }); // MATH101 exists
+                .mockResolvedValueOnce({ courses: [{ id: 100 }] }) // MATH101 exists
+                .mockResolvedValueOnce([]); // no prior enrollments
             mockRequest.post.mockResolvedValue(null); // enrollment success
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
@@ -498,7 +507,8 @@ describe('MoodleUploader Helper', () => {
             // Sequence: getUserByUsername (get, no user), createUser (post), getCourseByShortname (get), enrollUsers (post)
             mockRequest.get
                 .mockResolvedValueOnce({ users: [] }) // student1 NOT found
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] }); // MATH101 exists
+                .mockResolvedValueOnce({ courses: [{ id: 100 }] }) // MATH101 exists
+                .mockResolvedValueOnce([]); // no prior enrollments
             mockRequest.post
                 .mockResolvedValueOnce([{ id: 15, username: 'student1' }]) // Create student1
                 .mockResolvedValueOnce(null); // enrollment success
@@ -525,10 +535,9 @@ describe('MoodleUploader Helper', () => {
         });
 
         it('should skip students when user creation fails', async () => {
-            mockRequest.get.mockResolvedValueOnce({ users: [] }); // User NOT found
-            mockRequest.post.mockResolvedValueOnce({ exception: 'error', message: 'Creation failed' });
-
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            jest.spyOn(uploader, 'getOrCreateUser').mockResolvedValue({ id: null, created: true });
+            jest.spyOn(uploader, 'getCourseByShortname').mockResolvedValue(100);
             const result = await uploader.uploadStudents([sampleStudent]);
 
             expect(result.success).toHaveLength(0);
@@ -542,44 +551,63 @@ describe('MoodleUploader Helper', () => {
                 { ...sampleStudent, username: 'student2' }
             ];
 
-            // Two users, one course (cached)
+            // Two users, one course (cached) + one enrollment lookup per user
             mockRequest.get
                 .mockResolvedValueOnce({ users: [{ id: 10 }] }) // student1
                 .mockResolvedValueOnce({ courses: [{ id: 100 }] }) // MATH101 (first lookup)
-                .mockResolvedValueOnce({ users: [{ id: 20 }] }); // student2
+                .mockResolvedValueOnce([]) // student1 enrolled courses
+                .mockResolvedValueOnce({ users: [{ id: 20 }] }) // student2
+                .mockResolvedValueOnce([]); // student2 enrolled courses
             mockRequest.post.mockResolvedValue(null);
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
             await uploader.uploadStudents(twoStudents);
 
-            // 2 user lookups + 1 course lookup (cached for second student)
-            expect(mockRequest.get).toHaveBeenCalledTimes(3);
+            const courseLookups = mockRequest.get.mock.calls.filter(([, query]) => query?.includes('wsfunction=core_course_get_courses_by_field'));
+            expect(courseLookups).toHaveLength(1);
+        });
+
+        it('should skip students already enrolled in Moodle', async () => {
+            const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            jest.spyOn(uploader, 'getUserByUsername').mockResolvedValue(10);
+            jest.spyOn(uploader, 'getCourseByShortname').mockResolvedValue(100);
+            jest.spyOn(uploader, 'getUserEnrolledCourseIds').mockResolvedValue(new Set([100]));
+            const result = await uploader.uploadStudents([sampleStudent]);
+
+            expect(result.success).toHaveLength(0);
+            expect(result.skipped).toHaveLength(1);
+            expect(result.skipped[0].reason).toBe('Already enrolled in Moodle');
+            expect(mockRequest.post).not.toHaveBeenCalled();
         });
 
         it('should call progress callback during processing', async () => {
-            mockRequest.get
-                .mockResolvedValueOnce({ users: [{ id: 10 }] })
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] });
-            mockRequest.post.mockResolvedValue(null);
-
             const progressCallback = jest.fn();
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            jest.spyOn(uploader, 'getOrCreateUser').mockResolvedValue({ id: 10, created: false });
+            jest.spyOn(uploader, 'getCourseByShortname').mockResolvedValue(100);
+            jest.spyOn(uploader, 'getUserEnrolledCourseIds').mockResolvedValue(new Set());
+            jest.spyOn(uploader, 'enrollUsers').mockImplementation(async (enrollments, callback) => {
+                if (callback) {
+                    callback('Enrolling users... 100%');
+                }
+                return { success: enrollments, errors: [] };
+            });
             await uploader.uploadStudents([sampleStudent], progressCallback);
 
             expect(progressCallback).toHaveBeenCalledWith('Processing user 1/1...');
             expect(progressCallback).toHaveBeenCalledWith('Enrolling 1 students...');
+            expect(progressCallback).toHaveBeenCalledWith('Enrolling users... 100%');
         });
 
         it('should handle enrollment API errors', async () => {
-            mockRequest.get
-                .mockResolvedValueOnce({ users: [{ id: 10 }] })
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] });
-            mockRequest.post.mockResolvedValue({
-                exception: 'error',
-                message: 'Enrollment failed'
-            });
-
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            jest.spyOn(uploader, 'getOrCreateUser').mockResolvedValue({ id: 10, created: false });
+            jest.spyOn(uploader, 'getCourseByShortname').mockResolvedValue(100);
+            jest.spyOn(uploader, 'getUserEnrolledCourseIds').mockResolvedValue(new Set());
+            jest.spyOn(uploader, 'enrollUsers').mockResolvedValue({
+                success: [],
+                errors: [{ error: 'Enrollment failed' }]
+            });
             const result = await uploader.uploadStudents([sampleStudent]);
 
             expect(result.errors).toHaveLength(1);
@@ -587,16 +615,17 @@ describe('MoodleUploader Helper', () => {
         });
 
         it('should use STUDENT_ROLE_ID=5 for enrollments', async () => {
-            mockRequest.get
-                .mockResolvedValueOnce({ users: [{ id: 10 }] })
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] });
-            mockRequest.post.mockResolvedValue(null);
-
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            jest.spyOn(uploader, 'getOrCreateUser').mockResolvedValue({ id: 10, created: false });
+            jest.spyOn(uploader, 'getCourseByShortname').mockResolvedValue(100);
+            jest.spyOn(uploader, 'getUserEnrolledCourseIds').mockResolvedValue(new Set());
+            const enrollSpy = jest.spyOn(uploader, 'enrollUsers').mockResolvedValue({ success: [{}], errors: [] });
             await uploader.uploadStudents([sampleStudent]);
 
-            const callUrl = mockRequest.post.mock.calls[0][0];
-            expect(callUrl).toContain('enrolments%5B0%5D%5Broleid%5D=5');
+            expect(enrollSpy).toHaveBeenCalledWith(
+                [expect.objectContaining({ roleid: 5 })],
+                null
+            );
         });
 
         it('should handle empty students array', async () => {
@@ -609,12 +638,9 @@ describe('MoodleUploader Helper', () => {
         });
 
         it('should handle course lookup errors as individual errors', async () => {
-            // User found, but course lookup throws
-            mockRequest.get
-                .mockResolvedValueOnce({ users: [{ id: 10 }] })
-                .mockRejectedValueOnce(new Error('Network error'));
-
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            jest.spyOn(uploader, 'getOrCreateUser').mockResolvedValue({ id: 10, created: false });
+            jest.spyOn(uploader, 'getCourseByShortname').mockRejectedValue(new Error('Network error'));
             const result = await uploader.uploadStudents([sampleStudent]);
 
             expect(result.errors).toHaveLength(1);
@@ -636,7 +662,8 @@ describe('MoodleUploader Helper', () => {
         it('should enroll existing professors as teachers', async () => {
             mockRequest.get
                 .mockResolvedValueOnce({ users: [{ id: 30 }] }) // prof1 exists
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] }); // MATH101
+                .mockResolvedValueOnce({ courses: [{ id: 100 }] }) // MATH101
+                .mockResolvedValueOnce([]);
             mockRequest.post.mockResolvedValue(null);
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
@@ -650,7 +677,8 @@ describe('MoodleUploader Helper', () => {
         it('should create professors that do not exist', async () => {
             mockRequest.get
                 .mockResolvedValueOnce({ users: [] }) // prof1 NOT found
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] });
+                .mockResolvedValueOnce({ courses: [{ id: 100 }] })
+                .mockResolvedValueOnce([]);
             mockRequest.post
                 .mockResolvedValueOnce([{ id: 35, username: 'prof1' }]) // Create prof1
                 .mockResolvedValueOnce(null); // enrollment
@@ -666,15 +694,16 @@ describe('MoodleUploader Helper', () => {
         it('should use TEACHER_ROLE_ID=3 for enrollments', async () => {
             mockRequest.get
                 .mockResolvedValueOnce({ users: [{ id: 30 }] })
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] });
+                .mockResolvedValueOnce({ courses: [{ id: 100 }] })
+                .mockResolvedValueOnce([]);
             mockRequest.post.mockResolvedValue(null);
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
             await uploader.uploadProfessors([sampleProfessor]);
 
             // The enrollment is the first (and only) post call
-            const callUrl = mockRequest.post.mock.calls[0][0];
-            expect(callUrl).toContain('enrolments%5B0%5D%5Broleid%5D=3');
+            const [, callParams] = mockRequest.post.mock.calls[0];
+            expect(callParams['enrolments[0][roleid]']).toBe(3);
         });
 
         it('should skip professors when course not found', async () => {
@@ -686,24 +715,35 @@ describe('MoodleUploader Helper', () => {
             const result = await uploader.uploadProfessors([sampleProfessor]);
 
             expect(result.skipped).toHaveLength(1);
-            expect(result.skipped[0].reason).toBe('Course not found in Moodle');
+            expect(result.skipped[0].reason).toContain('Course not found in Moodle');
         });
 
         it('should skip professors when user creation fails', async () => {
-            mockRequest.get.mockResolvedValueOnce({ users: [] });
+            mockRequest.get.mockImplementation((endpoint, queryString) => {
+                if (queryString?.includes('wsfunction=core_user_get_users')) {
+                    return Promise.resolve({ users: [] });
+                }
+
+                if (queryString?.includes('wsfunction=core_course_get_courses_by_field')) {
+                    return Promise.resolve({ courses: [{ id: 100 }] });
+                }
+
+                return Promise.resolve({});
+            });
             mockRequest.post.mockResolvedValueOnce({ exception: 'error', message: 'Creation failed' });
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
             const result = await uploader.uploadProfessors([sampleProfessor]);
 
             expect(result.skipped).toHaveLength(1);
-            expect(result.skipped[0].reason).toBe('Failed to get or create user');
+            expect(result.skipped[0].reason).toBe('Failed to get or create user prof1');
         });
 
         it('should call progress callback during processing', async () => {
             mockRequest.get
                 .mockResolvedValueOnce({ users: [{ id: 30 }] })
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] });
+                .mockResolvedValueOnce({ courses: [{ id: 100 }] })
+                .mockResolvedValueOnce([]);
             mockRequest.post.mockResolvedValue(null);
 
             const progressCallback = jest.fn();
@@ -712,7 +752,8 @@ describe('MoodleUploader Helper', () => {
 
             expect(progressCallback).toHaveBeenCalledWith('Processing professor 1/1...');
             expect(progressCallback).toHaveBeenCalledWith('Enrolling 1 professors...');
-            expect(progressCallback).toHaveBeenCalledTimes(2);
+            expect(progressCallback).toHaveBeenCalledWith('Enrolling users... 100%');
+            expect(progressCallback).toHaveBeenCalledTimes(3);
         });
 
         it('should not call enrollment progress when all professors skipped', async () => {
@@ -755,7 +796,8 @@ describe('MoodleUploader Helper', () => {
         it('should handle enrollment API errors', async () => {
             mockRequest.get
                 .mockResolvedValueOnce({ users: [{ id: 30 }] })
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] });
+                .mockResolvedValueOnce({ courses: [{ id: 100 }] })
+                .mockResolvedValueOnce([]);
             mockRequest.post.mockResolvedValue({
                 exception: 'error',
                 message: 'Enrollment failed for professor'
@@ -778,14 +820,30 @@ describe('MoodleUploader Helper', () => {
             mockRequest.get
                 .mockResolvedValueOnce({ users: [{ id: 30 }] }) // prof1 first lookup
                 .mockResolvedValueOnce({ courses: [{ id: 100 }] }) // MATH101
+                .mockResolvedValueOnce([]) // prof1 enrolled courses
                 .mockResolvedValueOnce({ courses: [{ id: 200 }] }); // PHYS101
             mockRequest.post.mockResolvedValue(null);
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
             await uploader.uploadProfessors(sameProfTwoCourses);
 
-            // User lookup should be cached (1 user + 2 courses)
-            expect(mockRequest.get).toHaveBeenCalledTimes(3);
+            // User lookup should be cached (1 user + 2 courses + 1 enrollment lookup)
+            expect(mockRequest.get).toHaveBeenCalledTimes(4);
+        });
+
+        it('should skip professors already enrolled in Moodle', async () => {
+            mockRequest.get
+                .mockResolvedValueOnce({ users: [{ id: 30 }] })
+                .mockResolvedValueOnce({ courses: [{ id: 100 }] })
+                .mockResolvedValueOnce([{ id: 100, shortname: 'MATH101' }]);
+
+            const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            const result = await uploader.uploadProfessors([sampleProfessor]);
+
+            expect(result.success).toHaveLength(0);
+            expect(result.skipped).toHaveLength(1);
+            expect(result.skipped[0].reason).toBe('Already enrolled in Moodle');
+            expect(mockRequest.post).not.toHaveBeenCalled();
         });
     });
 
@@ -836,8 +894,8 @@ describe('MoodleUploader Helper', () => {
                 course: 'COURSE'
             }));
 
-            mockRequest.get.mockImplementation((url) => {
-                if (url.includes('core_user_get_users')) {
+            mockRequest.get.mockImplementation((endpoint, queryString) => {
+                if (queryString?.includes('wsfunction=core_user_get_users')) {
                     return Promise.resolve({ users: [{ id: 1 }] });
                 }
                 return Promise.resolve({ courses: [{ id: 100 }] });
@@ -860,18 +918,35 @@ describe('MoodleUploader Helper', () => {
                 { username: 'same', password: 'P', firstname: 'F', lastname: 'L', email: 'e@e.com', course: 'C2' }
             ];
 
-            mockRequest.get
-                .mockResolvedValueOnce({ users: [{ id: 10 }] }) // same user
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] }) // C1
-                .mockResolvedValueOnce({ courses: [{ id: 200 }] }); // C2
+            mockRequest.get.mockImplementation((endpoint, queryString) => {
+                if (queryString?.includes('wsfunction=core_user_get_users')) {
+                    return Promise.resolve({ users: [{ id: 10 }] });
+                }
+
+                if (queryString?.includes('wsfunction=core_course_get_courses_by_field')) {
+                    if (queryString.includes('value=C1')) {
+                        return Promise.resolve({ courses: [{ id: 100 }] });
+                    }
+                    if (queryString.includes('value=C2')) {
+                        return Promise.resolve({ courses: [{ id: 200 }] });
+                    }
+                    return Promise.resolve({ courses: [] });
+                }
+
+                if (queryString?.includes('wsfunction=core_enrol_get_users_courses')) {
+                    return Promise.resolve([]);
+                }
+
+                return Promise.resolve({});
+            });
             mockRequest.post.mockResolvedValue(null);
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
             const result = await uploader.uploadStudents(students);
 
             expect(result.success).toHaveLength(2);
-            // User cached, so only 1 user lookup + 2 course lookups
-            expect(mockRequest.get).toHaveBeenCalledTimes(3);
+            const userLookups = mockRequest.get.mock.calls.filter(([, query]) => query?.includes('wsfunction=core_user_get_users'));
+            expect(userLookups).toHaveLength(1);
         });
 
         it('should handle mixed success and failure in student upload', async () => {
@@ -929,8 +1004,8 @@ describe('MoodleUploader Helper', () => {
                 course: 'COURSE'
             }));
 
-            mockRequest.get.mockImplementation((url) => {
-                if (url.includes('core_user_get_users')) {
+            mockRequest.get.mockImplementation((endpoint, queryString) => {
+                if (queryString?.includes('wsfunction=core_user_get_users')) {
                     return Promise.resolve({ users: [{ id: 1 }] });
                 }
                 return Promise.resolve({ courses: [{ id: 100 }] });
@@ -950,7 +1025,8 @@ describe('MoodleUploader Helper', () => {
         it('should handle null progressCallback gracefully', async () => {
             mockRequest.get
                 .mockResolvedValueOnce({ users: [{ id: 10 }] })
-                .mockResolvedValueOnce({ courses: [{ id: 100 }] });
+                .mockResolvedValueOnce({ courses: [{ id: 100 }] })
+                .mockResolvedValueOnce([]);
             mockRequest.post.mockResolvedValue(null);
 
             const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
@@ -989,6 +1065,25 @@ describe('MoodleUploader Helper', () => {
 
             expect(result.errors).toHaveLength(1);
             expect(result.errors[0].error).toBe('course_exception');
+        });
+
+        it('should return empty enrolled course set when response is not an array', async () => {
+            mockRequest.get.mockResolvedValue({ not: 'array' });
+
+            const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            const result = await uploader.getUserEnrolledCourseIds(10);
+
+            expect(result).toEqual(new Set());
+        });
+
+        it('should throw when enrollment lookup returns API error payload', async () => {
+            mockRequest.get.mockResolvedValue({
+                exception: 'moodle_exception',
+                message: 'Failed lookup'
+            });
+
+            const uploader = new MoodleUploader('https://moodle.example.com', 'test-token');
+            await expect(uploader.getUserEnrolledCourseIds(10)).rejects.toThrow('Failed lookup');
         });
     });
 });

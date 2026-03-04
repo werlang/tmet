@@ -300,7 +300,7 @@ describe('Queue Helper', () => {
 
     describe('auto cleanup', () => {
         it('should clean up completed jobs after timeout', async () => {
-            const shortQueue = new Queue(50); // 50ms cleanup
+            const shortQueue = new JobQueue(50); // 50ms cleanup
             const jobId = shortQueue.queue(async () => ({ done: true }));
 
             await wait(30);
@@ -313,7 +313,7 @@ describe('Queue Helper', () => {
         });
 
         it('should clean up failed jobs after timeout', async () => {
-            const shortQueue = new Queue(50);
+            const shortQueue = new JobQueue(50);
             const jobId = shortQueue.queue(async () => {
                 throw new Error('Fail');
             });
@@ -330,7 +330,7 @@ describe('Queue Helper', () => {
 
     describe('concurrent job handling', () => {
         it('should respect max concurrent jobs limit', async () => {
-            const limitedQueue = new Queue(1000);
+            const limitedQueue = new JobQueue(1000);
             // Default is 1 concurrent job
             
             let runningCount = 0;
@@ -360,7 +360,7 @@ describe('Queue Helper', () => {
     describe('edge cases', () => {
         it('should handle default cleanup timeout', () => {
             // Default timeout is 5 minutes (300000ms)
-            const defaultQueue = new Queue();
+            const defaultQueue = new JobQueue();
             expect(defaultQueue).toBeDefined();
             defaultQueue.clearAll();
         });
@@ -380,7 +380,7 @@ describe('Queue Helper', () => {
             const originalEnv = process.env.MAX_CONCURRENT_JOBS;
             delete process.env.MAX_CONCURRENT_JOBS;
             
-            const defaultQueue = new Queue();
+            const defaultQueue = new JobQueue();
             const job1 = defaultQueue.createJob(async () => {
                 await wait(50);
                 return 'done';
@@ -406,7 +406,7 @@ describe('Queue Helper', () => {
             const originalEnv = process.env.MAX_CONCURRENT_JOBS;
             process.env.MAX_CONCURRENT_JOBS = '3';
             
-            const envQueue = new Queue();
+            const envQueue = new JobQueue();
             expect(envQueue).toBeDefined();
             
             // Restore env var
@@ -432,6 +432,21 @@ describe('Queue Helper', () => {
             expect(job.status).toBe('running');
             
             queue.clearAll();
+        });
+
+        it('should clear scheduled cleanup timers when clearAll is called', async () => {
+            const shortQueue = new JobQueue(1000);
+            const completedJobId = shortQueue.queue(async () => ({ done: true }));
+            const failedJobId = shortQueue.queue(async () => {
+                throw new Error('boom');
+            });
+
+            await wait(80);
+            expect(shortQueue.getJob(completedJobId)).not.toBeNull();
+            expect(shortQueue.getJob(failedJobId)).not.toBeNull();
+
+            shortQueue.clearAll();
+            expect(shortQueue.getAllJobs()).toEqual([]);
         });
     });
 });

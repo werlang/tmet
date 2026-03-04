@@ -115,6 +115,19 @@ describe('SUAP Model', () => {
             expect(mockSUAPScraper.initialize).toHaveBeenCalled();
         });
 
+        it('should default semester to 2 when current month is July or later', async () => {
+            mockSUAPScraper.evaluate.mockResolvedValue([]);
+            const monthSpy = jest.spyOn(Date.prototype, 'getMonth').mockReturnValue(10);
+
+            const suap = new SUAP();
+            await suap.extractSubjects({ year: 2025, courses: ['INF'] });
+
+            const firstGotoUrl = mockSUAPScraper.goto.mock.calls[0][0];
+            expect(firstGotoUrl).toContain('periodo_letivo__exact=2');
+
+            monthSpy.mockRestore();
+        });
+
         it('should extract all courses when no filter provided', async () => {
             mockSUAPScraper.evaluate.mockResolvedValue([]);
 
@@ -430,6 +443,67 @@ describe('SUAP Model', () => {
             expect(savedData).toHaveProperty('subjects');
             expect(savedData).toHaveProperty('students');
         });
+
+        it('should reuse cached subject data on repeated scrapeStudents call', async () => {
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([
+                    { siape: '123456', name: 'Prof. Silva' }
+                ])
+                .mockResolvedValueOnce([
+                    { enrollment: '2021001', name: 'João Silva' }
+                ])
+                .mockResolvedValueOnce('prof.silva@if.edu.br')
+                .mockResolvedValueOnce('joao.silva@email.com');
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            const firstResult = await suap.scrapeStudents('60244');
+            const secondResult = await suap.scrapeStudents('60244');
+
+            expect(secondResult).toEqual(firstResult);
+            expect(mockSUAPScraper.goto).toHaveBeenCalledTimes(4);
+            expect(mockSUAPScraper.evaluate).toHaveBeenCalledTimes(4);
+        });
+
+        it('should reuse cached professor data in scrapeProfessors after scrapeStudents', async () => {
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([
+                    { siape: '123456', name: 'Prof. Silva' }
+                ])
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce('prof.silva@if.edu.br');
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            const studentScrapeResult = await suap.scrapeStudents('60244');
+            const professors = await suap.scrapeProfessors('60244');
+
+            expect(professors).toEqual(studentScrapeResult.professors);
+            expect(mockSUAPScraper.goto).toHaveBeenCalledTimes(3);
+            expect(mockSUAPScraper.evaluate).toHaveBeenCalledTimes(3);
+        });
+
+        it('should reuse cached student email across different subjects', async () => {
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([
+                    { enrollment: '2021001', name: 'João Silva' }
+                ])
+                .mockResolvedValueOnce('joao.silva@email.com')
+                .mockResolvedValueOnce([
+                    { enrollment: '2021001', name: 'João Silva' }
+                ]);
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            await suap.scrapeStudentsOnly('60244');
+            await suap.scrapeStudentsOnly('60245');
+
+            expect(mockSUAPScraper.goto).toHaveBeenCalledTimes(3);
+            expect(mockSUAPScraper.evaluate).toHaveBeenCalledTimes(3);
+        });
     });
 
     describe('edge cases', () => {
@@ -521,6 +595,190 @@ describe('SUAP Model', () => {
             result.forEach(r => {
                 expect(['G1', 'G2']).toContain(r.group);
             });
+        });
+    });
+
+    describe('additional branch coverage', () => {
+        it('should execute scrapeProfessors callback and deduplicate professor rows', async () => {
+            let evaluateCall = 0;
+
+            const row1 = {
+                querySelectorAll: jest.fn(() => [
+                    { textContent: '' },
+                    { textContent: ' 123456 ' },
+                    { textContent: ' Prof. One ' }
+                ])
+            };
+            const rowDuplicate = {
+                querySelectorAll: jest.fn(() => [
+                    { textContent: '' },
+                    { textContent: '123456' },
+                    { textContent: 'Prof. One Duplicate' }
+                ])
+            };
+
+            const professorBox = {
+                querySelector: jest.fn(() => ({ textContent: 'Professores' })),
+                querySelectorAll: jest.fn(() => [row1, rowDuplicate])
+            };
+
+            mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
+                evaluateCall += 1;
+
+                if (evaluateCall === 1) {
+                    global.document = {
+                        querySelectorAll: jest.fn(() => [professorBox])
+                    };
+                    return Promise.resolve(callback(config));
+                }
+
+                global.document = {
+                    querySelectorAll: jest.fn(() => [
+                        {
+                            textContent: 'E-mail Institucional',
+                            nextElementSibling: {
+                                tagName: 'DD',
+                                textContent: 'prof.one@if.edu.br'
+                            }
+                        }
+                    ])
+                };
+                return Promise.resolve(callback(config));
+            });
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            const result = await suap.scrapeProfessors('60244');
+
+            expect(result).toEqual([
+                {
+                    name: 'Prof. One',
+                    email: 'prof.one@if.edu.br',
+                    siape: '123456'
+                }
+            ]);
+
+            const professorWriteCall = mockFs.writeFileSync.mock.calls.find(call =>
+                call[0].includes('suap_professors.json')
+            );
+            expect(professorWriteCall).toBeDefined();
+        });
+
+        it('should recover from corrupted professors file when saving scrapeProfessors result', async () => {
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([{ siape: '999999', name: 'Prof. Error' }])
+                .mockResolvedValueOnce('prof.error@if.edu.br');
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((filePath) => {
+                if (String(filePath).includes('suap_professors.json')) {
+                    throw new Error('Invalid JSON');
+                }
+                return '';
+            });
+
+            const suap = new SUAP();
+            const result = await suap.scrapeProfessors('77777');
+
+            expect(result).toHaveLength(1);
+            const professorWriteCall = mockFs.writeFileSync.mock.calls.find(call =>
+                call[0].includes('suap_professors.json')
+            );
+            expect(professorWriteCall).toBeDefined();
+
+            const savedData = JSON.parse(professorWriteCall[1]);
+            expect(savedData.subjects['77777']).toEqual(['999999']);
+            expect(savedData.professors['999999']).toEqual({
+                name: 'Prof. Error',
+                email: 'prof.error@if.edu.br'
+            });
+        });
+
+        it('should use cached students in scrapeStudentsOnly and report cached progress', async () => {
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([{ enrollment: '2021888', name: 'Aluno Cache' }])
+                .mockResolvedValueOnce('aluno.cache@if.edu.br');
+            mockFs.existsSync.mockReturnValue(false);
+
+            const progressCallback = jest.fn();
+            const suap = new SUAP();
+
+            const firstResult = await suap.scrapeStudentsOnly('60244');
+            const secondResult = await suap.scrapeStudentsOnly('60244', progressCallback);
+
+            expect(secondResult).toEqual(firstResult);
+            expect(progressCallback).toHaveBeenCalledWith('Using cached students');
+            expect(mockSUAPScraper.evaluate).toHaveBeenCalledTimes(2);
+        });
+
+        it('should reuse cached professor email across different subjects', async () => {
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([{ siape: '123456', name: 'Prof. Cache' }])
+                .mockResolvedValueOnce('prof.cache@if.edu.br')
+                .mockResolvedValueOnce([{ siape: '123456', name: 'Prof. Cache' }]);
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            const firstResult = await suap.scrapeProfessors('60244');
+            const secondResult = await suap.scrapeProfessors('60245');
+
+            expect(firstResult[0].email).toBe('prof.cache@if.edu.br');
+            expect(secondResult[0].email).toBe('prof.cache@if.edu.br');
+            expect(mockSUAPScraper.goto).toHaveBeenCalledTimes(3);
+            expect(mockSUAPScraper.evaluate).toHaveBeenCalledTimes(3);
+        });
+
+        it('should return null when professor profile email text is invalid', async () => {
+            let evaluateCall = 0;
+
+            mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
+                evaluateCall += 1;
+
+                if (evaluateCall === 1) {
+                    return Promise.resolve([{ siape: '555555', name: 'Prof. Invalid Email' }]);
+                }
+
+                global.document = {
+                    querySelectorAll: jest.fn(() => [
+                        {
+                            textContent: 'E-mail Institucional',
+                            nextElementSibling: {
+                                tagName: 'DD',
+                                textContent: 'sem-email-valido'
+                            }
+                        }
+                    ])
+                };
+
+                return Promise.resolve(callback(config));
+            });
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            const result = await suap.scrapeProfessors('60246');
+
+            expect(result).toHaveLength(1);
+            expect(result[0].email).toBeNull();
+        });
+
+        it('should return null when professor email fetch throws', async () => {
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([{ siape: '777777', name: 'Prof. Error' }]);
+
+            mockSUAPScraper.goto
+                .mockResolvedValueOnce(undefined)
+                .mockRejectedValueOnce(new Error('profile unavailable'));
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            const result = await suap.scrapeProfessors('60247');
+
+            expect(result).toHaveLength(1);
+            expect(result[0].email).toBeNull();
         });
     });
 
