@@ -44,13 +44,13 @@ class Moodle {
                 const subjectObj = s.subject;
 
                 const group = s.groupnames.includes('Grupo 1') ? '_G1' : s.groupnames.includes('Grupo 2') ? '_G2' : '';
-                const className = s.classids.length > 1 ? classes.filter(cl => s.classids.includes(cl.id)).map(cl => cl.name).join(',') : c.name;
+                const className = s.classids.length > 1 ? classes.filter(cl => s.classids.includes(cl.id)).map(cl => cl.name).join('|') : c.name;
 
                 // "[2025.2] TSI-2AN - Desenvolvimento Back-end I", CH_TSI_2AN_DBE1_2025.2, 120
-                // "[2025.2] TSI-4AN,ECA-8AN - Gestão e Empreendedorismo", CH_TSI_4AN_ECA_8AN_GE_2025.2, 120
+                // "[2025.2] TSI-4AN|ECA-8AN - Gestão e Empreendedorismo", CH_TSI_4AN_ECA_8AN_GE_2025.2, 120
                 // "[2025.2] INF-2AT-G1 - Banco de Dados", CH_INF_2AT_BD_2025.2_G1, 115
                 const fullName = `"[${year}.${semester}] ${className}${group.replace('_', '-')} - ${subjectObj.name.split('-').slice(1).join('-').trim()}"`;
-                const shortName = `CH_${className.replace(/[-,]/g, '_')}_${subjectObj.short.split(/\s*-\s*/)?.slice(1).join('')}_${year}.${semester}${group}`;
+                const shortName = `CH_${className.replace(/[-,\|]/g, '_')}_${subjectObj.short.split(/\s*-\s*/)?.slice(1).join('')}_${year}.${semester}${group}`;
                 const category = moodleConfig.categories[c.name.split('-')[0]];
 
                 if (!moodleSubjects.map(ms => ms[0]).includes(fullName) && category) {
@@ -98,11 +98,12 @@ class Moodle {
             .split('\n')
             .slice(1) // Skip header row
             .filter(line => line.trim()) // Skip empty lines
-            .map(line => line.split(',').map(item => item.trim()))
+            // split pattern: "fullname", shortname, category (category is number)
+            .map(line => line.match(/"(.+)", (.+), (\d+)/))
             .map(item => ({
-                fullname: item[0],
-                shortname: item[1],
-                category: item[2],
+                fullname: item[1],
+                shortname: item[2],
+                category: parseInt(item[3]),
             }));
 
         // console.log(courses);
@@ -151,12 +152,13 @@ class Moodle {
             .split('\n')
             .slice(1) // Skip header
             .map(line => {
+                // match pattern: "fullname", shortname, category (category is number)
                 const match = line?.match(/"(.+)", (.+), (\d+)/);
                 if (!match) return null;
                 return {
                     fullname: match[1],
                     shortname: match[2],
-                    category: match[3]
+                    category: parseInt(match[3])
                 };
             })
             .filter(s => s !== null);

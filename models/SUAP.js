@@ -11,11 +11,19 @@ class SUAP {
     #dataPath;
     #studentsPath;
     #professorsPath;
+    #studentsBySubjectCache;
+    #professorsBySubjectCache;
+    #studentEmailCache;
+    #professorEmailCache;
 
     constructor() {
         this.#dataPath = path.resolve('files', 'suap_subjects.json');
         this.#studentsPath = path.resolve('files', 'suap_students.json');
         this.#professorsPath = path.resolve('files', 'suap_professors.json');
+        this.#studentsBySubjectCache = new Map();
+        this.#professorsBySubjectCache = new Map();
+        this.#studentEmailCache = new Map();
+        this.#professorEmailCache = new Map();
     }
 
     /**
@@ -113,6 +121,18 @@ class SUAP {
      * @returns {Promise<Object>} Object with students array and professors array
      */
     async scrapeStudents(subjectId, progressCallback = null) {
+        const normalizedSubjectId = String(subjectId);
+
+        const cachedStudents = this.#studentsBySubjectCache.get(normalizedSubjectId);
+        const cachedProfessors = this.#professorsBySubjectCache.get(normalizedSubjectId);
+        if (cachedStudents && cachedProfessors) {
+            if (progressCallback) progressCallback('Using cached students and professors');
+            return {
+                students: this.#cloneCollection(cachedStudents),
+                professors: this.#cloneCollection(cachedProfessors),
+            };
+        }
+
         await SUAPScraper.initialize();
 
         // Step 1: Go to subject main page first to extract professors
@@ -223,8 +243,11 @@ class SUAP {
         if (progressCallback) progressCallback(`Completed. Saving ${students.length} students and ${professors.length} professors...`);
 
         // Save students and professors to file
-        await this.#saveStudents(subjectId, students);
-        await this.#saveProfessors(subjectId, professors);
+        await this.#saveStudents(normalizedSubjectId, students);
+        await this.#saveProfessors(normalizedSubjectId, professors);
+
+        this.#studentsBySubjectCache.set(normalizedSubjectId, this.#cloneCollection(students));
+        this.#professorsBySubjectCache.set(normalizedSubjectId, this.#cloneCollection(professors));
 
         return { students, professors };
     }
@@ -282,6 +305,14 @@ class SUAP {
      * @returns {Promise<Array>} Array of student objects with name, email, and enrollment
      */
     async scrapeStudentsOnly(subjectId, progressCallback = null) {
+        const normalizedSubjectId = String(subjectId);
+
+        const cachedStudents = this.#studentsBySubjectCache.get(normalizedSubjectId);
+        if (cachedStudents) {
+            if (progressCallback) progressCallback('Using cached students');
+            return this.#cloneCollection(cachedStudents);
+        }
+
         await SUAPScraper.initialize();
 
         // Navigate directly to notas_faltas tab for students
@@ -337,7 +368,8 @@ class SUAP {
         if (progressCallback) progressCallback(`Completed. Saving ${students.length} students...`);
 
         // Save only students to file
-        await this.#saveStudents(subjectId, students);
+        await this.#saveStudents(normalizedSubjectId, students);
+        this.#studentsBySubjectCache.set(normalizedSubjectId, this.#cloneCollection(students));
 
         return students;
     }
@@ -348,6 +380,10 @@ class SUAP {
      * @returns {Promise<string|null>} Student email or null if not found
      */
     async #fetchStudentEmail(enrollment) {
+        if (this.#studentEmailCache.has(enrollment)) {
+            return this.#studentEmailCache.get(enrollment);
+        }
+
         const url = `${suapConfig.baseUrl}/${suapConfig.studentProfile.url}/${enrollment}/`;
         
         try {
@@ -368,9 +404,11 @@ class SUAP {
                 return null;
             }, { emailLabel: suapConfig.studentProfile.email.label });
             
+            this.#studentEmailCache.set(enrollment, email);
             return email;
         } catch (error) {
             console.error(`Error fetching email for ${enrollment}:`, error.message);
+            this.#studentEmailCache.set(enrollment, null);
             return null;
         }
     }
@@ -382,6 +420,14 @@ class SUAP {
      * @returns {Promise<Array>} Array of professor objects with name, email, and siape
      */
     async scrapeProfessors(subjectId, progressCallback = null) {
+        const normalizedSubjectId = String(subjectId);
+
+        const cachedProfessors = this.#professorsBySubjectCache.get(normalizedSubjectId);
+        if (cachedProfessors) {
+            if (progressCallback) progressCallback('Using cached professors');
+            return this.#cloneCollection(cachedProfessors);
+        }
+
         await SUAPScraper.initialize();
 
         // Step 1: Get professor list from subject page (main diario page)
@@ -447,7 +493,8 @@ class SUAP {
         if (progressCallback) progressCallback(`Completed fetching ${professors.length} professors. Saving...`);
 
         // Save professors to file
-        await this.#saveProfessors(subjectId, professors);
+        await this.#saveProfessors(normalizedSubjectId, professors);
+        this.#professorsBySubjectCache.set(normalizedSubjectId, this.#cloneCollection(professors));
 
         return professors;
     }
@@ -458,6 +505,10 @@ class SUAP {
      * @returns {Promise<string|null>} Professor email or null if not found
      */
     async #fetchProfessorEmail(siape) {
+        if (this.#professorEmailCache.has(siape)) {
+            return this.#professorEmailCache.get(siape);
+        }
+
         const url = `${suapConfig.baseUrl}/${suapConfig.professorProfile.url}/${siape}/`;
         
         try {
@@ -484,11 +535,17 @@ class SUAP {
                 return null;
             }, { emailLabel: suapConfig.professorProfile.email.label });
             
+            this.#professorEmailCache.set(siape, email);
             return email;
         } catch (error) {
             console.error(`Error fetching email for professor ${siape}:`, error.message);
+            this.#professorEmailCache.set(siape, null);
             return null;
         }
+    }
+
+    #cloneCollection(collection) {
+        return collection.map(item => ({ ...item }));
     }
 
     /**
