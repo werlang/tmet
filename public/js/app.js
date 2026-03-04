@@ -5,6 +5,10 @@ import { PipelineSection } from './sections/pipeline.js';
 import { MatchingSection } from './sections/matching.js';
 import { StudentsSection } from './sections/students.js';
 
+// Replace year on footer
+document.querySelector('.site-footer__year').textContent = new Date().getFullYear();
+
+
 /**
  * Subject Matcher Application
  * Main coordinator that initializes and orchestrates section modules

@@ -45,4 +45,60 @@ body {
     color: var(--color-text-primary);
     padding: 20px;
     line-height: 1.6;
+    margin: 0;
+}
+
+.site-footer {
+    margin: 2rem -20px -20px -20px;
+    padding: 1rem 30px 1rem 30px;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+    background-color: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg-surface));
+
+}
+
+.site-footer__wrapper {
+    max-width: 900px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: auto;
+}
+
+.site-footer__meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.site-footer__name {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.site-footer__dot {
+    line-height: 1;
+}
+
+.site-footer__repo {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--color-link);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.site-footer__repo:hover,
+.site-footer__repo:focus-visible {
+    filter: brightness(0.9);
+}
+
+.site-footer__repo svg {
+    width: 1rem;
+    height: 1rem;
+    fill: currentColor;
 }
