@@ -3,6 +3,7 @@ import { ProgressModal } from '../components/progress-modal.js';
 import { StudentsModal } from '../components/students-modal.js';
 import { ProfessorsModal } from '../components/professors-modal.js';
 import { Request } from '../helpers/request.js';
+import { removeAccents } from '../helpers/text.js';
 
 /**
  * Students Section
@@ -27,6 +28,7 @@ class StudentsSection {
     #onDataChange;
     #showStudentsNotScrapedOnly = false;
     #showProfessorsNotScrapedOnly = false;
+    #subjectFilter = '';
 
     /**
      * @param {Object} options
@@ -73,6 +75,10 @@ class StudentsSection {
         });
         this.#elements.filterProfessorsNotScrapedToggle.addEventListener('change', (event) => {
             this.#showProfessorsNotScrapedOnly = event.target.checked;
+            this.#renderStudentsSubjectList();
+        });
+        this.#elements.studentsSubjectFilter.addEventListener('input', (event) => {
+            this.#subjectFilter = event.target.value;
             this.#renderStudentsSubjectList();
         });
         
@@ -162,7 +168,7 @@ class StudentsSection {
         if (filteredSubjects.length === 0) {
             const emptyState = document.createElement('div');
             emptyState.className = 'students-empty-state';
-            emptyState.innerHTML = '<p><strong>No subjects match current filters</strong></p><p>Disable one or both toggles to show all matched subjects</p>';
+            emptyState.innerHTML = `<p><strong>No subjects match current filters</strong></p><p>${this.#getEmptyFilterMessage()}</p>`;
             container.appendChild(emptyState);
             return;
         }
@@ -199,6 +205,8 @@ class StudentsSection {
      * @returns {Array}
      */
     #getFilteredSubjects(subjects) {
+        const normalizedFilter = removeAccents(this.#subjectFilter.trim().toLowerCase());
+
         return subjects.filter(subject => {
             if (this.#showStudentsNotScrapedOnly && this.#hasStudentsScraped(subject.id)) {
                 return false;
@@ -208,8 +216,52 @@ class StudentsSection {
                 return false;
             }
 
+             if (normalizedFilter && !this.#matchesSubjectFilter(subject, normalizedFilter)) {
+                return false;
+            }
+
             return true;
         });
+    }
+
+    /**
+     * Check if a subject matches the current text filter
+     * @param {Object} subject - SUAP subject
+     * @param {string} normalizedFilter - Normalized filter text
+     * @returns {boolean}
+     */
+    #matchesSubjectFilter(subject, normalizedFilter) {
+        const searchText = [
+            subject.fullname,
+            subject.name,
+            subject.subjectName,
+            subject.className,
+            subject.id
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        return removeAccents(searchText).includes(normalizedFilter);
+    }
+
+    /**
+     * Build the empty-state help text for active filters
+     * @returns {string}
+     */
+    #getEmptyFilterMessage() {
+        const suggestions = [];
+
+        if (this.#subjectFilter.trim()) {
+            suggestions.push('clear the search field');
+        }
+
+        if (this.#showStudentsNotScrapedOnly || this.#showProfessorsNotScrapedOnly) {
+            suggestions.push('disable one or both toggles');
+        }
+
+        if (suggestions.length === 0) {
+            return 'Adjust the current filters to show matching subjects.';
+        }
+
+        return `Try to ${suggestions.join(' or ')}.`;
     }
 
     /**

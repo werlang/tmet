@@ -68,6 +68,7 @@ class SubjectMatcherApp {
 
             // Students section
             studentsSubjectList: document.getElementById('students-subject-list'),
+            studentsSubjectFilter: document.getElementById('students-subject-filter'),
             extractStudentsBtn: document.getElementById('extract-students-btn'),
             extractStudentsOnlyBtn: document.getElementById('extract-students-only-btn'),
             extractProfessorsOnlyBtn: document.getElementById('extract-professors-only-btn'),
