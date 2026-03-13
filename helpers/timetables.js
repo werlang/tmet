@@ -82,11 +82,14 @@ class TimeTables {
         const { classes } = await this.getEntities();
         // console.log(classes);
         const ids = classes.map(c => c.id);
-        const classesFetchedData = await Promise.all(ids.map(id => this.fetchClass(id)));
+        const classesFetchedData = Object.fromEntries(await Promise.all(ids.map(async id => {
+            const data = await this.fetchClass(id);
+            return [id, data];
+        })));
         // console.log(classesFetchedData);
 
         classes.forEach(classObj => {
-            let classData = classesFetchedData.filter(c => c?.r?.ttitems.length).find(c => c?.r?.ttitems?.every(item => item.classids.includes(classObj.id)))?.r.ttitems;
+            let classData = classesFetchedData[classObj.id]?.r?.ttitems;
 
             classData?.forEach(item => {
                 item.subject = this.getSubject(item.subjectid);
