@@ -77,6 +77,18 @@ class Moodle {
         return csv;
     }
 
+    #getProfessorId(professor = {}) {
+        if (typeof professor.id === 'string' && professor.id.trim()) {
+            return professor.id.trim();
+        }
+
+        if (typeof professor.email !== 'string') {
+            return '';
+        }
+
+        return professor.email.split('@')[0]?.trim() || '';
+    }
+
     /**
      * Upload courses to Moodle
      * @param {Function} progressCallback - Optional progress callback
@@ -306,19 +318,18 @@ class Moodle {
                 const professor = professorInfo[siape];
                 if (!professor) continue;
 
+                const professorId = this.#getProfessorId(professor);
                 const professorName = professor.name || '';
                 const professorEmail = professor.email || '';
                 const nameParts = professorName.trim().split(/\s+/);
                 const firstName = nameParts[0] || '';
                 const lastName = nameParts.slice(1).join(' ') || '';
-                // Username is email prefix (before @), password is fixed 123456
-                const username = professorEmail.split('@')[0] || '';
 
-                // Skip if no valid username (email is required)
-                if (!username) continue;
+                // Skip if no valid professor id is available
+                if (!professorId) continue;
 
                 csvRows.push([
-                    username,
+                    professorId,
                     '123456',
                     firstName,
                     lastName,

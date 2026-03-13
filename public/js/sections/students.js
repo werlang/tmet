@@ -490,13 +490,13 @@ class StudentsSection {
             },
             students: {
                 button: this.#elements.extractStudentsOnlyBtn,
-                buttonLabel: 'Extract Students Only',
+                buttonLabel: 'Students Only',
                 title: 'Extracting Students',
                 successMsg: 'Students extracted successfully'
             },
             professors: {
                 button: this.#elements.extractProfessorsOnlyBtn,
-                buttonLabel: 'Extract Professors Only',
+                buttonLabel: 'Professors Only',
                 title: 'Extracting Professors',
                 successMsg: 'Professors extracted successfully'
             }

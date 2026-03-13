@@ -653,6 +653,7 @@ describe('SUAP Model', () => {
 
             expect(result).toEqual([
                 {
+                    id: 'prof.one',
                     name: 'Prof. One',
                     email: 'prof.one@if.edu.br',
                     siape: '123456'
@@ -690,6 +691,7 @@ describe('SUAP Model', () => {
             const savedData = JSON.parse(professorWriteCall[1]);
             expect(savedData.subjects['77777']).toEqual(['999999']);
             expect(savedData.professors['999999']).toEqual({
+                id: 'prof.error',
                 name: 'Prof. Error',
                 email: 'prof.error@if.edu.br'
             });

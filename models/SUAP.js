@@ -216,6 +216,7 @@ class SUAP {
             
             const email = await this.#fetchProfessorEmail(professor.siape);
             professors.push({
+                id: this.#buildProfessorId(email),
                 name: professor.name,
                 email,
                 siape: professor.siape,
@@ -417,7 +418,7 @@ class SUAP {
      * Scrape professors from a SUAP subject
      * @param {string} subjectId - The SUAP subject ID (diario ID)
      * @param {Function} progressCallback - Optional callback for progress updates
-     * @returns {Promise<Array>} Array of professor objects with name, email, and siape
+    * @returns {Promise<Array>} Array of professor objects with id, name, email, and siape
      */
     async scrapeProfessors(subjectId, progressCallback = null) {
         const normalizedSubjectId = String(subjectId);
@@ -483,6 +484,7 @@ class SUAP {
             
             const email = await this.#fetchProfessorEmail(professor.siape);
             professors.push({
+                id: this.#buildProfessorId(email),
                 name: professor.name,
                 email,
                 siape: professor.siape,
@@ -548,6 +550,22 @@ class SUAP {
         return collection.map(item => ({ ...item }));
     }
 
+    #buildProfessorId(email) {
+        if (typeof email !== 'string') {
+            return '';
+        }
+
+        return email.split('@')[0]?.trim() || '';
+    }
+
+    #normalizeProfessorRecord(professor = {}) {
+        return {
+            id: professor.id || this.#buildProfessorId(professor.email),
+            name: professor.name || '',
+            email: professor.email ?? '',
+        };
+    }
+
     /**
      * Save professors to JSON file
      * @param {string} subjectId - The SUAP subject ID
@@ -566,7 +584,12 @@ class SUAP {
                 const existingData = JSON.parse(content);
                 // Ensure structure exists (handle legacy format)
                 data.subjects = existingData.subjects || {};
-                data.professors = existingData.professors || {};
+                data.professors = Object.fromEntries(
+                    Object.entries(existingData.professors || {}).map(([siape, professor]) => [
+                        siape,
+                        this.#normalizeProfessorRecord(professor)
+                    ])
+                );
             } catch (error) {
                 console.error('Error reading existing professors file:', error.message);
             }
@@ -578,10 +601,7 @@ class SUAP {
         
         // Add/update professor info (deduplicated by SIAPE)
         professors.forEach(professor => {
-            data.professors[professor.siape] = {
-                name: professor.name,
-                email: professor.email
-            };
+            data.professors[professor.siape] = this.#normalizeProfessorRecord(professor);
         });
         
         // Write back to file

@@ -983,7 +983,46 @@ describe('Moodle Model', () => {
             expect(writtenCsv).toContain('editingteacher');
         });
 
-        it('should use 123456 as password in CSV', async () => {
+        it('should use stored professor id from JSON as username in CSV', async () => {
+            const professorsData = {
+                subjects: {
+                    "60244": ["1234567"]
+                },
+                professors: {
+                    "1234567": {
+                        id: 'prof.joao',
+                        name: 'João Silva',
+                        email: 'joao.silva@ifsul.edu.br'
+                    }
+                }
+            };
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_professors.json')) {
+                    return JSON.stringify(professorsData);
+                }
+                if (path.includes('moodle_classes.csv')) {
+                    return sampleMoodleCsvContent;
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([{
+                        moodleFullname: "[2025.1] INF-2AT-G2 - Programação Web I",
+                        suapId: '60244',
+                        type: 'auto'
+                    }]);
+                }
+                return '';
+            });
+
+            const moodle = new Moodle();
+            await moodle.generateProfessorCSV();
+
+            const writtenCsv = mockFs.writeFileSync.mock.calls[0][1];
+            expect(writtenCsv).toContain('prof.joao,123456,João,Silva,joao.silva@ifsul.edu.br');
+        });
+
+        it('should fallback to email prefix when stored professor id is missing', async () => {
             const professorsData = {
                 subjects: {
                     "60244": ["1234567"]
@@ -1014,10 +1053,8 @@ describe('Moodle Model', () => {
             const moodle = new Moodle();
             await moodle.generateProfessorCSV();
 
-            // Check the written CSV content - password should be 123456
             const writtenCsv = mockFs.writeFileSync.mock.calls[0][1];
             expect(writtenCsv).toContain('123456');
-            // Username should be email prefix
             expect(writtenCsv).toContain('joao.silva');
         });
 
