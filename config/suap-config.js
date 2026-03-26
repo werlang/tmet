@@ -30,6 +30,7 @@ const suapConfig = {
         TSI: 264,
         ECA: 269,
         PED: 815,
+        MEST: 619,
     },
     subjectDetail: {
         url: 'edu/diario',
