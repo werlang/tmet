@@ -348,3 +348,115 @@
 .students-empty-state p {
     margin: 0.5rem 0;
 }
+
+.manual-student-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem;
+    background: var(--color-bg-body);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+}
+
+.manual-student-header {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.manual-student-header h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--color-text-primary);
+}
+
+.manual-student-inputs {
+    margin-bottom: 0;
+}
+
+.manual-students-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.manual-students-summary[data-empty="true"] {
+    color: var(--color-text-secondary);
+    font-size: 0.95rem;
+}
+
+.manual-students-summary-copy {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--color-text-secondary);
+}
+
+.manual-students-summary-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 0.75rem;
+}
+
+.manual-student-summary-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 0.9rem 1rem;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    position: relative;
+}
+
+.manual-student-remove-btn {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    width: 1.8rem;
+    height: 1.8rem;
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    background: var(--color-bg-body);
+    color: var(--color-text-secondary);
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.manual-student-remove-btn:hover {
+    border-color: #c92a2a;
+    color: #c92a2a;
+    background: #fff5f5;
+}
+
+.manual-student-summary-name {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--color-text-primary);
+}
+
+.manual-student-summary-meta {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+    word-break: break-word;
+}
+
+.manual-student-course-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+}
+
+.manual-student-course-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.3rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-body);
+    color: var(--color-text-primary);
+    font-size: 0.78rem;
+    font-weight: 600;
+}

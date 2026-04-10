@@ -635,6 +635,81 @@ describe('Moodle Model', () => {
             expect(result.processedSubjects).toBe(1);
             expect(result.totalStudents).toBe(0);
         });
+
+        it('should ignore manual enrollments when generating the regular students CSV', async () => {
+            const studentsData = {
+                subjects: {},
+                students: {
+                    "20261CH.PROFEPT0005": {
+                        name: 'Ana Elisa de Souza',
+                        email: 'anasouza.ch005@academico.ifsul.edu.br'
+                    }
+                },
+                manualEnrollments: {
+                    "20261CH.PROFEPT0005": {
+                        password: '20261CH.PROFEPT0005',
+                        courseIds: ['CH_MEST_BCEPT_2026.1', 'CH_MEST_SP_2026.1']
+                    }
+                }
+            };
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_students.json')) {
+                    return JSON.stringify(studentsData);
+                }
+                if (path.includes('moodle_classes.csv')) {
+                    return sampleMoodleCsvContent;
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([]);
+                }
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = await moodle.generateStudentCSV();
+
+            expect(result.totalStudents).toBe(0);
+
+            const writtenCsv = mockFs.writeFileSync.mock.calls[0][1];
+            expect(writtenCsv).toBe('username,password,firstname,lastname,email,course1,role1');
+        });
+
+        it('should generate a manual-only CSV in a separate file', async () => {
+            const studentsData = {
+                subjects: {},
+                students: {
+                    "20261CH.PROFEPT0005": {
+                        name: 'Ana Elisa de Souza',
+                        email: 'anasouza.ch005@academico.ifsul.edu.br'
+                    }
+                },
+                manualEnrollments: {
+                    "20261CH.PROFEPT0005": {
+                        password: '20261CH.PROFEPT0005',
+                        courseIds: ['CH_MEST_BCEPT_2026.1']
+                    }
+                }
+            };
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_students.json')) {
+                    return JSON.stringify(studentsData);
+                }
+                return '';
+            });
+
+            const progressCallback = jest.fn();
+            const moodle = new Moodle();
+            const result = await moodle.generateManualStudentCSV(progressCallback);
+
+            expect(result.totalStudents).toBe(1);
+            expect(result.manualStudents).toBe(1);
+            expect(progressCallback).toHaveBeenCalledWith('Loading manual students data');
+            expect(progressCallback).toHaveBeenCalledWith('Writing manual students CSV file');
+        });
     });
 
     describe('edge cases', () => {
@@ -1182,17 +1257,23 @@ maria.santos,123456,Maria,Santos,maria.santos@email.com,CH_INF_2AT_PW1_2025.1_G2
             }));
         });
 
-        it('should throw error if students CSV file does not exist', async () => {
+        it('should throw error if no student CSV files exist', async () => {
             mockFs.existsSync.mockReturnValue(false);
 
             const moodle = new Moodle();
 
-            await expect(moodle.uploadStudents()).rejects.toThrow('Students CSV file not found');
+            await expect(moodle.uploadStudents()).rejects.toThrow('Students CSV files not found');
         });
 
-        it('should upload students from CSV file', async () => {
+        it('should upload students from both regular and manual CSV files', async () => {
             mockFs.existsSync.mockReturnValue(true);
-            mockFs.readFileSync.mockReturnValue(sampleStudentsCsv);
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('moodle_manual_students.csv')) {
+                    return `username,password,firstname,lastname,email,course1,role1
+manual.student,abc123,Manual,Student,manual.student@email.com,CH_MEST_BCEPT_2026.1,student`;
+                }
+                return sampleStudentsCsv;
+            });
 
             const moodle = new Moodle();
             const result = await moodle.uploadStudents();
@@ -1202,15 +1283,16 @@ maria.santos,123456,Maria,Santos,maria.santos@email.com,CH_INF_2AT_PW1_2025.1_G2
         });
 
         it('should call progress callback during upload', async () => {
-            mockFs.existsSync.mockReturnValue(true);
-            mockFs.readFileSync.mockReturnValue(sampleStudentsCsv);
+            mockFs.existsSync.mockImplementation((path) => !path.includes('moodle_students.csv'));
+            mockFs.readFileSync.mockReturnValue(`username,password,firstname,lastname,email,course1,role1
+manual.student,abc123,Manual,Student,manual.student@email.com,CH_MEST_BCEPT_2026.1,student`);
 
             const progressCallback = jest.fn();
             const moodle = new Moodle();
             await moodle.uploadStudents(progressCallback);
 
             expect(progressCallback).toHaveBeenCalledWith('Initializing Moodle uploader');
-            expect(progressCallback).toHaveBeenCalledWith('Uploading 2 students to Moodle');
+            expect(progressCallback).toHaveBeenCalledWith('Uploading 1 students to Moodle');
         });
 
         it('should parse CSV correctly and pass to uploader', async () => {

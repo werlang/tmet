@@ -101,6 +101,27 @@ class Moodle {
         }
     }
 
+    async generateManualStudentsCSV(progressCallback) {
+        try {
+            const result = await new Request().post('/api/moodle/manual-students-csv');
+
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/jobs',
+                'Manual students CSV generation',
+                progressCallback
+            );
+        } catch (error) {
+            console.error('Generate manual students CSV error:', error);
+            Toast.error('Error generating manual students CSV: ' + error.message);
+            throw error;
+        }
+    }
+
     /**
      * Generate professors CSV for Moodle bulk enrollment
      * @param {Function} progressCallback - Optional callback for progress updates

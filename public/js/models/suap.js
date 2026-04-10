@@ -45,6 +45,34 @@ class SUAP {
     }
 
     /**
+     * Add a manual student enrollment by matrícula
+     * @param {Object} params - Manual student payload
+     * @param {string} params.matricula - SUAP enrollment ID
+     * @param {string} params.password - Moodle password for CSV rows
+     * @param {string[]} params.courseIds - Moodle course shortnames/IDs
+     * @returns {Promise<Object>} Created manual student response
+     */
+    async addManualStudent(params) {
+        try {
+            return await new Request().post('/api/suap/manual-student', params);
+        } catch (error) {
+            console.error('Add manual student error:', error);
+            Toast.error('Error adding manual student: ' + error.message);
+            throw error;
+        }
+    }
+
+    async removeManualStudent(params) {
+        try {
+            return await new Request().post('/api/suap/manual-student/remove', params);
+        } catch (error) {
+            console.error('Remove manual student error:', error);
+            Toast.error('Error removing manual student: ' + error.message);
+            throw error;
+        }
+    }
+
+    /**
      * Poll job status until completion
      * @param {string} jobId - Job ID to poll
      * @param {string} endpoint - Status endpoint path

@@ -25,7 +25,8 @@ router.get('/students', async (req, res) => {
             // Ensure the structure is correct (handle legacy format)
             const normalizedData = {
                 subjects: data.subjects || {},
-                students: data.students || {}
+                students: data.students || {},
+                manualEnrollments: data.manualEnrollments || {}
             };
             
             res.json({
@@ -40,8 +41,10 @@ router.get('/students', async (req, res) => {
                     success: true,
                     data: {
                         subjects: {},
-                        students: {}
-                    }
+                        students: {},
+                        manualEnrollments: {}
+                    },
+                    studentUrl: `${suapConfig.baseUrl}/${suapConfig.studentProfile.url}/{{enrollment}}`,
                 });
             } else {
                 throw error;
@@ -53,6 +56,92 @@ router.get('/students', async (req, res) => {
         res.status(500).json({
             success: false,
             error: error.message
+        });
+    }
+});
+
+/**
+ * POST /suap/manual-student
+ * Fetch a student profile by enrollment and store manual Moodle course enrollments
+ */
+router.post('/manual-student', async (req, res) => {
+    try {
+        const enrollment = String(req.body.matricula || req.body.enrollment || '').trim();
+        const password = String(req.body.password || '').trim();
+        const courseIds = Array.from(new Set(
+            (Array.isArray(req.body.courseIds)
+                ? req.body.courseIds
+                : String(req.body.courseIds || req.body.courses || '')
+                    .split(','))
+                .map(courseId => String(courseId || '').trim())
+                .filter(Boolean)
+        ));
+
+        if (!enrollment) {
+            return res.status(400).json({
+                success: false,
+                error: 'SUAP enrollment is required'
+            });
+        }
+
+        if (!password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Password is required'
+            });
+        }
+
+        if (courseIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'At least one Moodle course ID is required'
+            });
+        }
+
+        const suap = new SUAP();
+        const manualStudent = await suap.addManualStudent({
+            enrollment,
+            password,
+            courseIds,
+        });
+
+        res.status(201).json({
+            success: true,
+            message: `Manual student saved for ${manualStudent.name}`,
+            data: manualStudent,
+        });
+    } catch (error) {
+        console.error('Manual student save error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+router.post('/manual-student/remove', async (req, res) => {
+    try {
+        const enrollment = String(req.body.matricula || req.body.enrollment || '').trim();
+
+        if (!enrollment) {
+            return res.status(400).json({
+                success: false,
+                error: 'SUAP enrollment is required'
+            });
+        }
+
+        const suap = new SUAP();
+        await suap.removeManualStudent(enrollment);
+
+        res.json({
+            success: true,
+            message: `Manual student removed for ${enrollment}`,
+        });
+    } catch (error) {
+        console.error('Manual student removal error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
         });
     }
 });

@@ -83,6 +83,12 @@ class SubjectMatcherApp {
             studentsSelectedCount: document.getElementById('students-selected-count'),
             generateStudentsCsvBtn: document.getElementById('generate-students-csv-btn'),
             uploadStudentsBtn: document.getElementById('upload-students-btn'),
+            manualStudentMatriculaInput: document.getElementById('manual-student-matricula-input'),
+            manualStudentPasswordInput: document.getElementById('manual-student-password-input'),
+            manualStudentCourseIdsInput: document.getElementById('manual-student-course-ids-input'),
+            addManualStudentBtn: document.getElementById('add-manual-student-btn'),
+            generateManualStudentsCsvBtn: document.getElementById('generate-manual-students-csv-btn'),
+            manualStudentsSummary: document.getElementById('manual-students-summary'),
             
             // Professors section
             generateProfessorsCsvBtn: document.getElementById('generate-professors-csv-btn'),

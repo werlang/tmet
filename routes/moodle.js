@@ -107,6 +107,34 @@ router.post('/students-csv', async (req, res) => {
 });
 
 /**
+ * POST /moodle/manual-students-csv
+ * Generate manual students CSV for Moodle bulk enrollment
+ */
+router.post('/manual-students-csv', async (req, res) => {
+    try {
+        console.log('Starting manual students CSV generation job...');
+
+        const jobQueue = req.app.locals.jobQueue;
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
+            return await processGenerateManualStudentsCSV(jobId, updateProgress);
+        });
+
+        res.status(202).json({
+            success: true,
+            jobId,
+            message: 'Manual students CSV generation job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+    } catch (error) {
+        console.error('Manual students CSV generation error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
  * POST /moodle/professors-csv
  * Generate professors CSV for Moodle bulk enrollment
  */
@@ -273,8 +301,29 @@ async function processGenerateStudentsCSV(jobId, updateProgress) {
     console.log(`[${jobId}] Students CSV generation completed`);
 
     return {
-        message: `Students CSV generated successfully. ${result.totalStudents} students from ${result.processedSubjects} subjects.`,
+        message: `Students CSV generated successfully. ${result.totalStudents} rows from ${result.processedSubjects} matched subjects.`,
         file: 'files/moodle_students.csv',
+        ...result
+    };
+}
+
+async function processGenerateManualStudentsCSV(jobId, updateProgress) {
+    updateProgress({
+        message: 'Starting manual students CSV generation...'
+    });
+
+    console.log(`[${jobId}] Starting manual students CSV generation`);
+
+    const moodle = new Moodle();
+    const result = await moodle.generateManualStudentCSV((message) => {
+        updateProgress({ message });
+    });
+
+    console.log(`[${jobId}] Manual students CSV generation completed`);
+
+    return {
+        message: `Manual students CSV generated successfully. ${result.totalStudents} rows from ${result.manualStudents} manual students.`,
+        file: 'files/moodle_manual_students.csv',
         ...result
     };
 }

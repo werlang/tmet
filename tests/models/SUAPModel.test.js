@@ -64,6 +64,75 @@ describe('SUAP Model', () => {
         });
     });
 
+    describe('addManualStudent()', () => {
+        it('should fetch a student profile and persist manual course enrollments', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(JSON.stringify({
+                subjects: {},
+                students: {},
+                manualEnrollments: {}
+            }));
+            mockSUAPScraper.evaluate.mockResolvedValue({
+                name: 'Ana Elisa de Souza',
+                email: 'anasouza.ch005@academico.ifsul.edu.br'
+            });
+
+            const suap = new SUAP();
+            const result = await suap.addManualStudent({
+                enrollment: '20261CH.PROFEPT0005',
+                password: '20261CH.PROFEPT0005',
+                courseIds: [' CH_MEST_BCEPT_2026.1 ', 'CH_MEST_SP_2026.1', 'CH_MEST_SP_2026.1']
+            });
+
+            expect(result.username).toBe('anasouza.ch005');
+
+            const studentWriteCall = mockFs.writeFileSync.mock.calls.find(call =>
+                call[0].includes('suap_students.json')
+            );
+            const savedData = JSON.parse(studentWriteCall[1]);
+
+            expect(savedData.students['20261CH.PROFEPT0005']).toEqual({
+                name: 'Ana Elisa de Souza',
+                email: 'anasouza.ch005@academico.ifsul.edu.br'
+            });
+            expect(savedData.manualEnrollments['20261CH.PROFEPT0005']).toEqual({
+                password: '20261CH.PROFEPT0005',
+                courseIds: ['CH_MEST_BCEPT_2026.1', 'CH_MEST_SP_2026.1']
+            });
+        });
+
+        it('should remove manual enrollments and clean orphaned students', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(JSON.stringify({
+                subjects: {},
+                students: {
+                    '20261CH.PROFEPT0005': {
+                        name: 'Ana Elisa de Souza',
+                        email: 'anasouza.ch005@academico.ifsul.edu.br'
+                    }
+                },
+                manualEnrollments: {
+                    '20261CH.PROFEPT0005': {
+                        password: '20261CH.PROFEPT0005',
+                        courseIds: ['CH_MEST_BCEPT_2026.1']
+                    }
+                }
+            }));
+
+            const suap = new SUAP();
+            const result = await suap.removeManualStudent('20261CH.PROFEPT0005');
+
+            expect(result.removed).toBe(true);
+
+            const studentWriteCall = mockFs.writeFileSync.mock.calls.find(call =>
+                call[0].includes('suap_students.json')
+            );
+            const savedData = JSON.parse(studentWriteCall[1]);
+            expect(savedData.manualEnrollments['20261CH.PROFEPT0005']).toBeUndefined();
+            expect(savedData.students['20261CH.PROFEPT0005']).toBeUndefined();
+        });
+    });
+
     describe('extractSubjects()', () => {
         it('should initialize scraper and extract subjects', async () => {
             mockSUAPScraper.evaluate.mockResolvedValue([
@@ -343,6 +412,45 @@ describe('SUAP Model', () => {
             expect(savedData.subjects).toHaveProperty('60244');
             expect(savedData.students).toHaveProperty('2021000');
             expect(savedData.students).toHaveProperty('2021001');
+        });
+
+        it('should preserve manual enrollments when saving scraped students', async () => {
+            const existingData = {
+                subjects: { "60243": ["2021000"] },
+                students: {
+                    "2021000": { name: "Existing Student", email: "existing@email.com" },
+                    "20261CH.PROFEPT0005": { name: "Ana Elisa de Souza", email: "anasouza.ch005@academico.ifsul.edu.br" }
+                },
+                manualEnrollments: {
+                    "20261CH.PROFEPT0005": {
+                        password: '20261CH.PROFEPT0005',
+                        courseIds: ['CH_MEST_BCEPT_2026.1']
+                    }
+                }
+            };
+
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([])
+                .mockResolvedValueOnce([
+                    { enrollment: '2021001', name: 'João Silva' }
+                ])
+                .mockResolvedValue('joao.silva@email.com');
+
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(JSON.stringify(existingData));
+
+            const suap = new SUAP();
+            await suap.scrapeStudents('60244');
+
+            const studentWriteCall = mockFs.writeFileSync.mock.calls.find(call =>
+                call[0].includes('suap_students.json')
+            );
+            const savedData = JSON.parse(studentWriteCall[1]);
+
+            expect(savedData.manualEnrollments['20261CH.PROFEPT0005']).toEqual({
+                password: '20261CH.PROFEPT0005',
+                courseIds: ['CH_MEST_BCEPT_2026.1']
+            });
         });
 
         it('should handle empty student list', async () => {

@@ -120,7 +120,7 @@ describe('SUAP Route', () => {
             await handler(req, res);
 
             expect(res._data.success).toBe(true);
-            expect(res._data.data).toEqual({ subjects: {}, students: {} });
+            expect(res._data.data).toEqual({ subjects: {}, students: {}, manualEnrollments: {} });
         });
 
         it('should handle legacy file format', async () => {
@@ -134,7 +134,7 @@ describe('SUAP Route', () => {
             await handler(req, res);
 
             expect(res._data.success).toBe(true);
-            expect(res._data.data).toEqual({ subjects: {}, students: {} });
+            expect(res._data.data).toEqual({ subjects: {}, students: {}, manualEnrollments: {} });
         });
 
         it('should handle read errors and return 500', async () => {

@@ -10,9 +10,13 @@ import { moodleConfig } from '../config/moodle-config.js';
  */
 class Moodle {
     #csvPath;
+    #studentsCsvPath;
+    #manualStudentsCsvPath;
 
     constructor() {
         this.#csvPath = path.resolve('files', 'moodle_classes.csv');
+        this.#studentsCsvPath = path.resolve('files', 'moodle_students.csv');
+        this.#manualStudentsCsvPath = path.resolve('files', 'moodle_manual_students.csv');
     }
 
     /**
@@ -89,6 +93,80 @@ class Moodle {
         return professor.email.split('@')[0]?.trim() || '';
     }
 
+    #normalizeManualEnrollments(manualEnrollments = {}) {
+        return Object.fromEntries(
+            Object.entries(manualEnrollments || {}).map(([enrollment, manualEnrollment]) => {
+                const rawCourseIds = Array.isArray(manualEnrollment?.courseIds)
+                    ? manualEnrollment.courseIds
+                    : Array.isArray(manualEnrollment?.courses)
+                        ? manualEnrollment.courses
+                        : [];
+
+                return [enrollment, {
+                    password: typeof manualEnrollment?.password === 'string'
+                        ? manualEnrollment.password.trim()
+                        : '',
+                    courseIds: Array.from(new Set(
+                        rawCourseIds
+                            .map(courseId => String(courseId || '').trim())
+                            .filter(Boolean)
+                    )),
+                }];
+            })
+        );
+    }
+
+    #buildStudentCsvRow({ enrollment, student = {}, password, courseId }) {
+        const studentName = student.name || '';
+        const studentEmail = student.email || '';
+        const nameParts = studentName.trim().split(/\s+/).filter(Boolean);
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        const username = studentEmail.split('@')[0] || enrollment;
+
+        return [
+            username,
+            password || enrollment,
+            firstName,
+            lastName,
+            studentEmail,
+            courseId,
+            'student'
+        ];
+    }
+
+    #getStudentCsvHeader() {
+        return ['username', 'password', 'firstname', 'lastname', 'email', 'course1', 'role1'];
+    }
+
+    #writeStudentCsv(filePath, rows) {
+        const csvString = rows.map(row => row.join(',')).join('\n');
+        fs.writeFileSync(filePath, csvString);
+        return csvString;
+    }
+
+    #parseStudentCsv(filePath) {
+        if (!fs.existsSync(filePath)) {
+            return [];
+        }
+
+        return fs.readFileSync(filePath, 'utf-8')
+            .split('\n')
+            .slice(1)
+            .filter(line => line.trim())
+            .map(line => {
+                const parts = line.split(',').map(item => item.trim());
+                return {
+                    username: parts[0],
+                    password: parts[1],
+                    firstname: parts[2],
+                    lastname: parts[3],
+                    email: parts[4],
+                    course: parts[5],
+                };
+            });
+    }
+
     /**
      * Upload courses to Moodle
      * @param {Function} progressCallback - Optional progress callback
@@ -137,7 +215,7 @@ class Moodle {
      */
     async generateStudentCSV(progressCallback = null) {
         const studentsPath = path.resolve('files', 'suap_students.json');
-        const csvPath = path.resolve('files', 'moodle_students.csv');
+        const csvPath = this.#studentsCsvPath;
 
         if (progressCallback) progressCallback('Loading students data');
 
@@ -145,12 +223,15 @@ class Moodle {
             throw new Error('Students data not found. Extract students first.');
         }
 
-        if (!fs.existsSync(this.#csvPath)) {
+        const studentsData = JSON.parse(fs.readFileSync(studentsPath, 'utf-8'));
+        const subjectStudents = studentsData.subjects || {};
+        const studentInfo = studentsData.students || {};
+
+        const hasMoodleCoursesCsv = fs.existsSync(this.#csvPath);
+
+        if (!hasMoodleCoursesCsv) {
             throw new Error('Moodle courses CSV not found. Generate courses CSV first.');
         }
-
-        const studentsData = JSON.parse(fs.readFileSync(studentsPath, 'utf-8'));
-        const { subjects: subjectStudents, students: studentInfo } = studentsData;
 
         // Load all matches from unified matches.json
         const matchesPath = path.resolve('files', 'matches.json');
@@ -162,9 +243,8 @@ class Moodle {
         // Parse Moodle CSV to get shortnames
         const moodleSubjects = moodleCsvContent
             .split('\n')
-            .slice(1) // Skip header
+            .slice(1)
             .map(line => {
-                // match pattern: "fullname", shortname, category (category is number)
                 const match = line?.match(/"(.+)", (.+), (\d+)/);
                 if (!match) return null;
                 return {
@@ -177,14 +257,33 @@ class Moodle {
 
         if (progressCallback) progressCallback('Processing matched subjects');
 
-        const csvRows = [];
-        const header = ['username', 'password', 'firstname', 'lastname', 'email', 'course1', 'role1'];
-        csvRows.push(header);
+        const csvRows = [this.#getStudentCsvHeader()];
+        const writtenRows = new Set();
 
         let totalStudents = 0;
         let processedSubjects = 0;
 
-        // Process each match (auto and manual) to find students
+        const appendStudentRow = ({ enrollment, student, password, courseId }) => {
+            const normalizedCourseId = String(courseId || '').trim();
+            if (!normalizedCourseId) {
+                return;
+            }
+
+            const rowKey = `${enrollment}:${normalizedCourseId}`;
+            if (writtenRows.has(rowKey)) {
+                return;
+            }
+
+            csvRows.push(this.#buildStudentCsvRow({
+                enrollment,
+                student,
+                password,
+                courseId: normalizedCourseId,
+            }));
+            writtenRows.add(rowKey);
+            totalStudents++;
+        };
+
         for (const match of matches) {
             const moodleSubject = moodleSubjects.find(s => s.fullname === match.moodleFullname);
             if (!moodleSubject) continue;
@@ -204,23 +303,12 @@ class Moodle {
                 const student = studentInfo[enrollment];
                 if (!student) continue;
 
-                const studentName = student.name || '';
-                const studentEmail = student.email || '';
-                const nameParts = studentName.trim().split(/\s+/);
-                const firstName = nameParts[0] || '';
-                const lastName = nameParts.slice(1).join(' ') || '';
-                const username = studentEmail.split('@')[0] || enrollment;
-
-                csvRows.push([
-                    username,
+                appendStudentRow({
                     enrollment,
-                    firstName,
-                    lastName,
-                    studentEmail,
-                    moodleSubject.shortname,
-                    'student'
-                ]);
-                totalStudents++;
+                    student,
+                    password: enrollment,
+                    courseId: moodleSubject.shortname,
+                });
             }
 
             processedSubjects++;
@@ -231,8 +319,7 @@ class Moodle {
 
         if (progressCallback) progressCallback('Writing CSV file');
 
-        const csvString = csvRows.map(row => row.join(',')).join('\n');
-        fs.writeFileSync(csvPath, csvString);
+        this.#writeStudentCsv(csvPath, csvRows);
 
         console.log(`Student CSV generated at: ${csvPath}`);
         console.log(`Total students: ${totalStudents}, Subjects processed: ${processedSubjects}`);
@@ -241,6 +328,67 @@ class Moodle {
             file: csvPath,
             totalStudents,
             processedSubjects
+        };
+    }
+
+    async generateManualStudentCSV(progressCallback = null) {
+        const studentsPath = path.resolve('files', 'suap_students.json');
+        const csvPath = this.#manualStudentsCsvPath;
+
+        if (progressCallback) progressCallback('Loading manual students data');
+
+        if (!fs.existsSync(studentsPath)) {
+            throw new Error('Students data not found. Add manual students first.');
+        }
+
+        const studentsData = JSON.parse(fs.readFileSync(studentsPath, 'utf-8'));
+        const studentInfo = studentsData.students || {};
+        const manualEnrollments = this.#normalizeManualEnrollments(studentsData.manualEnrollments);
+
+        const csvRows = [this.#getStudentCsvHeader()];
+        const writtenRows = new Set();
+        let totalStudents = 0;
+        let manualStudents = 0;
+
+        if (progressCallback) progressCallback('Processing manual student enrollments');
+
+        for (const [enrollment, manualEnrollment] of Object.entries(manualEnrollments)) {
+            const student = studentInfo[enrollment];
+            if (!student) {
+                continue;
+            }
+
+            manualStudents++;
+            manualEnrollment.courseIds.forEach(courseId => {
+                const normalizedCourseId = String(courseId || '').trim();
+                if (!normalizedCourseId) {
+                    return;
+                }
+
+                const rowKey = `${enrollment}:${normalizedCourseId}`;
+                if (writtenRows.has(rowKey)) {
+                    return;
+                }
+
+                csvRows.push(this.#buildStudentCsvRow({
+                    enrollment,
+                    student,
+                    password: manualEnrollment.password || enrollment,
+                    courseId: normalizedCourseId,
+                }));
+                writtenRows.add(rowKey);
+                totalStudents++;
+            });
+        }
+
+        if (progressCallback) progressCallback('Writing manual students CSV file');
+
+        this.#writeStudentCsv(csvPath, csvRows);
+
+        return {
+            file: csvPath,
+            totalStudents,
+            manualStudents,
         };
     }
 
@@ -368,10 +516,11 @@ class Moodle {
      * @returns {Promise<Object>} Upload results
      */
     async uploadStudents(progressCallback = null) {
-        const csvPath = path.resolve('files', 'moodle_students.csv');
+        const hasRegularCsv = fs.existsSync(this.#studentsCsvPath);
+        const hasManualCsv = fs.existsSync(this.#manualStudentsCsvPath);
 
-        if (!fs.existsSync(csvPath)) {
-            throw new Error('Students CSV file not found. Generate students CSV first.');
+        if (!hasRegularCsv && !hasManualCsv) {
+            throw new Error('Students CSV files not found. Generate students CSV first.');
         }
 
         if (progressCallback) progressCallback('Initializing Moodle uploader');
@@ -381,27 +530,27 @@ class Moodle {
             process.env.MOODLE_TOKEN,
         );
 
-        // Parse CSV - format: username,password,firstname,lastname,email,course1,role1
-        const students = fs.readFileSync(csvPath, 'utf-8')
-            .split('\n')
-            .slice(1) // Skip header row
-            .filter(line => line.trim()) // Skip empty lines
-            .map(line => {
-                const parts = line.split(',').map(item => item.trim());
-                return {
-                    username: parts[0],
-                    password: parts[1],
-                    firstname: parts[2],
-                    lastname: parts[3],
-                    email: parts[4],
-                    course: parts[5], // course1 is the shortname
-                };
-            });
+        const students = [
+            ...(hasRegularCsv ? this.#parseStudentCsv(this.#studentsCsvPath) : []),
+            ...(hasManualCsv ? this.#parseStudentCsv(this.#manualStudentsCsvPath) : []),
+        ];
 
-        if (progressCallback) progressCallback(`Uploading ${students.length} students to Moodle`);
+        const uniqueStudents = [];
+        const seenEnrollments = new Set();
+        students.forEach(student => {
+            const rowKey = `${student.username}:${student.course}`;
+            if (seenEnrollments.has(rowKey)) {
+                return;
+            }
+
+            seenEnrollments.add(rowKey);
+            uniqueStudents.push(student);
+        });
+
+        if (progressCallback) progressCallback(`Uploading ${uniqueStudents.length} students to Moodle`);
 
         console.log('\n=== Uploading Students via Moodle Web Service API ===\n');
-        const results = await uploader.uploadStudents(students, progressCallback);
+        const results = await uploader.uploadStudents(uniqueStudents, progressCallback);
         
         return results;
     }

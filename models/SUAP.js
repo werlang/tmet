@@ -13,6 +13,7 @@ class SUAP {
     #professorsPath;
     #studentsBySubjectCache;
     #professorsBySubjectCache;
+    #studentProfileCache;
     #studentEmailCache;
     #professorEmailCache;
 
@@ -22,6 +23,7 @@ class SUAP {
         this.#professorsPath = path.resolve('files', 'suap_professors.json');
         this.#studentsBySubjectCache = new Map();
         this.#professorsBySubjectCache = new Map();
+        this.#studentProfileCache = new Map();
         this.#studentEmailCache = new Map();
         this.#professorEmailCache = new Map();
     }
@@ -264,23 +266,7 @@ class SUAP {
      * @param {Array} students - Array of student objects
      */
     async #saveStudents(subjectId, students) {
-        let data = {
-            subjects: {},
-            students: {}
-        };
-        
-        // Load existing data if file exists
-        if (fs.existsSync(this.#studentsPath)) {
-            try {
-                const content = fs.readFileSync(this.#studentsPath, 'utf-8');
-                const existingData = JSON.parse(content);
-                // Ensure structure exists (handle legacy format)
-                data.subjects = existingData.subjects || {};
-                data.students = existingData.students || {};
-            } catch (error) {
-                console.error('Error reading existing students file:', error.message);
-            }
-        }
+        const data = this.#loadStudentsData();
         
         // Store enrollments list for this subject
         const enrollments = students.map(s => s.enrollment);
@@ -297,6 +283,55 @@ class SUAP {
         // Write back to file
         fs.writeFileSync(this.#studentsPath, JSON.stringify(data, null, 2));
         console.log(`Saved ${students.length} students to ${this.#studentsPath}`);
+    }
+
+    #loadStudentsData() {
+        const data = {
+            subjects: {},
+            students: {},
+            manualEnrollments: {},
+        };
+
+        if (!fs.existsSync(this.#studentsPath)) {
+            return data;
+        }
+
+        try {
+            const content = fs.readFileSync(this.#studentsPath, 'utf-8');
+            const existingData = JSON.parse(content);
+
+            data.subjects = existingData.subjects || {};
+            data.students = existingData.students || {};
+            data.manualEnrollments = Object.fromEntries(
+                Object.entries(existingData.manualEnrollments || {}).map(([enrollment, manualEnrollment]) => [
+                    enrollment,
+                    this.#normalizeManualEnrollment(manualEnrollment),
+                ])
+            );
+        } catch (error) {
+            console.error('Error reading existing students file:', error.message);
+        }
+
+        return data;
+    }
+
+    #normalizeManualEnrollment(manualEnrollment = {}) {
+        const rawCourseIds = Array.isArray(manualEnrollment.courseIds)
+            ? manualEnrollment.courseIds
+            : Array.isArray(manualEnrollment.courses)
+                ? manualEnrollment.courses
+                : [];
+
+        return {
+            password: typeof manualEnrollment.password === 'string'
+                ? manualEnrollment.password.trim()
+                : '',
+            courseIds: Array.from(new Set(
+                rawCourseIds
+                    .map(courseId => String(courseId || '').trim())
+                    .filter(Boolean)
+            )),
+        };
     }
 
     /**
@@ -376,6 +411,191 @@ class SUAP {
     }
 
     /**
+     * Fetch a student's profile from SUAP
+     * @param {string} enrollment - Student enrollment ID
+     * @returns {Promise<Object>} Student profile with enrollment, name and email
+     */
+    async fetchStudentProfile(enrollment) {
+        const normalizedEnrollment = String(enrollment || '').trim();
+
+        if (!normalizedEnrollment) {
+            throw new Error('Student enrollment is required');
+        }
+
+        if (this.#studentProfileCache.has(normalizedEnrollment)) {
+            return {
+                enrollment: normalizedEnrollment,
+                ...this.#studentProfileCache.get(normalizedEnrollment),
+            };
+        }
+
+        await SUAPScraper.initialize();
+
+        const url = `${suapConfig.baseUrl}/${suapConfig.studentProfile.url}/${normalizedEnrollment}/`;
+        await SUAPScraper.goto(url, suapConfig.studentProfile.ready);
+
+        const profile = await SUAPScraper.evaluate((config) => {
+            const getDefinitionValue = (labels) => {
+                const normalizedLabels = labels.map(label => label.toLowerCase());
+                const dtElements = document.querySelectorAll('dt');
+
+                for (const dt of dtElements) {
+                    const dtText = dt.textContent?.trim()?.toLowerCase();
+                    if (!dtText || !normalizedLabels.includes(dtText)) {
+                        continue;
+                    }
+
+                    const dd = dt.nextElementSibling;
+                    if (dd && dd.tagName === 'DD') {
+                        return dd.textContent.trim();
+                    }
+                }
+
+                return '';
+            };
+
+            const headingElement = typeof document.querySelector === 'function'
+                ? document.querySelector('.title-container h2, .title-container h3, h2, h1')
+                : null;
+            const name = getDefinitionValue(config.nameLabels)
+                || headingElement?.textContent?.trim()
+                || '';
+            const email = getDefinitionValue([config.emailLabel]);
+
+            return { name, email };
+        }, {
+            emailLabel: suapConfig.studentProfile.email.label,
+            nameLabels: ['Nome', 'Nome Civil', 'Nome Completo'],
+        });
+
+        const normalizedProfile = typeof profile === 'string'
+            ? {
+                name: '',
+                email: profile,
+            }
+            : {
+                name: profile?.name || '',
+                email: profile?.email || '',
+            };
+
+        this.#studentProfileCache.set(normalizedEnrollment, normalizedProfile);
+        this.#studentEmailCache.set(normalizedEnrollment, normalizedProfile.email || null);
+
+        return {
+            enrollment: normalizedEnrollment,
+            ...normalizedProfile,
+        };
+    }
+
+    /**
+     * Save a manual student enrollment for Moodle CSV generation
+     * @param {Object} options - Manual student data
+     * @param {string} options.enrollment - Student enrollment ID
+     * @param {string} options.password - Moodle password to use in CSV rows
+     * @param {string[]} options.courseIds - Moodle course shortnames/IDs
+     * @param {Function} progressCallback - Optional callback for progress updates
+     * @returns {Promise<Object>} Saved manual enrollment data
+     */
+    async addManualStudent({ enrollment, password, courseIds }, progressCallback = null) {
+        const normalizedEnrollment = String(enrollment || '').trim();
+        const normalizedPassword = String(password || '').trim();
+        const normalizedCourseIds = Array.from(new Set(
+            (Array.isArray(courseIds) ? courseIds : [])
+                .map(courseId => String(courseId || '').trim())
+                .filter(Boolean)
+        ));
+
+        if (!normalizedEnrollment) {
+            throw new Error('Student enrollment is required');
+        }
+
+        if (!normalizedPassword) {
+            throw new Error('Password is required');
+        }
+
+        if (normalizedCourseIds.length === 0) {
+            throw new Error('At least one course ID is required');
+        }
+
+        if (progressCallback) progressCallback('Fetching student profile from SUAP');
+
+        const studentsData = this.#loadStudentsData();
+        const existingStudent = studentsData.students?.[normalizedEnrollment] || {};
+        const profile = await this.fetchStudentProfile(normalizedEnrollment);
+        const studentName = profile.name || existingStudent.name || '';
+        const studentEmail = profile.email || existingStudent.email || '';
+
+        if (!studentName) {
+            throw new Error(`Could not find full name for ${normalizedEnrollment}`);
+        }
+
+        if (!studentEmail) {
+            throw new Error(`Could not find academic email for ${normalizedEnrollment}`);
+        }
+
+        const existingManualEnrollment = this.#normalizeManualEnrollment(
+            studentsData.manualEnrollments?.[normalizedEnrollment]
+        );
+        const mergedCourseIds = Array.from(new Set([
+            ...existingManualEnrollment.courseIds,
+            ...normalizedCourseIds,
+        ]));
+
+        studentsData.students[normalizedEnrollment] = {
+            name: studentName,
+            email: studentEmail,
+        };
+        studentsData.manualEnrollments[normalizedEnrollment] = {
+            password: normalizedPassword,
+            courseIds: mergedCourseIds,
+        };
+
+        fs.writeFileSync(this.#studentsPath, JSON.stringify(studentsData, null, 2));
+
+        if (progressCallback) progressCallback(`Saved manual enrollment for ${normalizedEnrollment}`);
+
+        return {
+            enrollment: normalizedEnrollment,
+            username: studentEmail.split('@')[0] || normalizedEnrollment,
+            name: studentName,
+            email: studentEmail,
+            password: normalizedPassword,
+            courseIds: mergedCourseIds,
+        };
+    }
+
+    async removeManualStudent(enrollment) {
+        const normalizedEnrollment = String(enrollment || '').trim();
+
+        if (!normalizedEnrollment) {
+            throw new Error('Student enrollment is required');
+        }
+
+        const studentsData = this.#loadStudentsData();
+        const existingManualEnrollment = studentsData.manualEnrollments?.[normalizedEnrollment];
+
+        if (!existingManualEnrollment) {
+            throw new Error(`Manual enrollment not found for ${normalizedEnrollment}`);
+        }
+
+        delete studentsData.manualEnrollments[normalizedEnrollment];
+
+        const isStillReferencedBySubject = Object.values(studentsData.subjects || {})
+            .some(enrollments => Array.isArray(enrollments) && enrollments.includes(normalizedEnrollment));
+
+        if (!isStillReferencedBySubject) {
+            delete studentsData.students[normalizedEnrollment];
+        }
+
+        fs.writeFileSync(this.#studentsPath, JSON.stringify(studentsData, null, 2));
+
+        return {
+            enrollment: normalizedEnrollment,
+            removed: true,
+        };
+    }
+
+    /**
      * Fetch a student's email from their profile page
      * @param {string} enrollment - Student enrollment ID
      * @returns {Promise<string|null>} Student email or null if not found
@@ -384,27 +604,10 @@ class SUAP {
         if (this.#studentEmailCache.has(enrollment)) {
             return this.#studentEmailCache.get(enrollment);
         }
-
-        const url = `${suapConfig.baseUrl}/${suapConfig.studentProfile.url}/${enrollment}/`;
         
         try {
-            await SUAPScraper.goto(url, suapConfig.studentProfile.ready);
-            
-            const email = await SUAPScraper.evaluate((config) => {
-                // Find the dt element with "E-mail Acadêmico" text
-                const dtElements = document.querySelectorAll('dt');
-                for (const dt of dtElements) {
-                    if (dt.textContent.trim() === config.emailLabel) {
-                        // Get the next sibling dd element
-                        const dd = dt.nextElementSibling;
-                        if (dd && dd.tagName === 'DD') {
-                            return dd.textContent.trim();
-                        }
-                    }
-                }
-                return null;
-            }, { emailLabel: suapConfig.studentProfile.email.label });
-            
+            const profile = await this.fetchStudentProfile(enrollment);
+            const email = profile.email || null;
             this.#studentEmailCache.set(enrollment, email);
             return email;
         } catch (error) {

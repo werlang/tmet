@@ -83,6 +83,8 @@ class StudentsSection {
         });
         
         // CSV generation
+        this.#elements.addManualStudentBtn.addEventListener('click', () => this.#addManualStudent());
+        this.#elements.generateManualStudentsCsvBtn.addEventListener('click', () => this.#generateManualStudentsCSV());
         this.#elements.generateStudentsCsvBtn.addEventListener('click', () => this.#generateStudentsCSV());
         this.#elements.generateProfessorsCsvBtn.addEventListener('click', () => this.#generateProfessorsCSV());
         
@@ -101,14 +103,14 @@ class StudentsSection {
                 new Request().get('/api/suap/professors')
             ]);
             // format: {subjects: {id: [enrollments]}, students: {enrollment: info}}
-            this.#studentsData = studentsResponse.data || { subjects: {}, students: {} };
+            this.#studentsData = studentsResponse.data || { subjects: {}, students: {}, manualEnrollments: {} };
             this.#studentUrl = studentsResponse.studentUrl;
             // format: {subjects: {id: [siapes]}, professors: {siape: info}}
             this.#professorsData = professorsResponse.data || { subjects: {}, professors: {} };
             this.#professorUrl = professorsResponse.professorUrl;
         } catch (error) {
             console.error('Error loading students/professors data:', error);
-            this.#studentsData = { subjects: {}, students: {} };
+            this.#studentsData = { subjects: {}, students: {}, manualEnrollments: {} };
             this.#professorsData = { subjects: {}, professors: {} };
         }
     }
@@ -118,7 +120,86 @@ class StudentsSection {
      */
     updateUI() {
         this.#renderStudentsSubjectList();
+        this.#renderManualStudentsSummary();
         this.#updateExtractStudentsButton();
+    }
+
+    #getManualStudentEntries() {
+        return Object.entries(this.#studentsData.manualEnrollments || {});
+    }
+
+    #parseCourseIds(value) {
+        return Array.from(new Set(
+            String(value || '')
+                .split(',')
+                .map(courseId => courseId.trim())
+                .filter(Boolean)
+        ));
+    }
+
+    #renderManualStudentsSummary() {
+        const container = this.#elements.manualStudentsSummary;
+        const manualEntries = this.#getManualStudentEntries()
+            .sort(([leftEnrollment], [rightEnrollment]) => leftEnrollment.localeCompare(rightEnrollment));
+
+        container.innerHTML = '';
+
+        if (manualEntries.length === 0) {
+            container.dataset.empty = 'true';
+            container.textContent = 'No manual students queued for CSV generation yet.';
+            return;
+        }
+
+        delete container.dataset.empty;
+
+        const summary = document.createElement('p');
+        summary.className = 'manual-students-summary-copy';
+        summary.textContent = `${manualEntries.length} manual student${manualEntries.length === 1 ? '' : 's'} queued for CSV generation.`;
+        container.appendChild(summary);
+
+        const list = document.createElement('div');
+        list.className = 'manual-students-summary-list';
+
+        manualEntries.forEach(([enrollment, manualEnrollment]) => {
+            const student = this.#studentsData.students?.[enrollment] || {};
+            const card = document.createElement('article');
+            card.className = 'manual-student-summary-card';
+
+            const removeButton = document.createElement('button');
+            removeButton.type = 'button';
+            removeButton.className = 'manual-student-remove-btn';
+            removeButton.textContent = 'X';
+            removeButton.setAttribute('aria-label', `Remove ${student.name || enrollment} from manual queue`);
+            removeButton.addEventListener('click', async () => {
+                await this.#removeManualStudent(enrollment);
+            });
+
+            const name = document.createElement('h4');
+            name.className = 'manual-student-summary-name';
+            name.textContent = student.name || enrollment;
+
+            const meta = document.createElement('p');
+            meta.className = 'manual-student-summary-meta';
+            meta.textContent = `${enrollment}${student.email ? ` • ${student.email}` : ''}`;
+
+            const courses = document.createElement('div');
+            courses.className = 'manual-student-course-list';
+
+            (manualEnrollment.courseIds || []).forEach(courseId => {
+                const badge = document.createElement('span');
+                badge.className = 'manual-student-course-badge';
+                badge.textContent = courseId;
+                courses.appendChild(badge);
+            });
+
+            card.appendChild(removeButton);
+            card.appendChild(name);
+            card.appendChild(meta);
+            card.appendChild(courses);
+            list.appendChild(card);
+        });
+
+        container.appendChild(list);
     }
 
     /**
@@ -551,6 +632,101 @@ class StudentsSection {
             Toast.error(error.message || 'Failed to extract data');
         } finally {
             this.#updateButton(config.button, false, config.buttonLabel);
+        }
+    }
+
+    async #addManualStudent() {
+        const matricula = this.#elements.manualStudentMatriculaInput.value.trim();
+        const password = this.#elements.manualStudentPasswordInput.value.trim();
+        const courseIds = this.#parseCourseIds(this.#elements.manualStudentCourseIdsInput.value);
+
+        if (!matricula) {
+            Toast.error('SUAP matrícula is required');
+            return;
+        }
+
+        if (!password) {
+            Toast.error('Password is required');
+            return;
+        }
+
+        if (courseIds.length === 0) {
+            Toast.error('Provide at least one Moodle course ID');
+            return;
+        }
+
+        this.#updateButton(this.#elements.addManualStudentBtn, true, 'Fetching...');
+        this.#progressModal.show({
+            title: 'Adding Manual Student',
+            message: 'Fetching student profile from SUAP'
+        });
+
+        try {
+            const result = await this.#suap.addManualStudent({
+                matricula,
+                password,
+                courseIds,
+            });
+
+            this.#progressModal.hide();
+            await this.#onDataChange();
+
+            this.#elements.manualStudentMatriculaInput.value = '';
+            this.#elements.manualStudentPasswordInput.value = '';
+            this.#elements.manualStudentCourseIdsInput.value = '';
+            this.#elements.manualStudentMatriculaInput.focus();
+
+            const savedStudent = result.data || {};
+            Toast.success(result.message || `Manual student saved for ${savedStudent.name || matricula}`);
+        } catch (error) {
+            this.#progressModal.hide();
+        } finally {
+            this.#updateButton(this.#elements.addManualStudentBtn, false, 'Add Manual Student');
+        }
+    }
+
+    async #removeManualStudent(enrollment) {
+        try {
+            const result = await this.#suap.removeManualStudent({ enrollment });
+            await this.#onDataChange();
+            Toast.success(result.message || `Manual student removed for ${enrollment}`);
+        } catch (error) {
+            // Toast handled in SUAP model
+        }
+    }
+
+    async #generateManualStudentsCSV() {
+        this.#updateButton(
+            this.#elements.generateManualStudentsCsvBtn,
+            true,
+            'Generating...'
+        );
+
+        this.#progressModal.show({
+            title: 'Generating Manual Students CSV',
+            message: 'Processing manual students queue'
+        });
+
+        try {
+            const result = await this.#moodle.generateManualStudentsCSV((message) => {
+                this.#progressModal.updateStatus(message);
+                this.#updateButton(
+                    this.#elements.generateManualStudentsCsvBtn,
+                    true,
+                    message
+                );
+            });
+
+            this.#progressModal.hide();
+            Toast.success(result.message || 'Manual students CSV generated successfully');
+        } catch (error) {
+            this.#progressModal.hide();
+        } finally {
+            this.#updateButton(
+                this.#elements.generateManualStudentsCsvBtn,
+                false,
+                'Generate Manual Students CSV'
+            );
         }
     }
 

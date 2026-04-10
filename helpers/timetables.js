@@ -94,7 +94,10 @@ class TimeTables {
             classData?.forEach(item => {
                 item.subject = this.getSubject(item.subjectid);
             });
-            classObj.subjects = classData;
+
+            if (Array.isArray(classData) && classData.length > 0) {
+                classObj.subjects = classData;
+            }
         });
 
         return classes;
