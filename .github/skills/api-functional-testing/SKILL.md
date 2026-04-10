@@ -1,34 +1,38 @@
 ---
 name: api-functional-testing
-description: Validate TMET API contracts and multi-step flows, especially async job workflows with polling. Use when verifying endpoint behavior across routes, queue progress, and persisted output files.
+description: Validate TMET API contracts and multi-step flows, especially async job polling, generated file artifacts, and extraction -> matching -> enrollment workflows. Use when verifying behavior across routes, models, helpers, queue progress, and persisted outputs in files/.
 ---
 
 # API Functional Testing (TMET)
 
 ## Use this skill to
-- Validate end-to-end API flows spanning route + model + helper boundaries.
-- Confirm async operations return `202` and are observable through `/api/jobs/:jobId`.
-- Check generated artifacts in `files/` when workflow outputs are expected.
+- Validate route + model + helper behavior together for the real TMET pipeline.
+- Confirm async operations return `202` and remain observable through `/api/jobs/:jobId`.
+- Check only the artifact files that the tested flow is supposed to create or consume.
 
-## Key API surfaces
-- `/api/matches`
-- `/api/moodle`
-- `/api/suap`
-- `/api/ai`
-- `/api/jobs`
+## High-value flows
+- `POST /api/moodle/csv` -> `GET /api/jobs/:jobId` -> `files/moodle_classes.csv`
+- `POST /api/suap/extract` -> `GET /api/jobs/:jobId` -> `files/suap_subjects.json`
+- `GET /api/matches` / `POST /api/matches` -> `files/matches.json`
+- `POST /api/ai/match` -> `GET /api/jobs/:jobId`
+- `POST /api/suap/extract-students` -> `files/suap_students.json` and/or `files/suap_professors.json`
+- `POST /api/moodle/students-csv`, `manual-students-csv`, `professors-csv`, `manual-courses-csv`
+- `POST /api/moodle/courses`, `students`, `professors`
 
 ## Workflow
-1. Start with one user-visible flow (example: `POST /api/moodle/csv` then `GET /api/jobs/:jobId`).
-2. Verify response contracts (`success`, `jobId`, `statusUrl`, expected error shape).
-3. Poll job endpoint until completion/failure where applicable.
-4. Validate side effects (`files/*.csv`, `files/*.json`) only when produced by the tested flow.
+1. Pick one user-visible workflow and identify its expected file outputs and follow-up endpoints.
+2. Verify the start response contract first: `success`, `jobId`, `message`, and `statusUrl` when async.
+3. Poll `/api/jobs/:jobId` until completion or failure.
+4. Check generated files only when they are part of the contract for that flow.
+5. Confirm manual queue behavior separately from the main extraction flow when testing `manual-courses` or `manual-student` endpoints.
 
-## Docker-first commands
+## Commands
 ```bash
 docker compose up -d --build
-docker compose exec node npm test -- --runInBand __tests__/integration/routes.test.js
+docker compose exec node npm test -- tests/integration/routes.test.js
+docker compose exec node npm test -- tests/routes/moodleRoute.test.js
 ```
 
 ## Out of scope
-- Performance/load testing infrastructure.
-- Cross-service contract tests for services not in this compose stack.
+- Performance or load testing infrastructure.
+- Contract tests for services outside this repository.

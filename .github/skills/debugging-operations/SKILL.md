@@ -1,35 +1,37 @@
 ---
 name: debugging-operations
-description: Diagnose TMET runtime, API, queue, and scraping/upload operational issues. Use when investigating failing routes, stuck jobs, Docker/container problems, malformed output files, or test regressions.
+description: Diagnose TMET runtime, queue, scraping, upload, and file-artifact issues. Use when investigating failing routes, stuck jobs, broken Browserless/SUAP flows, malformed CSV or JSON outputs, Docker problems, or test regressions.
 ---
 
 # Debugging and Operations (TMET)
 
 ## Use this skill to
-- Triage API failures in `routes/`, `models/`, and `helpers/`.
-- Investigate queue job lifecycle issues (`helpers/queue.js`, `/api/jobs/:jobId`).
-- Diagnose scraper/upload problems involving Browserless and external endpoints.
+- Triage backend failures in `routes/`, `models/`, and `helpers/`.
+- Investigate queue lifecycle issues in `helpers/queue.js` and `/api/jobs/:jobId`.
+- Diagnose broken pipeline artifacts in `files/*.json` and `files/*.csv`.
 
 ## Fast triage flow
-1. Reproduce with the smallest command or API call.
-2. Check `docker compose logs -f node` and route/model stack traces.
-3. Confirm queue state through `/api/jobs/:jobId` behavior.
-4. Validate required env vars are present and consistent.
-5. Add/adjust tests to lock the fix.
+1. Reproduce with the smallest route call, test file, or model method that still shows the problem.
+2. Check `docker compose logs -f node` and the closest failing test.
+3. Confirm queue state through `/api/jobs/:jobId` when the bug involves async work.
+4. Inspect the specific generated file involved instead of assuming the wrong stage failed.
+5. Verify environment variables only for the integrations that the failing flow actually touches.
 
-## Docker-first commands
+## Common hotspots
+- `helpers/scraper.js` + `config/suap-config.js` for SUAP login/session issues
+- `helpers/timetables.js` for EduPage extraction issues
+- `helpers/moodle-uploader.js` for Moodle upload failures
+- `helpers/chat-assist.js` + `models/AIMatch.js` for AI matching failures
+- `helpers/queue.js` when jobs appear stuck, missing, or prematurely cleaned up
+
+## Commands
 ```bash
 docker compose ps
 docker compose logs -f node
-docker compose exec node npm test
-docker compose exec node node server.js
+docker compose exec node npm test -- tests/routes/suapRoute.test.js
+docker compose exec node npm test -- tests/helpers/queue.test.js
 ```
 
-## Common hotspots
-- `helpers/scraper.js` + `config/suap-config.js` for SUAP extraction issues.
-- `helpers/moodle-uploader.js` + `config/moodle-config.js` for Moodle upload failures.
-- `helpers/queue.js` when job status/progress appears inconsistent.
-
 ## Out of scope
-- Incident tooling external to this repo.
-- Debug assumptions about message brokers or worker pools not implemented in TMET.
+- Incident tooling outside this repository.
+- Message brokers, worker pools, or persisted job systems that TMET does not implement.

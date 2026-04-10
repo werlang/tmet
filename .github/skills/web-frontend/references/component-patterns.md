@@ -5,6 +5,7 @@
 - `public/js/sections/*.js`: feature-level controllers (`pipeline`, `matching`, `students`).
 - `public/js/components/*.js`: reusable UI units (modals, toasts, list rendering).
 - `public/js/models/*.js`: API-facing data adapters.
+- `public/index.html` + `public/css/`: static shell and styles. There is no frontend build step.
 
 ## Pattern 1: Section composition
 
@@ -32,11 +33,18 @@ Use `public/js/helpers/request.js` static methods (`get`, `post`, etc.) for time
 
 `matching.js` delegates list rendering and selection state to `SubjectListUI` (`components/subject-list.js`) and modal behavior to `AIMatchModal` (`components/ai-modal.js`).
 
+## Pattern 5: Manual queue summaries
+
+- `pipeline.js` renders manual course summary cards from `/api/moodle/manual-courses`.
+- `students.js` renders manual student summary cards from `manualEnrollments` returned by `/api/suap/students`.
+- Preserve these summary surfaces when extending the pipeline; they are part of the actual operator workflow.
+
 ## Path safety checklist
 
 Before finalizing docs or code references, verify paths exist:
 - `public/js/app.js`
 - `public/js/sections/pipeline.js`
 - `public/js/sections/matching.js`
+- `public/js/sections/students.js`
 - `public/js/components/progress-modal.js`
 - `public/js/helpers/request.js`

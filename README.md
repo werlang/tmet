@@ -91,6 +91,17 @@ docker compose exec node npm run test:watch
 docker compose exec node npm run test:coverage
 ```
 
+## AI workflow files
+
+TMET includes repository-specific Copilot customizations under `.github/`:
+
+- `.github/copilot-instructions.md` for always-on repository guidance
+- `.github/skills/` for reusable TMET workflows
+- `.github/prompts/*.prompt.md` for on-demand audit and testing tasks
+- `.github/agents/tmet-docs-auditor.agent.md` for focused documentation drift audits
+
+These files are intended to stay aligned with the current codebase, routes, tests, and Compose workflow.
+
 ## License
 
 MIT — see `LICENSE`.

@@ -1,35 +1,41 @@
 ---
 name: api-unit-testing-jest
-description: Write and maintain TMET backend tests with Jest and Supertest. Use when changing routes, models, or helpers and you need to add focused tests under __tests__/routes, __tests__/models, __tests__/helpers, or __tests__/integration.
+description: Write and maintain TMET Jest + Supertest tests. Use when changing routes, models, helpers, queue logic, file parsing, or API contracts and you need focused coverage under tests/routes, tests/models, tests/helpers, or tests/integration.
 ---
 
 # API Unit Testing with Jest (TMET)
 
 ## Use this skill to
-- Add regression tests for route validation, status codes, and payload contracts.
-- Test model/helper behavior in isolation.
-- Keep coverage aligned with changed backend code.
+- Add regression coverage for route validation, status codes, payloads, and queue orchestration.
+- Test model/helper behavior in isolation with mocked filesystem, network, or Browserless boundaries.
+- Keep backend changes aligned with the existing Jest suite instead of inventing a new test harness.
 
 ## Test layout
-- `__tests__/routes/*`
-- `__tests__/models/*`
-- `__tests__/helpers/*`
-- `__tests__/integration/routes.test.js`
-- Shared fixtures/setup: `__tests__/fixtures.js`, `__tests__/setup.js`
+- `tests/routes/*`
+- `tests/models/*`
+- `tests/helpers/*`
+- `tests/integration/routes.test.js`
+- Shared helpers: `tests/setup.js`, `tests/fixtures.js`
+- Config: `jest.config.js`
+
+## Existing patterns to reuse
+- Use `jest.unstable_mockModule(...)` for ESM dependency mocking.
+- Use `createMockRequest(...)` and `createMockResponse()` from `tests/setup.js` for route handler tests.
+- Use `suppressConsole()` in suites that intentionally exercise error paths or noisy progress logging.
 
 ## Workflow
-1. Locate nearest existing test file for the changed module.
-2. Add the smallest meaningful test case first (validation/error path or success path).
-3. Run targeted tests before broader suites.
-4. Update expectations only when behavior change is intentional and documented.
+1. Start from the nearest existing test file for the touched route, model, or helper.
+2. Cover one meaningful behavior at a time: validation, success path, queue callback, or artifact-writing side effect.
+3. Mock unstable boundaries explicitly: filesystem, fetch, Browserless, or Moodle upload helpers.
+4. Run the narrowest relevant test file first, then widen only if the change crosses module boundaries.
 
-## Docker-first commands
+## Commands
 ```bash
-docker compose exec node npm test
-docker compose exec node npm run test:watch
-docker compose exec node npm run test:coverage
+npm test -- tests/routes/moodleRoute.test.js
+npm test -- tests/models/MoodleModel.test.js
+docker compose exec node npm test -- tests/integration/routes.test.js
 ```
 
 ## Out of scope
 - Introducing new test frameworks.
-- Adding browser E2E suites that do not exist in this repository.
+- Browser E2E infrastructure that does not exist in this repository.
