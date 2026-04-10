@@ -3,6 +3,108 @@ import { Moodle } from '../models/Moodle.js';
 
 const router = express.Router();
 
+router.get('/course-categories', (req, res) => {
+    try {
+        const moodle = new Moodle();
+        res.json({
+            success: true,
+            categories: moodle.getCourseCategories(),
+        });
+    } catch (error) {
+        console.error('Error loading Moodle course categories:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+router.get('/manual-courses', (req, res) => {
+    try {
+        const moodle = new Moodle();
+        res.json({
+            success: true,
+            courses: moodle.getManualCourses(),
+        });
+    } catch (error) {
+        console.error('Error loading manual Moodle courses:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+router.post('/manual-courses', (req, res) => {
+    const { fullname, categoryKey } = req.body;
+
+    try {
+        const moodle = new Moodle();
+        const course = moodle.addManualCourse({ fullname, categoryKey });
+
+        res.status(201).json({
+            success: true,
+            message: `Manual Moodle course queued: ${course.shortname}`,
+            course,
+        });
+    } catch (error) {
+        const statusCode = /required|format|exists|valid/i.test(error.message) ? 400 : 500;
+
+        console.error('Error creating manual Moodle course:', error);
+        res.status(statusCode).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+router.post('/manual-courses/remove', (req, res) => {
+    const { fullname } = req.body;
+
+    try {
+        const moodle = new Moodle();
+        const result = moodle.removeManualCourse(fullname);
+
+        res.json({
+            success: true,
+            message: `Manual Moodle course removed: ${fullname}`,
+            ...result,
+        });
+    } catch (error) {
+        const statusCode = /required|not found/i.test(error.message) ? 400 : 500;
+
+        console.error('Error removing manual Moodle course:', error);
+        res.status(statusCode).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+router.post('/manual-courses-csv', async (req, res) => {
+    try {
+        console.log('Starting manual courses CSV generation job...');
+
+        const jobQueue = req.app.locals.jobQueue;
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
+            return await processGenerateManualCoursesCSV(jobId, updateProgress);
+        });
+
+        res.status(202).json({
+            success: true,
+            jobId,
+            message: 'Manual courses CSV generation job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+    } catch (error) {
+        console.error('Manual courses CSV generation error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
 /**
  * POST /moodle/csv
  * Generate CSV from timetables
@@ -328,6 +430,27 @@ async function processGenerateManualStudentsCSV(jobId, updateProgress) {
     };
 }
 
+async function processGenerateManualCoursesCSV(jobId, updateProgress) {
+    updateProgress({
+        message: 'Starting manual courses CSV generation...'
+    });
+
+    console.log(`[${jobId}] Starting manual courses CSV generation`);
+
+    const moodle = new Moodle();
+    const result = await moodle.generateManualCourseCSV((message) => {
+        updateProgress({ message });
+    });
+
+    console.log(`[${jobId}] Manual courses CSV generation completed`);
+
+    return {
+        message: `Manual courses CSV generated successfully. ${result.totalCourses} courses queued.`,
+        file: 'files/moodle_manual_classes.csv',
+        ...result,
+    };
+}
+
 // Async function to process professors CSV generation
 async function processGenerateProfessorsCSV(jobId, updateProgress) {
     updateProgress({
@@ -350,14 +473,13 @@ async function processGenerateProfessorsCSV(jobId, updateProgress) {
     };
 }
 
-// Async function to process student upload
 async function processUploadStudents(jobId, updateProgress) {
     updateProgress({
         message: 'Starting student upload...'
     });
 
     console.log(`[${jobId}] Starting student upload`);
-    
+
     const moodle = new Moodle();
     const results = await moodle.uploadStudents((message) => {
         updateProgress({ message });
@@ -365,13 +487,12 @@ async function processUploadStudents(jobId, updateProgress) {
 
     console.log(`[${jobId}] Student upload completed`);
 
-    // Generate appropriate message based on results
     const successCount = results.success?.length || 0;
     const errorCount = results.errors?.length || 0;
     const skippedCount = results.skipped?.length || 0;
     const createdCount = results.created?.length || 0;
     let message;
-    
+
     if (errorCount > 0 && successCount === 0) {
         message = `Student upload failed: ${results.errors[0]?.error || 'Unknown error'}`;
     } else if (errorCount > 0 || skippedCount > 0) {

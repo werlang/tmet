@@ -45,6 +45,69 @@ class Moodle {
         }
     }
 
+    async loadCourseCategories() {
+        try {
+            const result = await new Request().get('/api/moodle/course-categories');
+            return result.categories || [];
+        } catch (error) {
+            console.error('Load course categories error:', error);
+            Toast.error('Error loading Moodle course categories: ' + error.message);
+            throw error;
+        }
+    }
+
+    async loadManualCourses() {
+        try {
+            const result = await new Request().get('/api/moodle/manual-courses');
+            return result.courses || [];
+        } catch (error) {
+            console.error('Load manual courses error:', error);
+            Toast.error('Error loading manual courses: ' + error.message);
+            throw error;
+        }
+    }
+
+    async createManualCourse(params) {
+        try {
+            return await new Request().post('/api/moodle/manual-courses', params);
+        } catch (error) {
+            console.error('Create manual course error:', error);
+            Toast.error('Error creating manual course: ' + error.message);
+            throw error;
+        }
+    }
+
+    async removeManualCourse(params) {
+        try {
+            return await new Request().post('/api/moodle/manual-courses/remove', params);
+        } catch (error) {
+            console.error('Remove manual course error:', error);
+            Toast.error('Error removing manual course: ' + error.message);
+            throw error;
+        }
+    }
+
+    async generateManualCoursesCSV(progressCallback) {
+        try {
+            const result = await new Request().post('/api/moodle/manual-courses-csv');
+
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/jobs',
+                'Manual courses CSV generation',
+                progressCallback
+            );
+        } catch (error) {
+            console.error('Generate manual courses CSV error:', error);
+            Toast.error('Error generating manual courses CSV: ' + error.message);
+            throw error;
+        }
+    }
+
     /**
      * Upload courses to Moodle
      * @param {Function} progressCallback - Optional callback for progress updates

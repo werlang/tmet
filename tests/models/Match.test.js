@@ -70,6 +70,37 @@ describe('Match Model', () => {
             expect(result.suapSubjects).toEqual(sampleSuapSubjects);
         });
 
+        it('should include manual Moodle courses from the separate CSV file', () => {
+            mockFs.existsSync.mockImplementation((path) => {
+                if (path.includes('moodle_classes.csv')) return false;
+                if (path.includes('moodle_manual_classes.csv')) return true;
+                if (path.includes('suap_subjects.json')) return true;
+                if (path.includes('matches.json')) return true;
+                return false;
+            });
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('moodle_manual_classes.csv')) {
+                    return 'fullname, shortname, category\n"[2026.1] INF-4AM - Segurança da Informação", CH_INF_4AM_SeguInfo_2026.1, 115';
+                }
+                if (path.includes('suap_subjects.json')) {
+                    return JSON.stringify([]);
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([]);
+                }
+                return '';
+            });
+
+            const match = new Match();
+            const result = match.getAll();
+
+            expect(result.subjects).toContainEqual(expect.objectContaining({
+                fullname: '[2026.1] INF-4AM - Segurança da Informação',
+                shortname: 'CH_INF_4AM_SeguInfo_2026.1',
+                category: '115'
+            }));
+        });
+
         it('should use existing manual matches from matches.json', () => {
             mockFs.existsSync.mockReturnValue(true);
             mockFs.readFileSync.mockImplementation((path) => {

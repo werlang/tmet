@@ -5,3 +5,4 @@
 samples/*
 files/*
 coverage/*
+node_modules

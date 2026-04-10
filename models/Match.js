@@ -9,11 +9,13 @@ import fs from 'fs';
 class Match {
     #matchesPath;
     #moodleClassesPath;
+    #manualMoodleClassesPath;
     #suapSubjectsPath;
 
     constructor() {
         this.#matchesPath = path.resolve('files', 'matches.json');
         this.#moodleClassesPath = path.resolve('files', 'moodle_classes.csv');
+        this.#manualMoodleClassesPath = path.resolve('files', 'moodle_manual_classes.csv');
         this.#suapSubjectsPath = path.resolve('files', 'suap_subjects.json');
     }
 
@@ -141,24 +143,39 @@ class Match {
      * @private
      */
     #loadMoodleSubjects() {
-        if (!fs.existsSync(this.#moodleClassesPath)) {
-            return [];
-        }
+        const seenFullnames = new Set();
+        const subjects = [];
 
-        const csv = fs.readFileSync(this.#moodleClassesPath, 'utf-8');
-        const lines = csv.split('\n').slice(1); // Skip header
-        
-        return lines
-            .map(line => {
-                const match = line?.match(/"(.+)", (.+), (\d+)/);
-                if (!match) return null;
-                return {
-                    fullname: match[1],
-                    shortname: match[2],
-                    category: match[3]
-                };
-            })
-            .filter(s => s !== null);
+        [this.#moodleClassesPath, this.#manualMoodleClassesPath].forEach(filePath => {
+            if (!fs.existsSync(filePath)) {
+                return;
+            }
+
+            const csv = fs.readFileSync(filePath, 'utf-8');
+            const lines = csv.split('\n').slice(1);
+
+            lines
+                .map(line => {
+                    const match = line?.match(/"(.+)",\s*(.+),\s*(\d+)/);
+                    if (!match) return null;
+                    return {
+                        fullname: match[1],
+                        shortname: match[2],
+                        category: match[3]
+                    };
+                })
+                .filter(Boolean)
+                .forEach(subject => {
+                    if (seenFullnames.has(subject.fullname)) {
+                        return;
+                    }
+
+                    seenFullnames.add(subject.fullname);
+                    subjects.push(subject);
+                });
+        });
+
+        return subjects;
     }
 
     /**

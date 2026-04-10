@@ -15,6 +15,7 @@ class PipelineSection {
     #suap;
     #progressModal;
     #onDataChange;
+    #manualCourses = [];
 
     /**
      * @param {Object} options
@@ -32,6 +33,8 @@ class PipelineSection {
 
         this.#attachEventListeners();
         this.#setDefaultDateValues();
+        this.#loadManualCourseCategories();
+        this.#loadManualCoursesSummary();
     }
 
     /**
@@ -41,6 +44,103 @@ class PipelineSection {
         this.#elements.generateCsvBtn.addEventListener('click', () => this.#generateCourseCSV());
         this.#elements.extractSuapBtn.addEventListener('click', () => this.#extractSUAP());
         this.#elements.uploadCoursesBtn.addEventListener('click', () => this.#uploadCourses());
+        this.#elements.addManualCourseBtn?.addEventListener('click', () => this.#createManualCourse());
+        this.#elements.generateManualCoursesCsvBtn?.addEventListener('click', () => this.#generateManualCoursesCSV());
+    }
+
+    async #loadManualCourseCategories() {
+        if (!this.#elements.manualCourseCategorySelect) {
+            return;
+        }
+
+        try {
+            const categories = await this.#moodle.loadCourseCategories();
+            const select = this.#elements.manualCourseCategorySelect;
+
+            select.innerHTML = '<option value="">Select a category</option>';
+
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category.key;
+                option.textContent = category.label;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            const select = this.#elements.manualCourseCategorySelect;
+            select.innerHTML = '<option value="">Failed to load categories</option>';
+        }
+    }
+
+    async #loadManualCoursesSummary() {
+        if (!this.#elements.manualCoursesSummary) {
+            return;
+        }
+
+        try {
+            this.#manualCourses = await this.#moodle.loadManualCourses();
+            this.#renderManualCoursesSummary();
+        } catch (error) {
+            this.#manualCourses = [];
+            this.#renderManualCoursesSummary();
+        }
+    }
+
+    #renderManualCoursesSummary() {
+        const container = this.#elements.manualCoursesSummary;
+
+        if (!container) {
+            return;
+        }
+
+        container.innerHTML = '';
+
+        if (this.#manualCourses.length === 0) {
+            container.dataset.empty = 'true';
+            container.textContent = 'No manual courses queued for CSV generation yet.';
+            return;
+        }
+
+        delete container.dataset.empty;
+
+        const summary = document.createElement('p');
+        summary.className = 'manual-students-summary-copy';
+        summary.textContent = `${this.#manualCourses.length} manual course${this.#manualCourses.length === 1 ? '' : 's'} queued for CSV generation.`;
+        container.appendChild(summary);
+
+        const list = document.createElement('div');
+        list.className = 'manual-students-summary-list';
+
+        this.#manualCourses
+            .slice()
+            .sort((left, right) => left.fullname.localeCompare(right.fullname))
+            .forEach(course => {
+                const card = document.createElement('article');
+                card.className = 'manual-student-summary-card';
+
+                const removeButton = document.createElement('button');
+                removeButton.type = 'button';
+                removeButton.className = 'manual-student-remove-btn';
+                removeButton.textContent = 'X';
+                removeButton.setAttribute('aria-label', `Remove ${course.fullname} from manual queue`);
+                removeButton.addEventListener('click', async () => {
+                    await this.#removeManualCourse(course.fullname);
+                });
+
+                const name = document.createElement('h4');
+                name.className = 'manual-student-summary-name';
+                name.textContent = course.fullname;
+
+                const meta = document.createElement('p');
+                meta.className = 'manual-student-summary-meta';
+                meta.textContent = `${course.shortname} • Category ${course.category}`;
+
+                card.appendChild(removeButton);
+                card.appendChild(name);
+                card.appendChild(meta);
+                list.appendChild(card);
+            });
+
+        container.appendChild(list);
     }
 
     /**
@@ -252,6 +352,87 @@ class PipelineSection {
         }
     }
 
+    async #createManualCourse() {
+        const fullname = this.#elements.manualCourseFullnameInput?.value?.trim();
+        const categoryKey = this.#elements.manualCourseCategorySelect?.value;
+
+        if (!fullname) {
+            Toast.error('Provide the manual course fullname.');
+            return;
+        }
+
+        if (!categoryKey) {
+            Toast.error('Select a Moodle category.');
+            return;
+        }
+
+        this.#updateButton(
+            this.#elements.addManualCourseBtn,
+            true,
+            'Adding...'
+        );
+
+        try {
+            const result = await this.#moodle.createManualCourse({ fullname, categoryKey });
+            await this.#loadManualCoursesSummary();
+
+            this.#elements.manualCourseFullnameInput.value = '';
+            this.#elements.manualCourseCategorySelect.value = '';
+            Toast.success(result.message || `Manual Moodle course queued: ${result.course?.shortname || ''}`.trim());
+        } catch (error) {
+            // Error already handled in Moodle model
+        } finally {
+            this.#updateButton(
+                this.#elements.addManualCourseBtn,
+                false,
+                'Add Manual Course'
+            );
+        }
+    }
+
+    async #generateManualCoursesCSV() {
+        this.#updateButton(
+            this.#elements.generateManualCoursesCsvBtn,
+            true,
+            'Generating...'
+        );
+
+        this.#progressModal.show({
+            title: 'Generating Manual Courses CSV',
+            message: 'Preparing manual course rows'
+        });
+
+        try {
+            const result = await this.#moodle.generateManualCoursesCSV((message) => {
+                this.#progressModal.updateStatus(message);
+                this.#updateButton(this.#elements.generateManualCoursesCsvBtn, true, message);
+            });
+
+            await this.#onDataChange();
+            await this.#loadManualCoursesSummary();
+            this.#progressModal.hide();
+            Toast.success(result.message || 'Manual courses CSV generated successfully');
+        } catch (error) {
+            this.#progressModal.hide();
+        } finally {
+            this.#updateButton(
+                this.#elements.generateManualCoursesCsvBtn,
+                false,
+                'Generate Manual Courses CSV'
+            );
+        }
+    }
+
+    async #removeManualCourse(fullname) {
+        try {
+            const result = await this.#moodle.removeManualCourse({ fullname });
+            await this.#loadManualCoursesSummary();
+            Toast.success(result.message || `Manual Moodle course removed: ${fullname}`);
+        } catch (error) {
+            // Error already handled in Moodle model
+        }
+    }
+
     /**
      * Update button state and text
      * @param {HTMLElement} button - Button element
@@ -261,6 +442,10 @@ class PipelineSection {
     #updateButton(button, disabled, text) {
         button.disabled = disabled;
         button.textContent = text;
+    }
+
+    updateUI() {
+        this.#loadManualCoursesSummary();
     }
 }
 

@@ -93,6 +93,13 @@ class SubjectMatcherApp {
             // Professors section
             generateProfessorsCsvBtn: document.getElementById('generate-professors-csv-btn'),
             uploadProfessorsBtn: document.getElementById('upload-professors-btn'),
+
+            // Manual course tools
+            manualCourseFullnameInput: document.getElementById('manual-course-fullname-input'),
+            manualCourseCategorySelect: document.getElementById('manual-course-category-select'),
+            addManualCourseBtn: document.getElementById('add-manual-course-btn'),
+            generateManualCoursesCsvBtn: document.getElementById('generate-manual-courses-csv-btn'),
+            manualCoursesSummary: document.getElementById('manual-courses-summary'),
         };
     }
 
@@ -148,6 +155,7 @@ class SubjectMatcherApp {
      * Update entire UI by delegating to sections
      */
     #updateUI() {
+        this.#pipelineSection.updateUI();
         this.#matchingSection.updateUI();
         this.#studentsSection.updateUI();
     }

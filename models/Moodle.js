@@ -10,11 +10,15 @@ import { moodleConfig } from '../config/moodle-config.js';
  */
 class Moodle {
     #csvPath;
+    #manualCoursesCsvPath;
+    #manualCoursesDataPath;
     #studentsCsvPath;
     #manualStudentsCsvPath;
 
     constructor() {
         this.#csvPath = path.resolve('files', 'moodle_classes.csv');
+        this.#manualCoursesCsvPath = path.resolve('files', 'moodle_manual_classes.csv');
+        this.#manualCoursesDataPath = path.resolve('files', 'moodle_manual_classes.json');
         this.#studentsCsvPath = path.resolve('files', 'moodle_students.csv');
         this.#manualStudentsCsvPath = path.resolve('files', 'moodle_manual_students.csv');
     }
@@ -53,7 +57,7 @@ class Moodle {
                 // "[2025.2] TSI-2AN - Desenvolvimento Back-end I", CH_TSI_2AN_DBE1_2025.2, 120
                 // "[2025.2] TSI-4AN|ECA-8AN - Gestão e Empreendedorismo", CH_TSI_4AN_ECA_8AN_GE_2025.2, 120
                 // "[2025.2] INF-2AT-G1 - Banco de Dados", CH_INF_2AT_BD_2025.2_G1, 115
-                const fullName = `"[${year}.${semester}] ${className}${group.replace('_', '-')} - ${subjectObj.name.split('-').slice(1).join('-').trim()}"`;
+                const fullName = `[${year}.${semester}] ${className}${group.replace('_', '-')} - ${subjectObj.name.split('-').slice(1).join('-').trim()}`;
                 const shortName = `CH_${className.replace(/[-,\|]/g, '_')}_${subjectObj.short.split(/\s*-\s*/)?.slice(1).join('')}_${year}.${semester}${group}`;
                 const category = moodleConfig.categories[c.name.split('-')[0]];
 
@@ -70,15 +74,298 @@ class Moodle {
         
         if (progressCallback) progressCallback(`Generating CSV file with ${moodleSubjects.length} subjects`);
         
-        const header = ['fullname', 'shortname', 'category'];
-        moodleSubjects.unshift(header);
-        const csv = moodleSubjects.map(ms => ms.join(', ')).join('\n');
-
-        fs.writeFileSync(this.#csvPath, csv);
+        const csv = this.#writeCourseCsv(this.#csvPath, moodleSubjects);
         
         if (progressCallback) progressCallback('CSV file saved successfully');
 
         return csv;
+    }
+
+    getCourseCategories() {
+        return Object.entries(moodleConfig.categories)
+            .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+            .map(([key, id]) => ({
+                key,
+                id,
+                label: `${key} (${id})`,
+            }));
+    }
+
+    getManualCourses() {
+        return this.#loadManualCourseEntries();
+    }
+
+    removeManualCourse(fullname) {
+        const normalizedFullname = String(fullname || '').trim();
+
+        if (!normalizedFullname) {
+            throw new Error('Course fullname is required.');
+        }
+
+        const manualCourses = this.#loadManualCourseEntries();
+        const remainingCourses = manualCourses.filter(course => course.fullname !== normalizedFullname);
+
+        if (remainingCourses.length === manualCourses.length) {
+            throw new Error('Manual course not found.');
+        }
+
+        this.#saveManualCourseEntries(remainingCourses);
+
+        return {
+            fullname: normalizedFullname,
+            totalCourses: remainingCourses.length,
+        };
+    }
+
+    addManualCourse({ fullname, categoryKey }) {
+        const normalizedFullname = String(fullname || '').trim();
+        const normalizedCategoryKey = String(categoryKey || '').trim().toUpperCase();
+        const category = moodleConfig.categories[normalizedCategoryKey];
+
+        if (!normalizedFullname) {
+            throw new Error('Course fullname is required.');
+        }
+
+        if (!category) {
+            throw new Error('Valid Moodle category is required.');
+        }
+
+        const courseData = this.#parseManualCourseFullname(normalizedFullname);
+        const shortname = this.#buildManualCourseShortname(courseData);
+        const existingCourses = [
+            ...this.#loadAllCourseRows(),
+            ...this.#loadManualCourseEntries(),
+        ];
+
+        if (existingCourses.some(course => course.fullname === normalizedFullname)) {
+            throw new Error('A Moodle course with this fullname already exists.');
+        }
+
+        if (existingCourses.some(course => course.shortname === shortname)) {
+            throw new Error(`Generated shortname already exists: ${shortname}`);
+        }
+
+        const manualCourses = this.#loadManualCourseEntries();
+        const manualCourse = {
+            fullname: normalizedFullname,
+            shortname,
+            category,
+            categoryKey: normalizedCategoryKey,
+        };
+
+        manualCourses.push(manualCourse);
+        this.#saveManualCourseEntries(manualCourses);
+
+        return {
+            file: this.#manualCoursesDataPath,
+            ...manualCourse,
+        };
+    }
+
+    createManualCourse(params) {
+        return this.addManualCourse(params);
+    }
+
+    async generateManualCourseCSV(progressCallback = null) {
+        if (progressCallback) progressCallback('Loading manual courses data');
+
+        const manualCourses = this.#loadManualCourseEntries();
+
+        if (manualCourses.length === 0) {
+            throw new Error('Manual course queue is empty. Add manual courses first.');
+        }
+
+        if (progressCallback) progressCallback('Writing manual courses CSV file');
+
+        const csvRows = manualCourses
+            .map(course => [course.fullname, course.shortname, course.category])
+            .sort((left, right) => left[0].localeCompare(right[0]));
+
+        this.#writeCourseCsv(this.#manualCoursesCsvPath, csvRows);
+
+        return {
+            file: this.#manualCoursesCsvPath,
+            totalCourses: csvRows.length,
+        };
+    }
+
+    #writeCourseCsv(filePath, rows) {
+        const csvRows = [this.#getCourseCsvHeader(), ...rows];
+        const csv = csvRows
+            .map(([fullname, shortname, category]) => {
+                if (fullname === 'fullname' && shortname === 'shortname') {
+                    return 'fullname, shortname, category';
+                }
+
+                return `"${fullname}", ${shortname}, ${category}`;
+            })
+            .join('\n');
+
+        fs.writeFileSync(filePath, csv);
+        return csv;
+    }
+
+    #getCourseCsvHeader() {
+        return ['fullname', 'shortname', 'category'];
+    }
+
+    #parseCourseCsv(filePath) {
+        if (!fs.existsSync(filePath)) {
+            return [];
+        }
+
+        return fs.readFileSync(filePath, 'utf-8')
+            .split('\n')
+            .slice(1)
+            .map(line => line?.match(/"(.+)",\s*(.+),\s*(\d+)/))
+            .filter(Boolean)
+            .map(([, fullname, shortname, category]) => ({
+                fullname,
+                shortname: shortname.trim(),
+                category: parseInt(category, 10),
+            }));
+    }
+
+    #loadManualCourseEntries() {
+        if (fs.existsSync(this.#manualCoursesDataPath)) {
+            const manualCourses = JSON.parse(fs.readFileSync(this.#manualCoursesDataPath, 'utf-8'));
+            return this.#normalizeManualCourses(manualCourses);
+        }
+
+        if (fs.existsSync(this.#manualCoursesCsvPath)) {
+            return this.#parseCourseCsv(this.#manualCoursesCsvPath)
+                .map(course => ({
+                    ...course,
+                    categoryKey: this.#getCategoryKeyById(course.category),
+                }));
+        }
+
+        return [];
+    }
+
+    #saveManualCourseEntries(manualCourses) {
+        fs.writeFileSync(this.#manualCoursesDataPath, JSON.stringify(manualCourses, null, 2));
+    }
+
+    #normalizeManualCourses(manualCourses = []) {
+        return Array.isArray(manualCourses)
+            ? manualCourses
+                .map(course => ({
+                    fullname: String(course?.fullname || '').trim(),
+                    shortname: String(course?.shortname || '').trim(),
+                    category: Number.parseInt(course?.category, 10),
+                    categoryKey: String(course?.categoryKey || this.#getCategoryKeyById(course?.category) || '').trim().toUpperCase(),
+                }))
+                .filter(course => course.fullname && course.shortname && Number.isInteger(course.category))
+            : [];
+    }
+
+    #getCategoryKeyById(categoryId) {
+        return Object.entries(moodleConfig.categories)
+            .find(([, id]) => Number(id) === Number(categoryId))?.[0] || '';
+    }
+
+    #loadAllCourseRows() {
+        const seenFullnames = new Set();
+        const courseRows = [];
+
+        [this.#csvPath, this.#manualCoursesCsvPath].forEach(filePath => {
+            this.#parseCourseCsv(filePath).forEach(course => {
+                if (seenFullnames.has(course.fullname)) {
+                    return;
+                }
+
+                seenFullnames.add(course.fullname);
+                courseRows.push(course);
+            });
+        });
+
+        return courseRows;
+    }
+
+    #parseManualCourseFullname(fullname) {
+        const match = fullname.match(/^\[(\d{4})\.(\d)\]\s+(.+?)\s+-\s+(.+)$/);
+
+        if (!match) {
+            throw new Error('Course fullname must follow the format [YYYY.S] CLASS - Subject Name.');
+        }
+
+        const [, year, semester, rawClassName, subjectName] = match;
+        const groupMatch = rawClassName.match(/^(.*?)(-G[12])$/);
+
+        return {
+            year,
+            semester,
+            className: (groupMatch?.[1] || rawClassName).trim(),
+            group: groupMatch?.[2]?.replace('-', '_') || '',
+            subjectName: subjectName.trim(),
+        };
+    }
+
+    #buildManualCourseShortname({ className, group, subjectName, year, semester }) {
+        const classToken = className.replace(/[-,\|]/g, '_');
+        const subjectToken = this.#buildSubjectToken(subjectName);
+
+        return `CH_${classToken}_${subjectToken}_${year}.${semester}${group}`;
+    }
+
+    #buildSubjectToken(subjectName) {
+        const stopWords = new Set(['a', 'ao', 'as', 'da', 'das', 'de', 'do', 'dos', 'e', 'em', 'na', 'nas', 'no', 'nos', 'o', 'os', 'para', 'por']);
+        const romanMap = new Map([
+            ['I', '1'],
+            ['II', '2'],
+            ['III', '3'],
+            ['IV', '4'],
+            ['V', '5'],
+            ['VI', '6'],
+            ['VII', '7'],
+            ['VIII', '8'],
+            ['IX', '9'],
+            ['X', '10'],
+        ]);
+
+        const normalizedWords = subjectName
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/&/g, ' ')
+            .split(/[^A-Za-z0-9+]+/)
+            .map(word => word.trim())
+            .filter(Boolean);
+
+        const significantWords = normalizedWords.filter(word => {
+            const upperWord = word.toUpperCase();
+            return romanMap.has(upperWord) || /^\d+$/.test(word) || !stopWords.has(word.toLowerCase());
+        });
+
+        const words = significantWords.length > 0 ? significantWords : normalizedWords;
+        const token = words
+            .map((word, index) => {
+                const upperWord = word.toUpperCase();
+
+                if (romanMap.has(upperWord)) {
+                    return romanMap.get(upperWord);
+                }
+
+                if (/^\d+$/.test(word)) {
+                    return word;
+                }
+
+                if (word.length <= 3) {
+                    return upperWord;
+                }
+
+                const sliceLength = index === 0 ? 4 : (words.length > 2 ? 3 : 4);
+                const base = word.slice(0, sliceLength).toLowerCase();
+                return base.charAt(0).toUpperCase() + base.slice(1);
+            })
+            .join('')
+            .replace(/[^A-Za-z0-9]/g, '');
+
+        if (!token) {
+            throw new Error('Could not generate a shortname from the provided course fullname.');
+        }
+
+        return token;
     }
 
     #getProfessorId(professor = {}) {
@@ -173,9 +460,16 @@ class Moodle {
      * @returns {Promise<Object>} Upload results
      */
     async uploadCourses(progressCallback = null) {
-        if (!fs.existsSync(this.#csvPath)) {
+        const courses = this.#loadAllCourseRows();
+
+        if (courses.length === 0) {
             throw new Error('CSV file not found. Generate CSV first.');
         }
+
+        return this.#uploadCourseRows(courses, progressCallback);
+    }
+
+    async #uploadCourseRows(courses, progressCallback = null) {
 
         if (progressCallback) progressCallback('Initializing Moodle uploader');
         
@@ -183,20 +477,6 @@ class Moodle {
             process.env.MOODLE_URL,
             process.env.MOODLE_TOKEN,
         );
-
-        const courses = fs.readFileSync(this.#csvPath, 'utf-8')
-            .split('\n')
-            .slice(1) // Skip header row
-            .filter(line => line.trim()) // Skip empty lines
-            // split pattern: "fullname", shortname, category (category is number)
-            .map(line => line.match(/"(.+)", (.+), (\d+)/))
-            .map(item => ({
-                fullname: item[1],
-                shortname: item[2],
-                category: parseInt(item[3]),
-            }));
-
-        // console.log(courses);
 
         if (progressCallback) progressCallback(`Uploading ${courses.length} courses to Moodle`);
 
@@ -227,33 +507,17 @@ class Moodle {
         const subjectStudents = studentsData.subjects || {};
         const studentInfo = studentsData.students || {};
 
-        const hasMoodleCoursesCsv = fs.existsSync(this.#csvPath);
+        const moodleSubjects = this.#loadAllCourseRows();
 
-        if (!hasMoodleCoursesCsv) {
+        if (moodleSubjects.length === 0) {
             throw new Error('Moodle courses CSV not found. Generate courses CSV first.');
         }
 
         // Load all matches from unified matches.json
         const matchesPath = path.resolve('files', 'matches.json');
-        const moodleCsvContent = fs.readFileSync(this.#csvPath, 'utf-8');
         const matches = fs.existsSync(matchesPath) 
             ? JSON.parse(fs.readFileSync(matchesPath, 'utf-8')) 
             : [];
-
-        // Parse Moodle CSV to get shortnames
-        const moodleSubjects = moodleCsvContent
-            .split('\n')
-            .slice(1)
-            .map(line => {
-                const match = line?.match(/"(.+)", (.+), (\d+)/);
-                if (!match) return null;
-                return {
-                    fullname: match[1],
-                    shortname: match[2],
-                    category: parseInt(match[3])
-                };
-            })
-            .filter(s => s !== null);
 
         if (progressCallback) progressCallback('Processing matched subjects');
 
@@ -408,7 +672,9 @@ class Moodle {
             throw new Error('Professors data not found. Extract professors first.');
         }
 
-        if (!fs.existsSync(this.#csvPath)) {
+        const moodleSubjects = this.#loadAllCourseRows();
+
+        if (moodleSubjects.length === 0) {
             throw new Error('Moodle courses CSV not found. Generate courses CSV first.');
         }
 
@@ -417,25 +683,9 @@ class Moodle {
 
         // Load all matches from unified matches.json
         const matchesPath = path.resolve('files', 'matches.json');
-        const moodleCsvContent = fs.readFileSync(this.#csvPath, 'utf-8');
         const matches = fs.existsSync(matchesPath) 
             ? JSON.parse(fs.readFileSync(matchesPath, 'utf-8')) 
             : [];
-
-        // Parse Moodle CSV to get shortnames
-        const moodleSubjects = moodleCsvContent
-            .split('\n')
-            .slice(1) // Skip header
-            .map(line => {
-                const match = line?.match(/"(.+)", (.+), (\d+)/);
-                if (!match) return null;
-                return {
-                    fullname: match[1],
-                    shortname: match[2],
-                    category: match[3]
-                };
-            })
-            .filter(s => s !== null);
 
         if (progressCallback) progressCallback('Processing matched subjects');
 

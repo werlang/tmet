@@ -260,6 +260,123 @@ describe('Moodle Model', () => {
         });
     });
 
+    describe('getCourseCategories()', () => {
+        it('should return Moodle course categories sorted by key', () => {
+            const moodle = new Moodle();
+
+            expect(moodle.getCourseCategories()).toEqual(expect.arrayContaining([
+                expect.objectContaining({ key: 'INF', id: 115, label: 'INF (115)' }),
+                expect.objectContaining({ key: 'TSI', id: 120, label: 'TSI (120)' }),
+            ]));
+        });
+    });
+
+    describe('addManualCourse()', () => {
+        it('should queue a manual Moodle course in the separate data file', () => {
+            mockFs.existsSync.mockReturnValue(false);
+
+            const moodle = new Moodle();
+            const result = moodle.addManualCourse({
+                fullname: '[2026.1] INF-4AM - Segurança da Informação',
+                categoryKey: 'INF'
+            });
+
+            expect(result.shortname).toBe('CH_INF_4AM_SeguInfo_2026.1');
+            expect(result.category).toBe(115);
+            expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+                expect.stringContaining('moodle_manual_classes.json'),
+                JSON.stringify([
+                    {
+                        fullname: '[2026.1] INF-4AM - Segurança da Informação',
+                        shortname: 'CH_INF_4AM_SeguInfo_2026.1',
+                        category: 115,
+                        categoryKey: 'INF'
+                    }
+                ], null, 2)
+            );
+        });
+
+        it('should reject invalid manual course fullnames', () => {
+            mockFs.existsSync.mockReturnValue(false);
+
+            const moodle = new Moodle();
+
+            expect(() => moodle.addManualCourse({
+                fullname: 'INF-4AM - Segurança da Informação',
+                categoryKey: 'INF'
+            })).toThrow('Course fullname must follow the format');
+        });
+
+        it('should remove a queued manual course from the data file', () => {
+            mockFs.existsSync.mockImplementation((path) => path.includes('moodle_manual_classes.json'));
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('moodle_manual_classes.json')) {
+                    return JSON.stringify([
+                        {
+                            fullname: '[2026.1] INF-4AM - Segurança da Informação',
+                            shortname: 'CH_INF_4AM_SeguInfo_2026.1',
+                            category: 115,
+                            categoryKey: 'INF'
+                        },
+                        {
+                            fullname: '[2026.1] INF-4AM - Segurança da Informação Avançada',
+                            shortname: 'CH_INF_4AM_SeguInfAva_2026.1',
+                            category: 115,
+                            categoryKey: 'INF'
+                        }
+                    ]);
+                }
+
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = moodle.removeManualCourse('[2026.1] INF-4AM - Segurança da Informação');
+
+            expect(result.totalCourses).toBe(1);
+            expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+                expect.stringContaining('moodle_manual_classes.json'),
+                JSON.stringify([
+                    {
+                        fullname: '[2026.1] INF-4AM - Segurança da Informação Avançada',
+                        shortname: 'CH_INF_4AM_SeguInfAva_2026.1',
+                        category: 115,
+                        categoryKey: 'INF'
+                    }
+                ], null, 2)
+            );
+        });
+    });
+
+    describe('generateManualCourseCSV()', () => {
+        it('should generate a manual courses CSV from the queue data file', async () => {
+            mockFs.existsSync.mockImplementation((path) => path.includes('moodle_manual_classes.json'));
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('moodle_manual_classes.json')) {
+                    return JSON.stringify([
+                        {
+                            fullname: '[2026.1] INF-4AM - Segurança da Informação',
+                            shortname: 'CH_INF_4AM_SeguInfo_2026.1',
+                            category: 115,
+                            categoryKey: 'INF'
+                        }
+                    ]);
+                }
+
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = await moodle.generateManualCourseCSV();
+
+            expect(result.totalCourses).toBe(1);
+            expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+                expect.stringContaining('moodle_manual_classes.csv'),
+                'fullname, shortname, category\n"[2026.1] INF-4AM - Segurança da Informação", CH_INF_4AM_SeguInfo_2026.1, 115'
+            );
+        });
+    });
+
     describe('uploadCourses()', () => {
         it('should throw error if CSV file does not exist', async () => {
             mockFs.existsSync.mockReturnValue(false);
@@ -307,6 +424,68 @@ describe('Moodle Model', () => {
 
             expect(result.errors.length).toBeGreaterThan(0);
         });
+
+        it('should upload manual course CSV rows when the regular CSV is missing', async () => {
+            mockFs.existsSync.mockImplementation((path) => path.includes('moodle_manual_classes.csv'));
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('moodle_manual_classes.csv')) {
+                    return 'fullname, shortname, category\n"[2026.1] INF-4AM - Segurança da Informação", CH_INF_4AM_SeguInfo_2026.1, 115';
+                }
+
+                return '';
+            });
+            mockMoodleUploader.mockImplementation(() => ({
+                uploadCourses: jest.fn().mockResolvedValue({
+                    success: [{ id: 1 }],
+                    errors: []
+                })
+            }));
+
+            const moodle = new Moodle();
+            const result = await moodle.uploadCourses();
+
+            expect(result.success).toHaveLength(1);
+        });
+
+        it('should upload merged regular and manual course CSV rows when both files exist', async () => {
+            mockFs.existsSync.mockImplementation((path) => (
+                path.includes('moodle_classes.csv') || path.includes('moodle_manual_classes.csv')
+            ));
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('moodle_classes.csv')) {
+                    return 'fullname, shortname, category\n"[2026.1] INF-4AM - Segurança da Informação", CH_INF_4AM_SeguInfo_2026.1, 115';
+                }
+                if (path.includes('moodle_manual_classes.csv')) {
+                    return 'fullname, shortname, category\n"[2026.1] INF-4AM - Segurança da Informação Avançada", CH_INF_4AM_SeguInfAva_2026.1, 115';
+                }
+
+                return '';
+            });
+            const uploadCourses = jest.fn().mockResolvedValue({
+                success: [{ id: 1 }, { id: 2 }],
+                errors: []
+            });
+            mockMoodleUploader.mockImplementation(() => ({
+                uploadCourses
+            }));
+
+            const moodle = new Moodle();
+            const result = await moodle.uploadCourses();
+
+            expect(result.success).toHaveLength(2);
+            expect(uploadCourses).toHaveBeenCalledWith([
+                {
+                    fullname: '[2026.1] INF-4AM - Segurança da Informação',
+                    shortname: 'CH_INF_4AM_SeguInfo_2026.1',
+                    category: 115,
+                },
+                {
+                    fullname: '[2026.1] INF-4AM - Segurança da Informação Avançada',
+                    shortname: 'CH_INF_4AM_SeguInfAva_2026.1',
+                    category: 115,
+                }
+            ], null);
+        });
     });
 
     describe('generateStudentCSV()', () => {
@@ -324,6 +503,7 @@ describe('Moodle Model', () => {
         it('should throw error if moodle CSV file does not exist', async () => {
             mockFs.existsSync.mockImplementation((path) => {
                 if (path.includes('moodle_classes.csv')) return false;
+                if (path.includes('moodle_manual_classes.csv')) return false;
                 if (path.includes('suap_students.json')) return true;
                 return true;
             });
@@ -335,6 +515,48 @@ describe('Moodle Model', () => {
             const moodle = new Moodle();
 
             await expect(moodle.generateStudentCSV()).rejects.toThrow('Moodle courses CSV not found');
+        });
+
+        it('should generate student CSV from manual course CSV rows when the regular course CSV is missing', async () => {
+            const studentsData = {
+                subjects: {
+                    'manual-suap-id': ['2021001']
+                },
+                students: {
+                    '2021001': { name: 'João Silva', email: 'joao.silva@email.com' }
+                }
+            };
+
+            mockFs.existsSync.mockImplementation((path) => {
+                if (path.includes('suap_students.json')) return true;
+                if (path.includes('moodle_manual_classes.csv')) return true;
+                if (path.includes('moodle_classes.csv')) return false;
+                if (path.includes('matches.json')) return true;
+                return true;
+            });
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('suap_students.json')) {
+                    return JSON.stringify(studentsData);
+                }
+                if (path.includes('moodle_manual_classes.csv')) {
+                    return 'fullname, shortname, category\n"[2026.1] INF-4AM - Segurança da Informação", CH_INF_4AM_SeguInfo_2026.1, 115';
+                }
+                if (path.includes('matches.json')) {
+                    return JSON.stringify([{
+                        moodleFullname: '[2026.1] INF-4AM - Segurança da Informação',
+                        suapId: 'manual-suap-id',
+                        type: 'manual'
+                    }]);
+                }
+
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = await moodle.generateStudentCSV();
+
+            expect(result.totalStudents).toBe(1);
+            expect(mockFs.writeFileSync).toHaveBeenCalled();
         });
 
         it('should generate student CSV from matched subjects', async () => {

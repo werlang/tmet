@@ -33,6 +33,23 @@ const mockMoodleUploader = jest.fn().mockImplementation(() => ({
 // Mock Moodle model - used by job callbacks
 // These mocks call the progress callback to cover that code path
 const mockMoodleInstance = {
+    getCourseCategories: jest.fn().mockReturnValue([
+        { key: 'INF', id: 115, label: 'INF (115)' }
+    ]),
+    getManualCourses: jest.fn().mockReturnValue([
+        {
+            fullname: '[2026.1] INF-4AM - Segurança da Informação',
+            shortname: 'CH_INF_4AM_SeguInfo_2026.1',
+            category: 115,
+            categoryKey: 'INF',
+        }
+    ]),
+    addManualCourse: jest.fn().mockReturnValue({
+        fullname: '[2026.1] INF-4AM - Segurança da Informação',
+        shortname: 'CH_INF_4AM_SeguInfo_2026.1',
+        category: 115,
+        categoryKey: 'INF',
+    }),
     generateCourseCSV: jest.fn().mockImplementation(async (params, progressCallback) => {
         if (progressCallback) progressCallback('Processing...');
         return undefined;
@@ -40,6 +57,15 @@ const mockMoodleInstance = {
     uploadCourses: jest.fn().mockImplementation(async (progressCallback) => {
         if (progressCallback) progressCallback('Uploading...');
         return { success: [{ id: 1 }], errors: [] };
+    }),
+    removeManualCourse: jest.fn().mockReturnValue({ totalCourses: 0 }),
+    generateManualStudentCSV: jest.fn().mockImplementation(async (progressCallback) => {
+        if (progressCallback) progressCallback('Generating manual students...');
+        return { totalStudents: 2, manualStudents: 1 };
+    }),
+    generateManualCourseCSV: jest.fn().mockImplementation(async (progressCallback) => {
+        if (progressCallback) progressCallback('Generating manual courses...');
+        return { totalCourses: 1 };
     }),
     generateStudentCSV: jest.fn().mockImplementation(async (progressCallback) => {
         if (progressCallback) progressCallback('Generating...');
@@ -182,6 +208,115 @@ describe('Moodle Route', () => {
 
             expect(res.statusCode).toBe(500);
             expect(res._data.success).toBe(false);
+        });
+    });
+
+    describe('GET /course-categories', () => {
+        it('should return Moodle course categories', async () => {
+            const handler = getRouteHandler('get', '/course-categories');
+            const req = createMockRequest();
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(200);
+            expect(res._data.success).toBe(true);
+            expect(res._data.categories).toEqual([
+                { key: 'INF', id: 115, label: 'INF (115)' }
+            ]);
+        });
+    });
+
+    describe('POST /manual-courses', () => {
+        it('should create a manual course and return 201', async () => {
+            const handler = getRouteHandler('post', '/manual-courses');
+            const req = createMockRequest({
+                body: {
+                    fullname: '[2026.1] INF-4AM - Segurança da Informação',
+                    categoryKey: 'INF'
+                }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(mockMoodleInstance.addManualCourse).toHaveBeenCalledWith({
+                fullname: '[2026.1] INF-4AM - Segurança da Informação',
+                categoryKey: 'INF'
+            });
+            expect(res.statusCode).toBe(201);
+            expect(res._data.success).toBe(true);
+            expect(res._data.course.shortname).toBe('CH_INF_4AM_SeguInfo_2026.1');
+        });
+
+        it('should return 400 for validation errors', async () => {
+            mockMoodleInstance.addManualCourse.mockImplementationOnce(() => {
+                throw new Error('Course fullname is required.');
+            });
+
+            const handler = getRouteHandler('post', '/manual-courses');
+            const req = createMockRequest({ body: {} });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(400);
+            expect(res._data.success).toBe(false);
+        });
+    });
+
+    describe('GET /manual-courses', () => {
+        it('should return queued manual courses', async () => {
+            const handler = getRouteHandler('get', '/manual-courses');
+            const req = createMockRequest();
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(200);
+            expect(res._data.success).toBe(true);
+            expect(res._data.courses).toHaveLength(1);
+        });
+    });
+
+    describe('POST /manual-courses-csv', () => {
+        it('should return 202 with jobId when starting manual courses CSV generation', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('test-job-123')
+            };
+
+            const handler = getRouteHandler('post', '/manual-courses-csv');
+            const req = createMockRequest({
+                body: {},
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data.success).toBe(true);
+            expect(res._data.message).toBe('Manual courses CSV generation job started');
+        });
+    });
+
+    describe('POST /manual-courses/remove', () => {
+        it('should remove a manual course from the queue', async () => {
+            const handler = getRouteHandler('post', '/manual-courses/remove');
+            const req = createMockRequest({
+                body: { fullname: '[2026.1] INF-4AM - Segurança da Informação' }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(200);
+            expect(mockMoodleInstance.removeManualCourse).toHaveBeenCalledWith('[2026.1] INF-4AM - Segurança da Informação');
+            expect(res._data).toEqual({
+                success: true,
+                message: 'Manual Moodle course removed: [2026.1] INF-4AM - Segurança da Informação',
+                totalCourses: 0,
+            });
         });
     });
 

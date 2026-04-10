@@ -176,9 +176,50 @@
         </div>
 
         <div class="pipeline-section">
-            <h2>Step 6: Manual Student Queue</h2>
+            <h2>Step 7: Generate & Upload Professors</h2>
             <div class="pipeline-content">
-                <p class="section-description">Fetch a student from SUAP by matricula, build a dedicated manual CSV, and keep these enrollments separate from the main student export.</p>
+                <p class="section-description">Generate a CSV file with professor assignments for bulk upload to Moodle</p>
+                <div class="button-row">
+                    <button id="generate-professors-csv-btn" class="pipeline-btn primary">Generate Professors CSV</button>
+                    <button id="upload-professors-btn" class="pipeline-btn secondary">Upload Professors to Moodle</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2>Manual Moodle Courses</h2>
+            <div class="pipeline-content">
+                <p class="section-description">Create Moodle courses that are missing from the EduPage import and persist them in a separate manual course file.</p>
+                <div class="manual-student-panel">
+                    <div class="manual-student-header">
+                        <h3>Manual Course Entry</h3>
+                        <p class="section-description">Enter the Moodle course fullname, choose the target category, and let TMET generate the shortname automatically.</p>
+                    </div>
+                    <div class="pipeline-inputs manual-student-inputs">
+                        <div class="input-group full-width">
+                            <label for="manual-course-fullname-input">Course fullname</label>
+                            <input type="text" id="manual-course-fullname-input" placeholder="[202X.1] XXX-0XX - Course Name" autocomplete="off">
+                        </div>
+                        <div class="input-group">
+                            <label for="manual-course-category-select">Category</label>
+                            <select id="manual-course-category-select" class="manual-course-select">
+                                <option value="">Loading categories...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="button-row">
+                        <button id="add-manual-course-btn" class="pipeline-btn secondary">Add Manual Course</button>
+                        <button id="generate-manual-courses-csv-btn" class="pipeline-btn secondary">Generate Manual Courses CSV</button>
+                    </div>
+                    <div id="manual-courses-summary" class="manual-students-summary"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="pipeline-section">
+            <h2>Manual Student Queue</h2>
+            <div class="pipeline-content">
+                <p class="section-description">Fetch a student from SUAP by matrícula, build a dedicated manual CSV, and keep these enrollments separate from the main student export.</p>
                 <div class="manual-student-panel">
                     <div class="manual-student-header">
                         <h3>Manual Student Entry</h3>
@@ -203,17 +244,6 @@
                         <button id="generate-manual-students-csv-btn" class="pipeline-btn secondary">Generate Manual Students CSV</button>
                     </div>
                     <div id="manual-students-summary" class="manual-students-summary"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="pipeline-section">
-            <h2>Step 7: Generate & Upload Professors</h2>
-            <div class="pipeline-content">
-                <p class="section-description">Generate a CSV file with professor assignments for bulk upload to Moodle</p>
-                <div class="button-row">
-                    <button id="generate-professors-csv-btn" class="pipeline-btn primary">Generate Professors CSV</button>
-                    <button id="upload-professors-btn" class="pipeline-btn secondary">Upload Professors to Moodle</button>
                 </div>
             </div>
         </div>
