@@ -50,14 +50,18 @@ class SUAP {
      * @param {string} params.matricula - SUAP enrollment ID
      * @param {string} params.password - Moodle password for CSV rows
      * @param {string[]} params.courseIds - Moodle course shortnames/IDs
+     * @param {Object} options - Request options
+     * @param {boolean} options.silentErrorToast - Skip default error toast when caller aggregates failures
      * @returns {Promise<Object>} Created manual student response
      */
-    async addManualStudent(params) {
+    async addManualStudent(params, options = {}) {
         try {
             return await new Request().post('/api/suap/manual-student', params);
         } catch (error) {
             console.error('Add manual student error:', error);
-            Toast.error('Error adding manual student: ' + error.message);
+            if (!options.silentErrorToast) {
+                Toast.error('Error adding manual student: ' + error.message);
+            }
             throw error;
         }
     }

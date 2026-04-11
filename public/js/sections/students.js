@@ -137,6 +137,15 @@ class StudentsSection {
         ));
     }
 
+    #parseManualStudentEnrollments(value) {
+        return Array.from(new Set(
+            String(value || '')
+                .split(',')
+                .map(enrollment => enrollment.trim())
+                .filter(Boolean)
+        ));
+    }
+
     #renderManualStudentsSummary() {
         const container = this.#elements.manualStudentsSummary;
         const manualEntries = this.#getManualStudentEntries()
@@ -636,12 +645,14 @@ class StudentsSection {
     }
 
     async #addManualStudent() {
-        const matricula = this.#elements.manualStudentMatriculaInput.value.trim();
+        const matriculas = this.#parseManualStudentEnrollments(
+            this.#elements.manualStudentMatriculaInput.value
+        );
         const password = this.#elements.manualStudentPasswordInput.value.trim();
         const courseIds = this.#parseCourseIds(this.#elements.manualStudentCourseIdsInput.value);
 
-        if (!matricula) {
-            Toast.error('SUAP matrícula is required');
+        if (matriculas.length === 0) {
+            Toast.error('Provide at least one SUAP matrícula');
             return;
         }
 
@@ -657,32 +668,98 @@ class StudentsSection {
 
         this.#updateButton(this.#elements.addManualStudentBtn, true, 'Fetching...');
         this.#progressModal.show({
-            title: 'Adding Manual Student',
-            message: 'Fetching student profile from SUAP'
+            title: matriculas.length === 1 ? 'Adding Manual Student' : 'Adding Manual Students',
+            message: `Fetching student 1 of ${matriculas.length} from SUAP`
         });
 
+        const successfulAdds = [];
+        const failedAdds = [];
+
         try {
-            const result = await this.#suap.addManualStudent({
-                matricula,
-                password,
-                courseIds,
-            });
+            for (const [index, matricula] of matriculas.entries()) {
+                this.#progressModal.updateStatus(
+                    `Fetching student ${index + 1} of ${matriculas.length}: ${matricula}`
+                );
+                this.#updateButton(
+                    this.#elements.addManualStudentBtn,
+                    true,
+                    `Adding ${index + 1}/${matriculas.length}...`
+                );
+
+                try {
+                    const result = await this.#suap.addManualStudent({
+                        matricula,
+                        password,
+                        courseIds,
+                    }, {
+                        silentErrorToast: true,
+                    });
+
+                    successfulAdds.push({ matricula, result });
+                } catch (error) {
+                    failedAdds.push({
+                        matricula,
+                        message: error.message || 'Unknown error',
+                    });
+                }
+            }
 
             this.#progressModal.hide();
-            await this.#onDataChange();
 
-            this.#elements.manualStudentMatriculaInput.value = '';
-            this.#elements.manualStudentPasswordInput.value = '';
-            this.#elements.manualStudentCourseIdsInput.value = '';
+            if (successfulAdds.length > 0) {
+                await this.#onDataChange();
+            }
+
+            this.#elements.manualStudentMatriculaInput.value = failedAdds
+                .map(({ matricula }) => matricula)
+                .join(', ');
+            if (failedAdds.length === 0) {
+                this.#elements.manualStudentPasswordInput.value = '';
+                this.#elements.manualStudentCourseIdsInput.value = '';
+            }
             this.#elements.manualStudentMatriculaInput.focus();
 
-            const savedStudent = result.data || {};
-            Toast.success(result.message || `Manual student saved for ${savedStudent.name || matricula}`);
+            if (successfulAdds.length > 0 && failedAdds.length === 0) {
+                if (successfulAdds.length === 1) {
+                    const [{ matricula, result }] = successfulAdds;
+                    const savedStudent = result.data || {};
+                    Toast.success(result.message || `Manual student saved for ${savedStudent.name || matricula}`);
+                } else {
+                    Toast.success(`${successfulAdds.length} manual students queued successfully.`);
+                }
+                return;
+            }
+
+            if (successfulAdds.length > 0) {
+                Toast.warning(
+                    `${successfulAdds.length} manual student${successfulAdds.length === 1 ? '' : 's'} queued. ` +
+                    `${failedAdds.length} failed: ${this.#summarizeManualStudentFailures(failedAdds)}`
+                );
+                return;
+            }
+
+            Toast.error(
+                `Failed to queue manual student${failedAdds.length === 1 ? '' : 's'}: ` +
+                this.#summarizeManualStudentFailures(failedAdds)
+            );
         } catch (error) {
             this.#progressModal.hide();
         } finally {
             this.#updateButton(this.#elements.addManualStudentBtn, false, 'Add Manual Student');
         }
+    }
+
+    #summarizeManualStudentFailures(failedAdds) {
+        const preview = failedAdds
+            .slice(0, 3)
+            .map(({ matricula, message }) => `${matricula} (${message})`)
+            .join(', ');
+
+        if (failedAdds.length <= 3) {
+            return preview;
+        }
+
+        return `${preview}, and ${failedAdds.length - 3} more`;
     }
 
     async #removeManualStudent(enrollment) {

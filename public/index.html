@@ -219,16 +219,16 @@
         <div class="pipeline-section">
             <h2>Manual Student Queue</h2>
             <div class="pipeline-content">
-                <p class="section-description">Fetch a student from SUAP by matrícula, build a dedicated manual CSV, and keep these enrollments separate from the main student export.</p>
+                <p class="section-description">Fetch one or more students from SUAP by matrícula, build a dedicated manual CSV, and keep these enrollments separate from the main student export.</p>
                 <div class="manual-student-panel">
                     <div class="manual-student-header">
                         <h3>Manual Student Entry</h3>
-                        <p class="section-description">Fetch a student from SUAP by matrícula and queue one CSV row per Moodle course ID.</p>
+                        <p class="section-description">Fetch students from SUAP by matrícula and queue one CSV row per Moodle course ID. Separate multiple matrículas with commas.</p>
                     </div>
                     <div class="pipeline-inputs manual-student-inputs">
                         <div class="input-group">
-                            <label for="manual-student-matricula-input">SUAP matrícula</label>
-                            <input type="text" id="manual-student-matricula-input" placeholder="202X1CH.COURSE000" autocomplete="off">
+                            <label for="manual-student-matricula-input">SUAP matrícula(s)</label>
+                            <input type="text" id="manual-student-matricula-input" placeholder="202X1CH.COURSE000, 202X1CH.COURSE001" autocomplete="off">
                         </div>
                         <div class="input-group">
                             <label for="manual-student-password-input">Password</label>
