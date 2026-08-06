@@ -63,7 +63,8 @@ Treat `files/` as part of the real application workflow. The most important gene
 
 ## Integration Facts
 - EduPage timetable extraction lives in `helpers/timetables.js`.
-- SUAP browser automation goes through Browserless via `helpers/scraper.js` and the `chrome` Compose service.
+- SUAP browser automation goes through Browserless via Playwright (`playwright-core`) in `helpers/scraper.js` and the `chrome` Compose service over CDP.
+- SUAP DOM selectors are maintained in `config/suap-selectors.js` with optional `SUAP_SELECTORS_FILE` JSON overrides.
 - AI matching is optional and uses `helpers/chat-assist.js` plus `models/AIMatch.js`.
 - Missing AI configuration should be treated as a real configuration problem, not silently bypassed.
 
@@ -72,7 +73,7 @@ Treat `files/` as part of the real application workflow. The most important gene
 docker compose up -d --build
 docker compose logs -f node
 docker compose exec node npm test
-docker compose exec node npm run test:coverage
+docker compose exec node npm test:coverage
 ```
 
 `compose.yaml` currently defines:
@@ -89,8 +90,9 @@ docker compose exec node npm run test:coverage
 
 ### Optional
 - `CHAT_ASSIST_API_KEY`
-- `CHROME_PORT`
-- `MAX_CONCURRENT_JOBS`
+- `CHROME_PORT` (default `3000`)
+- `MAX_CONCURRENT_JOBS` (default `1`)
+- `SUAP_SELECTORS_FILE` (optional custom JSON selector file)
 - `NODE_ENV`
 
 ## Conventions
@@ -112,8 +114,9 @@ docker compose exec node npm run test:coverage
 - For route and model work, follow the existing ESM mocking patterns already used in the suite.
 - For docs or AI customization changes, validate claims against `server.js`, `routes/`, `models/`, `helpers/`, `package.json`, and `compose.yaml`.
 
-## AI Workflow Files
-- `.github/skills/` stores TMET-specific reusable workflows.
-- `.github/prompts/*.prompt.md` stores reusable on-demand tasks.
-- `.github/agents/` stores focused custom agents for recurring maintenance work.
+## AI Workflow & Agent Guidance
+- `AGENTS.md` at project root serves as the primary orientation guide for AI coding agents.
+- `.agents/skills/` stores TMET-specific reusable workflow skills.
+- `.agents/prompts/*.prompt.md` stores reusable on-demand task prompts.
+- `.github/agents/` stores custom agent definitions (e.g. `tmet-docs-auditor.agent.md`).
 - Keep these files tightly scoped to verified TMET behavior and current customization conventions.

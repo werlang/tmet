@@ -9,11 +9,12 @@ tools: [read, search, edit]
 Rewrite the selected TMET AI context files so they match the current repository and current customization conventions.
 
 ## Scope
+- `AGENTS.md`
+- `README.md`
 - `.github/copilot-instructions.md`
-- `.github/skills/**/*.md`
-- `.github/prompts/*.prompt.md`
+- `.agents/skills/**/*.md`
+- `.agents/prompts/*.prompt.md`
 - `.github/agents/*.agent.md`
-- `README.md` when it references the AI workflow
 
 ## Rules
 1. Code wins over docs.

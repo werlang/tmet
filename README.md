@@ -100,16 +100,17 @@ docker compose exec node npm run test:watch
 docker compose exec node npm run test:coverage
 ```
 
-## AI workflow files
+## AI workflow & agent guidance
 
-TMET includes repository-specific Copilot customizations under `.github/`:
+TMET includes agent orientation and workflow guidance files:
 
-- `.github/copilot-instructions.md` for always-on repository guidance
-- `.github/skills/` for reusable TMET workflows
-- `.github/prompts/*.prompt.md` for on-demand audit and testing tasks
-- `.github/agents/tmet-docs-auditor.agent.md` for focused documentation drift audits
+- [`AGENTS.md`](AGENTS.md) root guide for AI coding agents
+- `.github/copilot-instructions.md` repository guidance for GitHub Copilot
+- `.agents/skills/` reusable TMET agent skills
+- `.agents/prompts/*.prompt.md` on-demand task prompts
+- `.github/agents/tmet-docs-auditor.agent.md` documentation auditor agent
 
-These files are intended to stay aligned with the current codebase, routes, tests, and Compose workflow.
+These files stay aligned with the current codebase, routes, tests, and Compose workflow.
 
 ## License
 

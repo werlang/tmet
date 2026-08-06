@@ -9,11 +9,12 @@ tools: [read, search, edit]
 Audit the selected TMET documentation against the current repository and fix confirmed drift.
 
 ## Audit targets
-1. `README.md`
-2. `.github/copilot-instructions.md`
-3. `.github/skills/**/*.md`
-4. `.github/prompts/*.prompt.md`
-5. `.github/agents/*.agent.md`
+1. `AGENTS.md`
+2. `README.md`
+3. `.github/copilot-instructions.md`
+4. `.agents/skills/**/*.md`
+5. `.agents/prompts/*.prompt.md`
+6. `.github/agents/*.agent.md`
 
 ## Source of truth
 - `server.js`
