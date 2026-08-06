@@ -45,6 +45,10 @@ class SUAPScraper {
         const page = await defaultContext.newPage();
         await page.setViewportSize({ width: 1920, height: 2000 });
 
+        if (typeof page.setDefaultTimeout === 'function') {
+            page.setDefaultTimeout(30000);
+        }
+
         console.log('Connected to Chrome.');
 
         SUAPScraper.page = page;
@@ -63,11 +67,16 @@ class SUAPScraper {
         const submitSelector = await SUAPScraper.#findFirstSelector(selectors.login.submit);
 
         if (!usernameSelector || !passwordSelector || !submitSelector) {
-            throw new Error('Could not find SUAP login form fields. Check selectors in config/suap-selectors.json');
+            throw new Error('Could not find SUAP login form fields. Check selectors in config/suap-selectors.js');
         }
 
-        await SUAPScraper.page.$eval(usernameSelector, (el, _username) => el.value = _username, SUAPScraper.username);
-        await SUAPScraper.page.$eval(passwordSelector, (el, _password) => el.value = _password, SUAPScraper.password);
+        if (typeof SUAPScraper.page.fill === 'function') {
+            await SUAPScraper.page.fill(usernameSelector, SUAPScraper.username);
+            await SUAPScraper.page.fill(passwordSelector, SUAPScraper.password);
+        } else {
+            await SUAPScraper.page.$eval(usernameSelector, (el, _username) => el.value = _username, SUAPScraper.username);
+            await SUAPScraper.page.$eval(passwordSelector, (el, _password) => el.value = _password, SUAPScraper.password);
+        }
 
         // Register the navigation listener BEFORE clicking to avoid a race where a
         // fast redirect destroys the page context before the waiter is set up.
@@ -78,7 +87,8 @@ class SUAPScraper {
 
         const sessionValid = await SUAPScraper.isSessionValid();
         if (!sessionValid) {
-            throw new Error('SUAP login failed or session expired immediately after login');
+            const detail = await SUAPScraper.#extractLoginError(selectors.login.errorSelectors);
+            throw new Error(detail ? `SUAP login failed: ${detail}` : 'SUAP login failed or session expired immediately after login');
         }
 
         await SUAPScraper.#waitForAnySelector(selectors.login.postLoginReady, { timeout: 5000 }).catch(() => null);
@@ -284,8 +294,29 @@ class SUAPScraper {
         }, serialized);
     }
 
+    /**
+     * Extract exact error text from page when login fails.
+     * @param {string[]} errorSelectors - Candidate error container selectors.
+     * @returns {Promise<string|null>} Extracted error text or null.
+     */
+    static async #extractLoginError(errorSelectors = []) {
+        try {
+            for (const selector of errorSelectors) {
+                if (!selector) continue;
+                const el = await SUAPScraper.page.$(selector);
+                if (el) {
+                    const text = await SUAPScraper.page.evaluate(node => node.textContent?.trim(), el);
+                    if (text) return text;
+                }
+            }
+        } catch {
+            // ignore extraction errors
+        }
+        return null;
+    }
+
     static async initialize() {
-        if (!SUAPScraper.connected) {
+        if (!SUAPScraper.connected || !SUAPScraper.page || (typeof SUAPScraper.page.isClosed === 'function' && SUAPScraper.page.isClosed())) {
             await SUAPScraper.connect();
         }
         return SUAPScraper;

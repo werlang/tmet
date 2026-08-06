@@ -87,11 +87,21 @@ class SUAP {
                 return rows;
             }, suapConfig.bookSearch);
 
+            // Contract validation: Ensure DOM layout did not break silently
+            if (SUAPsubjects.length > 0) {
+                const validRows = SUAPsubjects.filter(s => s.id && s.name && s.class);
+                if (validRows.length === 0) {
+                    throw new Error(`SUAP_DOM_CHANGED: Table rows were found for course ${courseName} but field extraction failed. SUAP layout structure may have changed.`);
+                }
+            }
+
             SUAPsubjects.forEach((subject) => {
                 // Banco de Dados, remove extra spaces
-                const subjectName = subject.name.split(' - ')?.[1]?.replace(/\s+/g, ' ').trim();
+                const subjectName = (subject.name || '').split(' - ')?.[1]?.replace(/\s+/g, ' ').trim() || subject.name || '';
                 // INF-1AT
-                subject.className = `${courseName}-${subject.class.split('.')?.[1]}A${subject.class.at(-1)}`;
+                const classPart = subject.class ? subject.class.split('.')?.[1] : '';
+                const lastChar = subject.class ? subject.class.at(-1) : '';
+                subject.className = `${courseName}-${classPart}A${lastChar}`;
                 // INF-1AT - Banco de Dados
                 subject.fullname = `${subject.className} - ${subjectName}`;
                 subject.subjectName = subjectName;

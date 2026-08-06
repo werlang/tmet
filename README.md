@@ -47,17 +47,15 @@ Optional:
 - `CHAT_ASSIST_API_KEY`
 - `CHROME_PORT` (default `3000`)
 - `MAX_CONCURRENT_JOBS` (default `1`)
-- `SUAP_SELECTORS_FILE` (default `config/suap-selectors.json`)
+- `SUAP_SELECTORS_FILE` (optional custom selector JSON path)
 
 ## SUAP selector configuration
 
-SUAP login/session selectors are loaded from `config/suap-selectors.json`.
+SUAP login/session selectors are built into `config/suap-selectors.js`.
 
-- Update this file when SUAP changes login form or session markers.
-- Keep selectors ordered from most specific to most generic.
-- If you need a different file per environment, set `SUAP_SELECTORS_FILE` to a custom JSON path.
-
-The scraper always keeps safe built-in defaults, so missing or partial keys in the JSON file do not break execution.
+- Built-in defaults cover login, error messages, and session markers.
+- If you need custom overrides per environment, point `SUAP_SELECTORS_FILE` to a custom JSON file.
+- The scraper automatically merges custom overrides with safe built-in defaults.
 
 ## API workflow
 

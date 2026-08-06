@@ -148,4 +148,54 @@ describe('SUAPScraper', () => {
             'SUAP navigation failed after 2 attempts',
         );
     });
+
+    it('uses Playwright fill method when available on page object', async () => {
+        const mockPage = {
+            goto: jest.fn().mockResolvedValue(undefined),
+            $: jest.fn(async (selector) => {
+                if (selector === '#id_username') return {};
+                if (selector === '#id_password') return {};
+                if (selector === 'input[type="submit"]') return {};
+                return null;
+            }),
+            fill: jest.fn().mockResolvedValue(undefined),
+            click: jest.fn().mockResolvedValue(undefined),
+            waitForLoadState: jest.fn().mockResolvedValue(undefined),
+            waitForSelector: jest.fn().mockResolvedValue(undefined),
+            content: jest.fn().mockResolvedValue('<html><body>ok</body></html>'),
+        };
+
+        SUAPScraper.page = mockPage;
+        jest.spyOn(SUAPScraper, 'isSessionValid').mockResolvedValue(true);
+
+        await SUAPScraper.login();
+
+        expect(mockPage.fill).toHaveBeenCalledWith('#id_username', SUAPScraper.username);
+        expect(mockPage.fill).toHaveBeenCalledWith('#id_password', SUAPScraper.password);
+        expect(SUAPScraper.logged).toBe(true);
+    });
+
+    it('extracts detailed server error message when login fails', async () => {
+        const mockPage = {
+            goto: jest.fn().mockResolvedValue(undefined),
+            $: jest.fn(async (selector) => {
+                if (selector === '#id_username') return {};
+                if (selector === '#id_password') return {};
+                if (selector === 'input[type="submit"]') return {};
+                if (selector === '.errornote') return {};
+                return null;
+            }),
+            $eval: jest.fn().mockResolvedValue(undefined),
+            click: jest.fn().mockResolvedValue(undefined),
+            waitForLoadState: jest.fn().mockResolvedValue(undefined),
+            waitForSelector: jest.fn().mockResolvedValue(undefined),
+            evaluate: jest.fn(async (fn, node) => 'Usuário ou senha inválidos.'),
+            content: jest.fn().mockResolvedValue('<html><body>error</body></html>'),
+        };
+
+        SUAPScraper.page = mockPage;
+        jest.spyOn(SUAPScraper, 'isSessionValid').mockResolvedValue(false);
+
+        await expect(SUAPScraper.login()).rejects.toThrow('SUAP login failed: Usuário ou senha inválidos.');
+    });
 });

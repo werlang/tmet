@@ -1,8 +1,8 @@
 import fs from 'fs';
-import path from 'path';
 
-const defaultSelectorFilePath = path.resolve('config', 'suap-selectors.json');
-
+/**
+ * Default SUAP DOM Selectors & Session Messages
+ */
 const defaultSuapSelectors = Object.freeze({
     login: {
         username: [
@@ -27,6 +27,13 @@ const defaultSuapSelectors = Object.freeze({
             '.user-profile',
             'a[href*="logout"]',
             'a[href*="/accounts/logout"]',
+        ],
+        errorSelectors: [
+            '.errornote',
+            '.alert-danger',
+            '.msg.alert',
+            '.alert-error',
+            '.errorlist',
         ],
     },
     session: {
@@ -95,6 +102,7 @@ function mergeSelectors(rawSelectors) {
     merged.login.password = normalizeList(login.password, merged.login.password);
     merged.login.submit = normalizeList(login.submit, merged.login.submit);
     merged.login.postLoginReady = normalizeList(login.postLoginReady, merged.login.postLoginReady);
+    merged.login.errorSelectors = normalizeList(login.errorSelectors, merged.login.errorSelectors);
 
     merged.session.invalidWhenPresent = normalizeList(
         session.invalidWhenPresent,
@@ -109,11 +117,16 @@ function mergeSelectors(rawSelectors) {
 }
 
 /**
- * Load SUAP selectors from a JSON file, with defaults and hot-reload via mtime cache.
- * @param {string} [filePath] - Optional custom selector file path.
+ * Load SUAP selectors. Returns default JS selectors, or merges custom JSON file
+ * if process.env.SUAP_SELECTORS_FILE or optional filePath argument is provided.
+ * @param {string} [filePath] - Optional custom selector JSON file path.
  * @returns {object} Effective selector configuration.
  */
-function loadSuapSelectors(filePath = process.env.SUAP_SELECTORS_FILE || defaultSelectorFilePath) {
+function loadSuapSelectors(filePath = process.env.SUAP_SELECTORS_FILE) {
+    if (!filePath) {
+        return clone(defaultSuapSelectors);
+    }
+
     try {
         if (!fs.existsSync(filePath)) {
             return clone(defaultSuapSelectors);
@@ -139,4 +152,4 @@ function loadSuapSelectors(filePath = process.env.SUAP_SELECTORS_FILE || default
     }
 }
 
-export { defaultSelectorFilePath, defaultSuapSelectors, loadSuapSelectors };
+export { defaultSuapSelectors, loadSuapSelectors };
