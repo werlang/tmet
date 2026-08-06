@@ -1,5 +1,6 @@
 import puppeteer from 'puppeteer-core';
 import { suapConfig } from '../config/suap-config.js';
+import { loadSuapSelectors } from '../config/suap-selectors.js';
 
 class SUAPScraper {
     
@@ -10,6 +11,7 @@ class SUAPScraper {
     static username = process.env.SUAP_USERNAME;
     static password = process.env.SUAP_PASSWORD;
     static chromePort = process.env.CHROME_PORT || 3000;
+    static maxNavigationAttempts = 3;
 
     // Private constructor to prevent instantiation
     constructor() {
@@ -44,13 +46,32 @@ class SUAPScraper {
     }
 
     static async login() {
+        const selectors = loadSuapSelectors();
+
         console.log(`Logging in as ${SUAPScraper.username}`);
         await SUAPScraper.page.goto(`${suapConfig.baseUrl}/${suapConfig.login.url}`);
-        await SUAPScraper.page.$eval(suapConfig.login.username, (el, _username) => el.value = _username, SUAPScraper.username);
-        await SUAPScraper.page.$eval(suapConfig.login.password, (el, _password) => el.value = _password, SUAPScraper.password);
-        await SUAPScraper.page.click(suapConfig.login.submit);
 
-        await SUAPScraper.page.waitForSelector(suapConfig.login.ready, { timeout: 5000 });
+        const usernameSelector = await SUAPScraper.#findFirstSelector(selectors.login.username);
+        const passwordSelector = await SUAPScraper.#findFirstSelector(selectors.login.password);
+        const submitSelector = await SUAPScraper.#findFirstSelector(selectors.login.submit);
+
+        if (!usernameSelector || !passwordSelector || !submitSelector) {
+            throw new Error('Could not find SUAP login form fields. Check selectors in config/suap-selectors.json');
+        }
+
+        await SUAPScraper.page.$eval(usernameSelector, (el, _username) => el.value = _username, SUAPScraper.username);
+        await SUAPScraper.page.$eval(passwordSelector, (el, _password) => el.value = _password, SUAPScraper.password);
+        await SUAPScraper.page.click(submitSelector);
+
+        await SUAPScraper.page.waitForNavigation({ timeout: 5000, waitUntil: 'domcontentloaded' }).catch(() => null);
+
+        const sessionValid = await SUAPScraper.isSessionValid();
+        if (!sessionValid) {
+            throw new Error('SUAP login failed or session expired immediately after login');
+        }
+
+        await SUAPScraper.#waitForAnySelector(selectors.login.postLoginReady, { timeout: 5000 }).catch(() => null);
+
         console.log('Login successful');
 
         SUAPScraper.logged = true;
@@ -63,8 +84,10 @@ class SUAPScraper {
      */
     static async isSessionValid() {
         try {
+            const selectors = loadSuapSelectors();
+
             // Check if login form exists (means we're on login page or session expired)
-            const hasLoginForm = await SUAPScraper.page.$(suapConfig.login.username);
+            const hasLoginForm = await SUAPScraper.#findFirstSelector(selectors.session.invalidWhenPresent);
             if (hasLoginForm) {
                 console.log('Session expired - login form detected');
                 return false;
@@ -72,9 +95,10 @@ class SUAPScraper {
             
             // Check if there's an error message about session
             const pageContent = await SUAPScraper.page.content();
-            if (pageContent.includes('Sua sessão expirou') || 
-                pageContent.includes('faça login novamente') ||
-                pageContent.includes('Efetuar login')) {
+            const hasExpiredMessage = selectors.session.expiredMessages.some(
+                (message) => pageContent.includes(message),
+            );
+            if (hasExpiredMessage) {
                 console.log('Session expired - expiration message detected');
                 return false;
             }
@@ -86,7 +110,19 @@ class SUAPScraper {
         }
     }
 
-    static async goto(url, confirmElement) {
+    /**
+     * Navigate to a SUAP page and confirm it loaded.
+     * Retries are bounded to avoid infinite relogin loops when selectors drift.
+     * @param {string} url - Target URL.
+     * @param {string} confirmElement - Selector that confirms page readiness.
+     * @param {number} attempt - Internal attempt counter.
+     * @returns {Promise<typeof SUAPScraper>}
+     */
+    static async goto(url, confirmElement, attempt = 1) {
+        if (attempt > SUAPScraper.maxNavigationAttempts) {
+            throw new Error(`SUAP navigation failed after ${SUAPScraper.maxNavigationAttempts} attempts: ${url}`);
+        }
+
         try {
             if (!SUAPScraper.logged) {
                 await SUAPScraper.login();
@@ -106,7 +142,7 @@ class SUAPScraper {
             SUAPScraper.connected = false;
             await SUAPScraper.connect();
             console.log('Reconnected to browser, trying to load page again...');
-            return await SUAPScraper.goto(url, confirmElement);
+            return await SUAPScraper.goto(url, confirmElement, attempt + 1);
         }
 
         if (confirmElement) {
@@ -117,12 +153,59 @@ class SUAPScraper {
                 if (err.name === 'TimeoutError') {
                     console.log(`Timeout waiting for selector ${confirmElement}, trying to login again...`);
                     SUAPScraper.logged = false;
-                    return await SUAPScraper.goto(url, confirmElement);
+                    return await SUAPScraper.goto(url, confirmElement, attempt + 1);
                 } else {
-                    throw Error('Error loading professor search results');
+                    throw new Error(`Error loading SUAP page ${url}: ${err.message}`);
                 }
             }
         }
+
+        return SUAPScraper;
+    }
+
+    /**
+     * Return the first selector that exists in the current document.
+     * @param {string[]} selectors - Candidate selectors.
+     * @returns {Promise<string|null>}
+     */
+    static async #findFirstSelector(selectors) {
+        for (const selector of selectors) {
+            if (!selector) {
+                continue;
+            }
+
+            const element = await SUAPScraper.page.$(selector);
+            if (element) {
+                return selector;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Wait for any selector in the provided list.
+     * @param {string[]} selectors - Candidate selectors.
+     * @param {object} options - Puppeteer wait options.
+     * @returns {Promise<string>} Resolved selector.
+     */
+    static async #waitForAnySelector(selectors, options = {}) {
+        let lastError = null;
+
+        for (const selector of selectors) {
+            if (!selector) {
+                continue;
+            }
+
+            try {
+                await SUAPScraper.page.waitForSelector(selector, options);
+                return selector;
+            } catch (error) {
+                lastError = error;
+            }
+        }
+
+        throw lastError || new Error('No selector matched');
     }
 
     static async evaluate(fn, data = {}) {
