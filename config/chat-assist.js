@@ -1,7 +1,8 @@
 const chatAssistConfig = {
     url: 'https://api.deepseek.com/chat/completions',
-    model: 'deepseek-chat',
-    temperature: 1.0,
+    model: 'deepseek-v4-flash',
+    thinking: { type: 'enabled' },
+    reasoning_effort: 'max',
     maxTokens: 2048,
     keepHistory: false,
     systemPrompt: `You are an expert at matching academic course subjects between two different systems. 

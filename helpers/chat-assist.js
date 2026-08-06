@@ -28,6 +28,8 @@ class ChatAssist {
         const {
             temperature = chatAssistConfig.temperature,
             maxTokens = chatAssistConfig.maxTokens,
+            thinking = chatAssistConfig.thinking,
+            reasoning_effort = chatAssistConfig.reasoning_effort,
             keepHistory = false,
         } = options;
 
