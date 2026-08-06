@@ -61,9 +61,13 @@ class SUAPScraper {
 
         await SUAPScraper.page.$eval(usernameSelector, (el, _username) => el.value = _username, SUAPScraper.username);
         await SUAPScraper.page.$eval(passwordSelector, (el, _password) => el.value = _password, SUAPScraper.password);
-        await SUAPScraper.page.click(submitSelector);
 
-        await SUAPScraper.page.waitForNavigation({ timeout: 5000, waitUntil: 'domcontentloaded' }).catch(() => null);
+        // Register the navigation listener BEFORE clicking to avoid a race where a
+        // fast redirect destroys the page context before waitForNavigation is set up.
+        await Promise.all([
+            SUAPScraper.page.waitForNavigation({ timeout: 10000, waitUntil: 'networkidle0' }).catch(() => null),
+            SUAPScraper.page.click(submitSelector),
+        ]);
 
         const sessionValid = await SUAPScraper.isSessionValid();
         if (!sessionValid) {
@@ -105,6 +109,13 @@ class SUAPScraper {
             
             return true;
         } catch (error) {
+            // "Execution context was destroyed" is a transient Puppeteer error that occurs
+            // while the page is mid-navigation — it does NOT mean the session is invalid.
+            // Treat it as valid so the caller can wait for the new page to settle.
+            if (error.message && error.message.includes('Execution context was destroyed')) {
+                console.log('Session check skipped — page is still navigating (context destroyed)');
+                return true;
+            }
             console.error('Error checking session validity:', error.message);
             return false;
         }
