@@ -18,7 +18,7 @@
   "dependencies": {
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
-    "puppeteer-core": "^24.30.0"
+    "playwright-core": "^1.41.1"
   },
   "devDependencies": {
     "jest": "^30.2.0",

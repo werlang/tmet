@@ -11,9 +11,9 @@ import { suppressConsole } from '../setup.js';
 
 const mockConnect = jest.fn();
 
-jest.unstable_mockModule('puppeteer-core', () => ({
-    default: {
-        connect: mockConnect,
+jest.unstable_mockModule('playwright-core', () => ({
+    chromium: {
+        connectOverCDP: mockConnect,
     },
 }));
 
@@ -55,7 +55,7 @@ describe('SUAPScraper', () => {
             }),
             $eval: jest.fn().mockResolvedValue(undefined),
             click: jest.fn().mockResolvedValue(undefined),
-            waitForNavigation: jest.fn().mockResolvedValue(undefined),
+            waitForLoadState: jest.fn().mockResolvedValue(undefined),
             waitForSelector: jest.fn().mockResolvedValue(undefined),
             content: jest.fn().mockResolvedValue('<html><body>ok</body></html>'),
         };
@@ -100,7 +100,7 @@ describe('SUAPScraper', () => {
             }),
             $eval: jest.fn().mockResolvedValue(undefined),
             click: jest.fn().mockResolvedValue(undefined),
-            waitForNavigation: jest.fn().mockResolvedValue(undefined),
+            waitForLoadState: jest.fn().mockResolvedValue(undefined),
             waitForSelector: jest.fn().mockResolvedValue(undefined),
             content: jest.fn().mockResolvedValue('<html><body>ok</body></html>'),
         };

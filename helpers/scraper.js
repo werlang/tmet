@@ -1,9 +1,9 @@
-import puppeteer from 'puppeteer-core';
+import { chromium } from 'playwright-core';
 import { suapConfig } from '../config/suap-config.js';
 import { loadSuapSelectors } from '../config/suap-selectors.js';
 
 class SUAPScraper {
-    
+
     static browser = null;
     static page = null;
     static connected = false;
@@ -18,13 +18,17 @@ class SUAPScraper {
         throw new Error('SUAPScraper is a static class. Use static methods instead.');
     }
 
+    /**
+     * Connect to the remote Browserless Chrome instance via the CDP endpoint.
+     * Playwright's connectOverCDP speaks the same Chrome DevTools Protocol that
+     * Browserless v1 exposes on http://chrome:<port>, so no container changes needed.
+     */
     static async connect() {
         // Remote debug: edge://inspect/#devices
         try {
-            SUAPScraper.browser = await puppeteer.connect({
-                browserURL: `http://chrome:${SUAPScraper.chromePort}`,
-                // slowMo: 250
-            });
+            SUAPScraper.browser = await chromium.connectOverCDP(
+                `http://chrome:${SUAPScraper.chromePort}`
+            );
         } catch (error) {
             console.error('Could not connect to Chrome.');
             return await new Promise(resolve => {
@@ -35,8 +39,11 @@ class SUAPScraper {
             });
         }
 
-        const page = await SUAPScraper.browser.newPage();
-        await page.setViewport({ width: 1920, height: 2000 });
+        // connectOverCDP exposes a default BrowserContext — reuse it.
+        const defaultContext = SUAPScraper.browser.contexts()[0]
+            ?? await SUAPScraper.browser.newContext();
+        const page = await defaultContext.newPage();
+        await page.setViewportSize({ width: 1920, height: 2000 });
 
         console.log('Connected to Chrome.');
 
@@ -63,9 +70,9 @@ class SUAPScraper {
         await SUAPScraper.page.$eval(passwordSelector, (el, _password) => el.value = _password, SUAPScraper.password);
 
         // Register the navigation listener BEFORE clicking to avoid a race where a
-        // fast redirect destroys the page context before waitForNavigation is set up.
+        // fast redirect destroys the page context before the waiter is set up.
         await Promise.all([
-            SUAPScraper.page.waitForNavigation({ timeout: 10000, waitUntil: 'networkidle0' }).catch(() => null),
+            SUAPScraper.page.waitForLoadState('networkidle'),
             SUAPScraper.page.click(submitSelector),
         ]);
 
@@ -83,8 +90,8 @@ class SUAPScraper {
     }
 
     /**
-     * Check if we're still logged in by looking for login form elements
-     * @returns {Promise<boolean>} True if session is valid
+     * Check if we're still logged in by looking for login form elements.
+     * @returns {Promise<boolean>} True if session is valid.
      */
     static async isSessionValid() {
         try {
@@ -96,7 +103,7 @@ class SUAPScraper {
                 console.log('Session expired - login form detected');
                 return false;
             }
-            
+
             // Check if there's an error message about session
             const pageContent = await SUAPScraper.page.content();
             const hasExpiredMessage = selectors.session.expiredMessages.some(
@@ -106,12 +113,12 @@ class SUAPScraper {
                 console.log('Session expired - expiration message detected');
                 return false;
             }
-            
+
             return true;
         } catch (error) {
-            // "Execution context was destroyed" is a transient Puppeteer error that occurs
-            // while the page is mid-navigation — it does NOT mean the session is invalid.
-            // Treat it as valid so the caller can wait for the new page to settle.
+            // "Execution context was destroyed" is a transient Playwright/CDP error that
+            // occurs while the page is mid-navigation — it does NOT mean the session is
+            // invalid. Treat it as valid so the caller can wait for the new page to settle.
             if (error.message && error.message.includes('Execution context was destroyed')) {
                 console.log('Session check skipped — page is still navigating (context destroyed)');
                 return true;
@@ -139,7 +146,7 @@ class SUAPScraper {
                 await SUAPScraper.login();
             }
             await SUAPScraper.page.goto(url);
-            
+
             // Check if session is still valid after navigation
             const sessionValid = await SUAPScraper.isSessionValid();
             if (!sessionValid) {
@@ -197,7 +204,7 @@ class SUAPScraper {
     /**
      * Wait for any selector in the provided list.
      * @param {string[]} selectors - Candidate selectors.
-     * @param {object} options - Puppeteer wait options.
+     * @param {object} options - Wait options ({ timeout }).
      * @returns {Promise<string>} Resolved selector.
      */
     static async #waitForAnySelector(selectors, options = {}) {
@@ -219,6 +226,12 @@ class SUAPScraper {
         throw lastError || new Error('No selector matched');
     }
 
+    /**
+     * Evaluate a function in the browser context, with support for serializing
+     * functions embedded inside the data argument (Playwright's evaluate cannot
+     * transfer live function references, so we stringify and eval them the same
+     * way Puppeteer required).
+     */
     static async evaluate(fn, data = {}) {
         // Serialize functions in data
         const serializeFunctions = (data) => {
@@ -226,7 +239,7 @@ class SUAPScraper {
             for (const [key, value] of Object.entries(data)) {
                 if (typeof value === 'function') {
                     data[key] = `fn:${value.toString()}`;
-                } 
+                }
                 else if (value && typeof value === 'object' && !Array.isArray(value)) {
                     data[key] = serializeFunctions(value);
                 }
@@ -242,7 +255,6 @@ class SUAPScraper {
         const serialized = serializeFunctions(data) || {};
         // serialize function argument
         serialized.fn = fn.toString();
-        // console.log(serialized);
 
         return SUAPScraper.page.evaluate((data) => {
             // in the browser, deserialize functions in data
@@ -283,11 +295,11 @@ class SUAPScraper {
         await SUAPScraper.initialize();
 
         try {
-            // Set the HTML content
+            // Set the HTML content and wait for any in-page network activity to settle
             await SUAPScraper.page.setContent(text, {
-                waitUntil: 'networkidle0'
+                waitUntil: 'networkidle'
             });
-    
+
             // Generate PDF
             const pdfBuffer = await SUAPScraper.page.pdf({
                 format: 'A4',
@@ -299,12 +311,12 @@ class SUAPScraper {
                     left: '20px'
                 }
             });
-    
+
             // Convert Buffer to Base64
             const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
-    
+
             console.log(`PDF generated successfully - Size: ${pdfBuffer.length} bytes`);
-    
+
             return pdfBase64;
         }
         catch (error) {
