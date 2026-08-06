@@ -5,7 +5,8 @@ const suapConfig = {
         username: '#id_username',
         password: '#id_password',
         submit: 'input[type="submit"]',
-        ready: '#user-tools .user-profile'
+        ready: '#user-tools .user-profile',
+        timeoutMs: 30000,
     },
     bookSearch: {
         url: {
@@ -15,7 +16,7 @@ const suapConfig = {
                 tab: 'tab_any_data',
             },
         },
-        ready: '#changelist-form .results table#result_list',
+        ready: 'table#result_list, #changelist-form .results table#result_list, #changelist-form .msg.alert',
         rows: '#changelist-form .results table#result_list tbody tr',
         data: {
             id: (tr) => tr.querySelectorAll('td')?.[1]?.textContent.trim(),

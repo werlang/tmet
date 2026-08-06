@@ -120,7 +120,7 @@ describe('SUAPScraper', () => {
             expect.any(Function),
             SUAPScraper.password,
         );
-        expect(mockPage.click).toHaveBeenCalledWith('#custom-submit');
+        expect(mockPage.click).toHaveBeenCalledWith('#custom-submit', { noWaitAfter: true });
     });
 
     it('stops retrying navigation when confirm selector never appears', async () => {

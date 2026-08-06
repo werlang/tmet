@@ -53,6 +53,7 @@ class SUAPScraper {
 
         SUAPScraper.page = page;
         SUAPScraper.connected = true;
+        SUAPScraper.logged = false;
         return SUAPScraper;
     }
 
@@ -60,7 +61,7 @@ class SUAPScraper {
         const selectors = loadSuapSelectors();
 
         console.log(`Logging in as ${SUAPScraper.username}`);
-        await SUAPScraper.page.goto(`${suapConfig.baseUrl}/${suapConfig.login.url}`);
+        await SUAPScraper.page.goto(`${suapConfig.baseUrl}/${suapConfig.login.url}`, { waitUntil: 'domcontentloaded' });
 
         const usernameSelector = await SUAPScraper.#findFirstSelector(selectors.login.username);
         const passwordSelector = await SUAPScraper.#findFirstSelector(selectors.login.password);
@@ -78,20 +79,24 @@ class SUAPScraper {
             await SUAPScraper.page.$eval(passwordSelector, (el, _password) => el.value = _password, SUAPScraper.password);
         }
 
-        // Register the navigation listener BEFORE clicking to avoid a race where a
-        // fast redirect destroys the page context before the waiter is set up.
-        await Promise.all([
-            SUAPScraper.page.waitForLoadState('networkidle'),
-            SUAPScraper.page.click(submitSelector),
-        ]);
+        if (typeof SUAPScraper.page.click === 'function') {
+            await SUAPScraper.page.click(submitSelector, { noWaitAfter: true }).catch(async () => {
+                await SUAPScraper.page.click(submitSelector);
+            });
+        }
+
+        const waitCandidates = [
+            ...selectors.login.postLoginReady,
+            ...selectors.login.errorSelectors,
+        ];
+        const timeoutMs = suapConfig.login?.timeoutMs || 30000;
+        await SUAPScraper.#waitForAnySelector(waitCandidates, { timeout: timeoutMs }).catch(() => null);
 
         const sessionValid = await SUAPScraper.isSessionValid();
         if (!sessionValid) {
             const detail = await SUAPScraper.#extractLoginError(selectors.login.errorSelectors);
             throw new Error(detail ? `SUAP login failed: ${detail}` : 'SUAP login failed or session expired immediately after login');
         }
-
-        await SUAPScraper.#waitForAnySelector(selectors.login.postLoginReady, { timeout: 5000 }).catch(() => null);
 
         console.log('Login successful');
 
@@ -155,7 +160,7 @@ class SUAPScraper {
             if (!SUAPScraper.logged) {
                 await SUAPScraper.login();
             }
-            await SUAPScraper.page.goto(url);
+            await SUAPScraper.page.goto(url, { waitUntil: 'domcontentloaded' });
 
             // Check if session is still valid after navigation
             const sessionValid = await SUAPScraper.isSessionValid();
@@ -163,7 +168,7 @@ class SUAPScraper {
                 console.log('Session invalid after navigation, re-authenticating...');
                 SUAPScraper.logged = false;
                 await SUAPScraper.login();
-                await SUAPScraper.page.goto(url);
+                await SUAPScraper.page.goto(url, { waitUntil: 'domcontentloaded' });
             }
         } catch (err) {
             console.error(err);
@@ -175,7 +180,8 @@ class SUAPScraper {
 
         if (confirmElement) {
             try {
-                await SUAPScraper.page.waitForSelector(confirmElement, { timeout: 5000 });
+                const timeoutMs = suapConfig.login?.timeoutMs || 30000;
+                await SUAPScraper.page.waitForSelector(confirmElement, { state: 'attached', timeout: timeoutMs });
                 return SUAPScraper;
             } catch (err) {
                 if (err.name === 'TimeoutError') {
@@ -218,22 +224,14 @@ class SUAPScraper {
      * @returns {Promise<string>} Resolved selector.
      */
     static async #waitForAnySelector(selectors, options = {}) {
-        let lastError = null;
-
-        for (const selector of selectors) {
-            if (!selector) {
-                continue;
-            }
-
-            try {
-                await SUAPScraper.page.waitForSelector(selector, options);
-                return selector;
-            } catch (error) {
-                lastError = error;
-            }
+        const valid = (selectors || []).filter((s) => typeof s === 'string' && s.trim().length > 0);
+        if (valid.length === 0) {
+            throw new Error('No valid selectors provided');
         }
 
-        throw lastError || new Error('No selector matched');
+        const combined = valid.join(', ');
+        await SUAPScraper.page.waitForSelector(combined, { state: 'attached', ...options });
+        return combined;
     }
 
     /**
