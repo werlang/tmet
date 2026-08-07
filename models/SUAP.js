@@ -368,34 +368,7 @@ class SUAP {
 
         console.log(`Scraping professors for subject ${subjectId}...`);
 
-        // Extract professor info from the "Professores" box table
-        // The table has columns: Ações, Matrícula, Nome, Campus, Tipo, Carga Horária, Ativo, Período da Posse
-        const basicProfessors = await SUAPScraper.evaluate(() => {
-            const professors = [];
-            
-            // Find the "Professores" box by looking for h3 with that text
-            const boxes = document.querySelectorAll('.box');
-            for (const box of boxes) {
-                const title = box.querySelector('h3')?.textContent?.trim();
-                if (title === 'Professores') {
-                    // Found the professors box - get the table rows
-                    const rows = box.querySelectorAll('table tbody tr');
-                    rows.forEach((tr) => {
-                        const cells = tr.querySelectorAll('td');
-                        if (cells.length >= 3) {
-                            // cells[1] = Matrícula (SIAPE), cells[2] = Nome
-                            const siape = cells[1]?.textContent?.trim();
-                            const name = cells[2]?.textContent?.trim();
-                            if (siape && name && !professors.find(p => p.siape === siape)) {
-                                professors.push({ siape, name });
-                            }
-                        }
-                    });
-                    break;
-                }
-            }
-            return professors;
-        });
+        const basicProfessors = await this.#extractBasicProfessors();
 
         console.log(`Found ${basicProfessors.length} professors`);
 
@@ -867,34 +840,7 @@ class SUAP {
 
         if (progressCallback) progressCallback(`Extracting professor list...`);
         
-        // Extract professor info from the "Professores" box table
-        // The table has columns: Ações, Matrícula, Nome, Campus, Tipo, Carga Horária, Ativo, Período da Posse
-        const basicProfessors = await SUAPScraper.evaluate(() => {
-            const professors = [];
-            
-            // Find the "Professores" box by looking for h3 with that text
-            const boxes = document.querySelectorAll('.box');
-            for (const box of boxes) {
-                const title = box.querySelector('h3')?.textContent?.trim();
-                if (title === 'Professores') {
-                    // Found the professors box - get the table rows
-                    const rows = box.querySelectorAll('table tbody tr');
-                    rows.forEach((tr) => {
-                        const cells = tr.querySelectorAll('td');
-                        if (cells.length >= 3) {
-                            // cells[1] = Matrícula (SIAPE), cells[2] = Nome
-                            const siape = cells[1]?.textContent?.trim();
-                            const name = cells[2]?.textContent?.trim();
-                            if (siape && name && !professors.find(p => p.siape === siape)) {
-                                professors.push({ siape, name });
-                            }
-                        }
-                    });
-                    break;
-                }
-            }
-            return professors;
-        });
+        const basicProfessors = await this.#extractBasicProfessors();
 
         console.log(`Found ${basicProfessors.length} professors. Fetching emails...`);
         if (progressCallback) progressCallback(`Found ${basicProfessors.length} professors. Fetching emails...`);
@@ -1033,6 +979,132 @@ class SUAP {
         // Write back to file
         fs.writeFileSync(this.#professorsPath, JSON.stringify(data, null, 2));
         console.log(`Saved ${professors.length} professors to ${this.#professorsPath}`);
+    }
+    /**
+     * Extract basic professor list (SIAPE and Name) from current SUAP subject detail page in browser context
+     * @returns {Promise<Array<{siape: string, name: string}>>}
+     */
+    async #extractBasicProfessors() {
+        return await SUAPScraper.evaluate(() => {
+            const professors = [];
+            const addedSiapes = new Set();
+
+            const addProfessor = (siape, name) => {
+                const cleanSiape = (siape || '').trim();
+                const cleanName = (name || '').trim();
+                if (cleanSiape && cleanName && !addedSiapes.has(cleanSiape)) {
+                    addedSiapes.add(cleanSiape);
+                    professors.push({ siape: cleanSiape, name: cleanName });
+                }
+            };
+
+            // 1. Search for boxes/containers with headings containing "professor" or "professores"
+            const containers = document.querySelectorAll('.box, fieldset, section, .panel, .tab-content, div');
+            const professorBoxes = [];
+
+            for (const container of containers) {
+                const header = container.querySelector?.('h1, h2, h3, h4, h5, legend, caption, .box-header, .title, header');
+                if (header) {
+                    const text = (header.textContent || '').trim().toLowerCase();
+                    if (text.includes('professor') || text.includes('professores')) {
+                        professorBoxes.push(container);
+                    }
+                }
+            }
+
+            // Also search table elements directly if caption/headers mention professor or siape
+            const tables = document.querySelectorAll('table');
+            for (const table of tables) {
+                const caption = table.querySelector?.('caption')?.textContent?.toLowerCase() || '';
+                const thElements = Array.from(table.querySelectorAll?.('th') || []);
+                const thText = thElements.map(th => th.textContent || '').join(' ').toLowerCase();
+                if (caption.includes('professor') || thText.includes('professor') || thText.includes('siape')) {
+                    if (!professorBoxes.includes(table)) {
+                        professorBoxes.push(table);
+                    }
+                }
+            }
+
+            // Helper to parse rows within candidate elements
+            const processElements = (elements) => {
+                elements.forEach(element => {
+                    const rows = element.querySelectorAll?.('tr') || [];
+                    rows.forEach(tr => {
+                        // Strategy A: Look for link to professor profile /rh/servidor/<siape>/
+                        const profileLink = tr.querySelector?.('a[href*="/rh/servidor/"]');
+                        if (profileLink) {
+                            const href = profileLink.getAttribute?.('href') || '';
+                            const match = href.match(/\/rh\/servidor\/([^/]+)/);
+                            const siapeFromUrl = match ? match[1] : null;
+                            const linkText = (profileLink.textContent || '').trim();
+
+                            const cells = tr.querySelectorAll?.('td') || [];
+                            let siape = siapeFromUrl || (cells[1]?.textContent || '').trim();
+                            let name = linkText;
+
+                            // If link text is SIAPE number, look for name in cell
+                            if (/^\d+$/.test(name) || name === siape) {
+                                name = (cells[2]?.textContent || cells[1]?.textContent || linkText).trim();
+                            }
+
+                            if (siape && name) {
+                                addProfessor(siape, name);
+                                return;
+                            }
+                        }
+
+                        // Strategy B: Fallback to checking table cells
+                        const cells = tr.querySelectorAll?.('td') || [];
+                        if (cells.length >= 2) {
+                            // Check for 6-8 digit SIAPE in any cell
+                            for (let i = 0; i < cells.length; i++) {
+                                const text = (cells[i]?.textContent || '').trim();
+                                if (/^\d{6,8}$/.test(text)) {
+                                    const siape = text;
+                                    const nextCell = cells[i + 1] || cells[i - 1];
+                                    const name = (nextCell?.textContent || '').trim();
+                                    if (name && !/^\d+$/.test(name)) {
+                                        addProfessor(siape, name);
+                                        return;
+                                    }
+                                }
+                            }
+
+                            // Legacy fallback: cells[1] = siape, cells[2] = name
+                            if (cells.length >= 3) {
+                                const siape = (cells[1]?.textContent || '').trim();
+                                const name = (cells[2]?.textContent || '').trim();
+                                if (siape && name) {
+                                    addProfessor(siape, name);
+                                }
+                            }
+                        }
+                    });
+                });
+            };
+
+            if (professorBoxes.length > 0) {
+                processElements(professorBoxes);
+            }
+
+            // Global fallback: if no professors found in boxes, search ALL links with /rh/servidor/ on page
+            if (professors.length === 0) {
+                const allProfileLinks = document.querySelectorAll('a[href*="/rh/servidor/"]');
+                allProfileLinks.forEach(link => {
+                    const href = link.getAttribute?.('href') || '';
+                    const match = href.match(/\/rh\/servidor\/([^/]+)/);
+                    if (match && match[1]) {
+                        const siape = match[1];
+                        const name = (link.textContent || '').trim();
+                        if (siape && name && !/^\d+$/.test(name)) {
+                            addProfessor(siape, name);
+                        }
+                    }
+                });
+            }
+
+            return professors;
+        });
     }
 }
 

@@ -1232,5 +1232,59 @@ describe('SUAP Model', () => {
             expect(result.professors).toEqual([]);
         });
 
+        it('should extract professors with heading title variations like "Professores (1)" and profile links', async () => {
+            let evaluateCall = 0;
+
+            mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
+                evaluateCall += 1;
+                if (evaluateCall === 1) {
+                    // Browser callback for professor extraction
+                    const mockProfileLink = {
+                        getAttribute: () => '/rh/servidor/7654321/',
+                        textContent: 'Prof. Carlos Silva'
+                    };
+                    const mockRow = {
+                        querySelector: jest.fn((selector) => {
+                            if (selector === 'a[href*="/rh/servidor/"]') return mockProfileLink;
+                            return null;
+                        }),
+                        querySelectorAll: jest.fn(() => [
+                            { textContent: 'Ações' },
+                            { textContent: '7654321' },
+                            { textContent: 'Prof. Carlos Silva' }
+                        ])
+                    };
+                    const mockBox = {
+                        querySelector: jest.fn(() => ({ textContent: 'Professores (1)' })),
+                        querySelectorAll: jest.fn((selector) => {
+                            if (selector === 'tr') return [mockRow];
+                            return [];
+                        })
+                    };
+
+                    global.document = {
+                        querySelectorAll: jest.fn(() => [mockBox])
+                    };
+
+                    return Promise.resolve(callback(config));
+                }
+
+                // Email lookup
+                return Promise.resolve('carlos.silva@ifsul.edu.br');
+            });
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            const professors = await suap.scrapeProfessors('99100');
+
+            expect(professors).toHaveLength(1);
+            expect(professors[0]).toEqual({
+                id: 'carlos.silva',
+                name: 'Prof. Carlos Silva',
+                email: 'carlos.silva@ifsul.edu.br',
+                siape: '7654321'
+            });
+        });
     });
 });
