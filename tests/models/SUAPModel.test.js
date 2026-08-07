@@ -296,6 +296,74 @@ describe('SUAP Model', () => {
         });
     });
 
+    describe('extractSubjectsByIds()', () => {
+        it('should throw error when subjectIds is empty or not an array', async () => {
+            const suap = new SUAP();
+            await expect(suap.extractSubjectsByIds([])).rejects.toThrow('Array of subject IDs is required');
+            await expect(suap.extractSubjectsByIds(null)).rejects.toThrow('Array of subject IDs is required');
+        });
+
+        it('should extract subjects by ID by scanning courses and falling back to individual queries if missing', async () => {
+            // Mock course evaluation returning subjects for INF course
+            mockSUAPScraper.evaluate.mockResolvedValue([
+                {
+                    id: "60244",
+                    name: "TEC.3837 - Programação Web I - Ensino Médio",
+                    class: "20251.2.CH.INF_I.90.1T"
+                },
+                {
+                    id: "75210",
+                    name: "TEC.3838 - Banco de Dados II",
+                    class: "20261.1.CH.INF_I.90.1T"
+                }
+            ]);
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            const result = await suap.extractSubjectsByIds(['60244', '75210', '99999']);
+
+            expect(mockSUAPScraper.initialize).toHaveBeenCalled();
+            expect(mockSUAPScraper.goto).toHaveBeenCalled();
+            expect(result.some(s => s.id === '60244')).toBe(true);
+            expect(result.some(s => s.id === '75210')).toBe(true);
+            expect(mockFs.writeFileSync).toHaveBeenCalled();
+        });
+
+        it('should discover context from single diário and fetch full group batch to cull unfetched list', async () => {
+            mockFs.existsSync.mockReturnValue(false);
+
+            // Mock sequence:
+            // 1st evaluate (discovery query for 75210): returns row with class 20261.1.CH.INF_I.90.1T
+            // 2nd evaluate (group batch query for INF 2026.1): returns 75210 and 75225, culling both from unfetched list
+            // 3rd evaluate (discovery query for remaining 76439): returns row with class 20262.2.CH.TSI.90.4N
+            // 4th evaluate (group batch query for TSI 2026.2): returns 76439
+            mockSUAPScraper.evaluate
+                .mockResolvedValueOnce([
+                    { id: '75210', name: 'TEC.3838 - Banco de Dados', class: '20261.1.CH.INF_I.90.1T' }
+                ])
+                .mockResolvedValueOnce([
+                    { id: '75210', name: 'TEC.3838 - Banco de Dados', class: '20261.1.CH.INF_I.90.1T' },
+                    { id: '75225', name: 'TEC.3839 - Mecatrônica I', class: '20261.1.CH.MCT_I.90.1T' }
+                ])
+                .mockResolvedValueOnce([
+                    { id: '76439', name: 'TEC.3840 - Servicos de Rede', class: '20262.2.CH.TSI.90.4N' }
+                ])
+                .mockResolvedValueOnce([
+                    { id: '76439', name: 'TEC.3840 - Servicos de Rede', class: '20262.2.CH.TSI.90.4N' }
+                ]);
+
+            const suap = new SUAP();
+            const result = await suap.extractSubjectsByIds(['75210', '75225', '76439']);
+
+            expect(result.some(s => s.id === '75210')).toBe(true);
+            expect(result.some(s => s.id === '75225')).toBe(true);
+            expect(result.some(s => s.id === '76439')).toBe(true);
+
+            expect(mockSUAPScraper.goto).toHaveBeenCalled();
+        });
+    });
+
     describe('scrapeStudents()', () => {
         it('should scrape students and professors from subject page', async () => {
             // First call - professors from main page
@@ -1163,5 +1231,6 @@ describe('SUAP Model', () => {
             expect(result.students).toEqual([]);
             expect(result.professors).toEqual([]);
         });
+
     });
 });

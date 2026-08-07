@@ -44,6 +44,10 @@ const mockSuapInstance = {
     scrapeProfessors: jest.fn().mockImplementation(async (subjectId, progressCallback) => {
         if (progressCallback) progressCallback('Scraping professors...');
         return [{ siape: '1234567', name: 'Test Professor' }];
+    }),
+    extractSubjectsByIds: jest.fn().mockImplementation(async (subjectIds, progressCallback) => {
+        if (progressCallback) progressCallback('Extracting matched subjects...');
+        return undefined;
     })
 };
 const mockSUAP = jest.fn().mockImplementation(() => mockSuapInstance);
@@ -205,6 +209,45 @@ describe('SUAP Route', () => {
             await handler(req, res);
 
             expect(res.statusCode).toBe(500);
+        });
+    });
+
+    describe('POST /extract-matched', () => {
+        it('should return 400 when no matched subjects exist', async () => {
+            mockFs.existsSync.mockReturnValue(false);
+            mockFs.readFileSync.mockReturnValue(JSON.stringify([]));
+
+            const handler = getRouteHandler('post', '/extract-matched');
+            const req = createMockRequest();
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(400);
+            expect(res._data.error).toContain('No matched SUAP subjects found');
+        });
+
+        it('should queue extraction job when matched subjects exist', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(JSON.stringify([
+                { moodleFullname: 'Course A', suapId: '60244', type: 'manual' }
+            ]));
+
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('job-matched-123')
+            };
+
+            const handler = getRouteHandler('post', '/extract-matched');
+            const req = createMockRequest({
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data.success).toBe(true);
+            expect(res._data.jobId).toBe('job-matched-123');
         });
     });
 

@@ -126,6 +126,219 @@ class SUAP {
     }
 
     /**
+     * Extract specific subjects by ID from SUAP and merge with suap_subjects.json
+     * Picks a single unfetched diário ID, queries SUAP to discover its exact (course, year, semester) context,
+     * then fetches the entire group batch for that context, culling all returned IDs from the unfetched set.
+     * @param {string[]} subjectIds - Array of SUAP subject IDs to extract
+     * @param {Function} progressCallback - Optional progress callback
+     * @returns {Promise<Array>} Extracted/merged subjects
+     */
+    async extractSubjectsByIds(subjectIds, progressCallback = null) {
+        if (!subjectIds || !Array.isArray(subjectIds) || subjectIds.length === 0) {
+            throw new Error('Array of subject IDs is required');
+        }
+
+        if (progressCallback) progressCallback('Initializing browser automation');
+        await SUAPScraper.initialize();
+
+        // Load existing subjects if file exists
+        let existingSubjects = [];
+        if (fs.existsSync(this.#dataPath)) {
+            try {
+                existingSubjects = JSON.parse(fs.readFileSync(this.#dataPath, 'utf-8')) || [];
+            } catch (err) {
+                console.error('Error reading existing suap_subjects.json:', err);
+                existingSubjects = [];
+            }
+        }
+
+        const targetIds = new Set(subjectIds.map(id => String(id).trim()).filter(Boolean));
+        const unfetchedIds = new Set(targetIds);
+        const extractedSubjectsMap = new Map();
+        const courses = suapConfig.courses;
+
+        // Helper to format raw SUAP subject row
+        const formatSubjectRow = (rawRow) => {
+            if (!rawRow || !rawRow.id) return null;
+
+            const rawClass = rawRow.class || '';
+            const parts = rawClass.split('.').filter(Boolean);
+
+            let courseName = Object.keys(courses).find(code =>
+                rawClass.includes(`.${code}`) || rawClass.includes(`.${code}_`)
+            ) || parts.find(p => courses[p]) || parts[3]?.split('_')?.[0] || 'COURSE';
+
+            const subjectName = (rawRow.name || '').split(' - ')?.[1]?.replace(/\s+/g, ' ').trim() || rawRow.name || '';
+            const period = parts[1] || '1';
+            const shift = rawClass.at(-1) || 'T';
+            const className = `${courseName}-${period}A${shift}`;
+            const fullname = `${className} - ${subjectName}`;
+
+            return {
+                id: String(rawRow.id),
+                name: rawRow.name,
+                class: rawClass,
+                className,
+                fullname,
+                subjectName,
+                group: false
+            };
+        };
+
+        const queriedBatches = new Set();
+        let loopIndex = 0;
+
+        // Loop while there are still unfetched IDs
+        while (unfetchedIds.size > 0) {
+            loopIndex++;
+            const currentId = unfetchedIds.values().next().value;
+
+            if (progressCallback) {
+                progressCallback(`Step ${loopIndex}: Discovering context for diário ID ${currentId} (${unfetchedIds.size} remaining)...`);
+            }
+
+            // Step A: Discover context by searching for single diário ID directly in SUAP
+            let discoveredRow = null;
+            try {
+                const query = new URLSearchParams({
+                    ...suapConfig.bookSearch.url.query,
+                    q: currentId,
+                    tab: 'tab_any_data',
+                    all: 'true',
+                }).toString();
+                const discoveryUrl = `${suapConfig.baseUrl}/${suapConfig.bookSearch.url.base}/?${query}`;
+
+                await SUAPScraper.goto(discoveryUrl, suapConfig.bookSearch.ready);
+
+                const rows = await SUAPScraper.evaluate((template) => {
+                    const results = [];
+                    document.querySelectorAll(template.rows).forEach((tr) => {
+                        results.push({
+                            id: template.data.id(tr),
+                            name: template.data.name(tr),
+                            class: template.data.class(tr),
+                        });
+                    });
+                    return results;
+                }, suapConfig.bookSearch);
+
+                discoveredRow = rows.find(r => String(r.id) === String(currentId));
+            } catch (err) {
+                console.error(`Error discovering context for diário ID ${currentId}:`, err.message);
+            }
+
+            // Always delete currentId from unfetchedIds so we never infinite loop
+            unfetchedIds.delete(currentId);
+
+            if (discoveredRow && discoveredRow.id) {
+                const formatted = formatSubjectRow(discoveredRow);
+                if (formatted) {
+                    extractedSubjectsMap.set(formatted.id, formatted);
+                }
+            } else {
+                continue;
+            }
+
+            // Step B: Infer (course, year, semester) or campus period from the discovered class string
+            const rawClass = discoveredRow.class || '';
+            const parts = rawClass.split('.').filter(Boolean);
+            const rawYear = parts[0]?.slice(0, 4) || new Date().getFullYear();
+            const semester = parts[1] || (new Date().getMonth() < 6 ? 1 : 2);
+            const courseCode = Object.keys(courses).find(code =>
+                rawClass.includes(`.${code}`) || rawClass.includes(`.${code}_`)
+            ) || parts[3]?.split('_')?.[0];
+
+            const courseId = courseCode ? courses[courseCode] : null;
+            const batchKey = courseId ? `${courseCode}-${rawYear}-${semester}` : `campus-${rawYear}-${semester}`;
+
+            if (queriedBatches.has(batchKey)) {
+                // Batch already fetched, move on
+                continue;
+            }
+            queriedBatches.add(batchKey);
+
+            // Step C: Fetch the full group batch for this discovered context
+            if (progressCallback) {
+                progressCallback(`Fetching group batch ${batchKey} for ${unfetchedIds.size} remaining IDs...`);
+            }
+
+            const queryParams = {
+                tab: 'tab_any_data',
+                all: 'true',
+                ano_letivo: this.#getYearOffset(parseInt(rawYear)),
+                periodo_letivo__exact: semester,
+            };
+
+            if (courseId) {
+                queryParams.turma__curso_campus = courseId;
+            } else {
+                queryParams.turma__curso_campus__diretoria__setor__uo = suapConfig.bookSearch.url.query.turma__curso_campus__diretoria__setor__uo || 4;
+            }
+
+            const batchUrl = `${suapConfig.baseUrl}/${suapConfig.bookSearch.url.base}/?${new URLSearchParams(queryParams).toString()}`;
+
+            try {
+                await SUAPScraper.goto(batchUrl, suapConfig.bookSearch.ready);
+
+                const rows = await SUAPScraper.evaluate((template) => {
+                    const results = [];
+                    document.querySelectorAll(template.rows).forEach((tr) => {
+                        results.push({
+                            id: template.data.id(tr),
+                            name: template.data.name(tr),
+                            class: template.data.class(tr),
+                        });
+                    });
+                    return results;
+                }, suapConfig.bookSearch);
+
+                let culledCount = 0;
+                rows.forEach((row) => {
+                    if (row && row.id) {
+                        const formattedRow = formatSubjectRow(row);
+                        if (formattedRow) {
+                            extractedSubjectsMap.set(formattedRow.id, formattedRow);
+                            if (unfetchedIds.has(formattedRow.id)) {
+                                unfetchedIds.delete(formattedRow.id);
+                                culledCount++;
+                            }
+                        }
+                    }
+                });
+
+                console.log(`[Group Batch ${batchKey}] Retrieved ${rows.length} total rows, culled ${culledCount} unfetched IDs.`);
+            } catch (err) {
+                console.error(`Error fetching group batch ${batchKey}:`, err.message);
+            }
+        }
+
+        // Merge extracted subjects into existingSubjects
+        extractedSubjectsMap.forEach((newSubject, id) => {
+            const index = existingSubjects.findIndex(s => String(s.id) === String(id));
+            if (index >= 0) {
+                existingSubjects[index] = newSubject;
+            } else {
+                existingSubjects.push(newSubject);
+            }
+        });
+
+        // Re-evaluate duplicates for group assignment (G1/G2)
+        existingSubjects.forEach((subject) => {
+            const duplicate = existingSubjects.find(s => s.fullname === subject.fullname && String(s.id) !== String(subject.id));
+            if (duplicate) {
+                subject.group = parseInt(duplicate.id) > parseInt(subject.id) ? 'G1' : 'G2';
+            } else {
+                subject.group = false;
+            }
+        });
+
+        if (progressCallback) progressCallback(`Saving ${existingSubjects.length} total subjects to file`);
+        fs.writeFileSync(this.#dataPath, JSON.stringify(existingSubjects, null, 2));
+
+        return existingSubjects;
+    }
+
+    /**
      * Scrape students from a SUAP subject
      * Also extracts professor information from the subject page
      * @param {string} subjectId - The SUAP subject ID (diario ID)

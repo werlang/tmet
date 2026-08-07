@@ -1,6 +1,9 @@
 import { SubjectListUI } from '../components/subject-list.js';
 import { AIMatchModal } from '../components/ai-modal.js';
 import { Matching } from '../models/matching.js';
+import { Toast } from '../components/toast.js';
+import { ProgressModal } from '../components/progress-modal.js';
+import { Request } from '../helpers/request.js';
 
 /**
  * Matching Section
@@ -14,6 +17,7 @@ class MatchingSection {
     #suap;
     #ui;
     #modal;
+    #progressModal;
     #onDataChange;
 
     /**
@@ -30,6 +34,7 @@ class MatchingSection {
         this.#onDataChange = onDataChange;
         this.#ui = new SubjectListUI(elements);
         this.#modal = new AIMatchModal(elements);
+        this.#progressModal = new ProgressModal();
 
         this.#attachEventListeners();
     }
@@ -42,6 +47,9 @@ class MatchingSection {
         this.#elements.moodleSearch.addEventListener('input', (e) => this.#handleMoodleSearch(e.target.value));
         this.#elements.suapSearch.addEventListener('input', (e) => this.#handleSuapSearch(e.target.value));
         this.#elements.aiMatchBtn.addEventListener('click', () => this.#performAIMatching());
+        if (this.#elements.extractMatchedSuapBtn) {
+            this.#elements.extractMatchedSuapBtn.addEventListener('click', () => this.#extractMatchedSUAP());
+        }
         this.#elements.matchedSectionHeader.addEventListener('click', () => this.#ui.toggleMatchedList());
     }
 
@@ -183,6 +191,29 @@ class MatchingSection {
     #updateButton(button, disabled, text) {
         button.disabled = disabled;
         button.textContent = text;
+    }
+
+    /**
+     * Extract matched SUAP subjects by ID
+     */
+    async #extractMatchedSUAP() {
+        try {
+            this.#progressModal.show({
+                title: 'Extracting Matched SUAP Subjects',
+                message: 'Starting extraction for matched SUAP subjects...'
+            });
+
+            await this.#suap.extractMatchedSubjects((message) => {
+                this.#progressModal.updateStatus(message);
+            });
+
+            this.#progressModal.hide();
+            Toast.success('Matched SUAP subjects extracted successfully!');
+            await this.#onDataChange();
+        } catch (error) {
+            this.#progressModal.hide();
+            console.error('Extraction error:', error);
+        }
     }
 }
 

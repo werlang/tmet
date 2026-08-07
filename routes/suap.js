@@ -1,5 +1,6 @@
 import express from 'express';
 import { SUAP } from '../models/SUAP.js';
+import { Match } from '../models/Match.js';
 import { suapConfig } from '../config/suap-config.js';
 import fs from 'fs/promises';
 import path from 'path';
@@ -180,6 +181,57 @@ router.post('/extract', async (req, res) => {
         res.status(500).json({ 
             success: false, 
             error: error.message 
+        });
+    }
+});
+
+/**
+ * POST /suap/extract-matched
+ * Extract SUAP subjects specifically for all matched subject IDs (long-running operation, returns job ID)
+ */
+router.post('/extract-matched', async (req, res) => {
+    try {
+        const matchModel = new Match();
+        const matches = matchModel.getAllMatches();
+
+        // Collect all unique suapIds from matches
+        const suapIdsSet = new Set();
+        matches.forEach(m => {
+            if (m.suapId) {
+                const ids = Array.isArray(m.suapId) ? m.suapId : [m.suapId];
+                ids.forEach(id => {
+                    if (id) suapIdsSet.add(String(id).trim());
+                });
+            }
+        });
+
+        const suapIds = Array.from(suapIdsSet).filter(Boolean);
+
+        if (suapIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'No matched SUAP subjects found. Please match subjects first in Step 3.'
+            });
+        }
+
+        console.log(`Starting SUAP extraction for ${suapIds.length} matched subjects...`);
+        const jobQueue = req.app.locals.jobQueue;
+
+        const jobId = jobQueue.queue(async (jobId, updateProgress) => {
+            return await processExtractMatchedSUAP(jobId, suapIds, updateProgress);
+        });
+
+        res.status(202).json({
+            success: true,
+            jobId,
+            message: `SUAP extraction job started for ${suapIds.length} matched subjects`,
+            statusUrl: `/api/jobs/${jobId}`
+        });
+    } catch (error) {
+        console.error('SUAP matched extraction error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
         });
     }
 });
@@ -376,6 +428,27 @@ async function processExtractSUAP(jobId, params, updateProgress) {
 
     return {
         message: 'SUAP data extracted successfully',
+        file: 'files/suap_subjects.json'
+    };
+}
+
+// Async function to process matched SUAP extraction
+async function processExtractMatchedSUAP(jobId, subjectIds, updateProgress) {
+    updateProgress({
+        message: `Starting extraction for ${subjectIds.length} matched SUAP subjects...`
+    });
+
+    console.log(`[${jobId}] Starting matched SUAP extraction for IDs:`, subjectIds);
+
+    const suap = new SUAP();
+    await suap.extractSubjectsByIds(subjectIds, (message) => {
+        updateProgress({ message });
+    });
+
+    console.log(`[${jobId}] Matched SUAP extraction completed`);
+
+    return {
+        message: `Extracted ${subjectIds.length} matched SUAP subjects successfully`,
         file: 'files/suap_subjects.json'
     };
 }

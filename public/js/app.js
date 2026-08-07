@@ -45,6 +45,7 @@ class SubjectMatcherApp {
             moodleSearch: document.getElementById('moodle-search'),
             suapSearch: document.getElementById('suap-search'),
             aiMatchBtn: document.getElementById('ai-match-btn'),
+            extractMatchedSuapBtn: document.getElementById('extract-matched-suap-btn'),
             matchedSectionHeader: document.getElementById('matched-section-header'),
 
             // Matching section - Modal

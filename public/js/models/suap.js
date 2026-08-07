@@ -45,6 +45,33 @@ class SUAP {
     }
 
     /**
+     * Extract matched SUAP subjects by ID
+     * @param {Function} progressCallback - Optional callback for progress updates
+     * @returns {Promise<Object>} Result object
+     */
+    async extractMatchedSubjects(progressCallback) {
+        try {
+            const result = await new Request().post('/api/suap/extract-matched');
+
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/jobs',
+                'Matched SUAP extraction',
+                progressCallback
+            );
+
+        } catch (error) {
+            console.error('Extract matched SUAP error:', error);
+            Toast.error('Error extracting matched SUAP subjects: ' + error.message);
+            throw error;
+        }
+    }
+
+    /**
      * Add a manual student enrollment by matrícula
      * @param {Object} params - Manual student payload
      * @param {string} params.matricula - SUAP enrollment ID
