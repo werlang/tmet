@@ -42,6 +42,8 @@ class ChatAssist {
                 temperature,
                 max_tokens: maxTokens,
                 stream: false,
+                ...(thinking && { thinking }),
+                ...(reasoning_effort && { reasoning_effort }),
             };
 
             const headers = {

@@ -1,9 +1,9 @@
 const chatAssistConfig = {
     url: 'https://api.deepseek.com/chat/completions',
     model: 'deepseek-v4-flash',
-    thinking: { type: 'enabled' },
+    thinking: { type: 'disabled' },
     reasoning_effort: 'max',
-    maxTokens: 2048,
+    maxTokens: 4096,
     keepHistory: false,
     systemPrompt: `You are an expert at matching academic course subjects between two different systems. 
 Your task is to find the best matches between Moodle subjects and SUAP subjects based on course names, codes, and context.

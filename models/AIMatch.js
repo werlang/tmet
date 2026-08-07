@@ -73,16 +73,39 @@ ${suapList}`;
         const matches = [];
 
         try {
-            // Handle 'null' response (no confident matches)
-            if (response.trim().toLowerCase() === 'null') {
+            let cleaned = response.trim();
+            if (cleaned.toLowerCase() === 'null') {
                 return matches;
             }
 
+            // Remove markdown code fences if present (e.g. ```json ... ```)
+            cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+            // First try parsing as a single JSON structure (e.g., Array of matches)
+            try {
+                const parsedJSON = JSON.parse(cleaned);
+                const list = Array.isArray(parsedJSON) ? parsedJSON : [parsedJSON];
+                for (const item of list) {
+                    if (item && item.moodleFullname && item.suapIds && typeof item.confidence === 'number') {
+                        matches.push(item);
+                    }
+                }
+                if (matches.length > 0) {
+                    return matches;
+                }
+            } catch (e) {
+                // Not a single valid JSON block, fall back to line-by-line parsing
+            }
+
             // Parse JSONL format (one JSON object per line)
-            const lines = response.trim().split('\n');
+            const lines = cleaned.split('\n');
             for (const line of lines) {
-                const trimmedLine = line.trim();
+                let trimmedLine = line.trim();
                 if (!trimmedLine || trimmedLine.toLowerCase() === 'null') continue;
+                // Remove trailing comma if present (e.g. inside formatted JSON list)
+                if (trimmedLine.endsWith(',')) {
+                    trimmedLine = trimmedLine.slice(0, -1).trim();
+                }
 
                 try {
                     const parsed = JSON.parse(trimmedLine);
