@@ -989,10 +989,14 @@ class SUAP {
             const professors = [];
             const addedSiapes = new Set();
 
+            const isHeaderUserLink = (el) => {
+                return !!el?.closest?.('#user-tools, #user-profile, .user-profile, #header, nav, .navbar, .top-bar, .user-menu, .user-info');
+            };
+
             const addProfessor = (siape, name) => {
                 const cleanSiape = (siape || '').trim();
                 const cleanName = (name || '').trim();
-                if (cleanSiape && cleanName && !addedSiapes.has(cleanSiape)) {
+                if (cleanSiape && cleanName && /^\d+$/.test(cleanSiape) && !addedSiapes.has(cleanSiape)) {
                     addedSiapes.add(cleanSiape);
                     professors.push({ siape: cleanSiape, name: cleanName });
                 }
@@ -1003,6 +1007,8 @@ class SUAP {
             const professorBoxes = [];
 
             for (const container of containers) {
+                if (isHeaderUserLink(container)) continue;
+
                 const header = container.querySelector?.('h1, h2, h3, h4, h5, legend, caption, .box-header, .title, header');
                 if (header) {
                     const text = (header.textContent || '').trim().toLowerCase();
@@ -1015,6 +1021,8 @@ class SUAP {
             // Also search table elements directly if caption/headers mention professor or siape
             const tables = document.querySelectorAll('table');
             for (const table of tables) {
+                if (isHeaderUserLink(table)) continue;
+
                 const caption = table.querySelector?.('caption')?.textContent?.toLowerCase() || '';
                 const thElements = Array.from(table.querySelectorAll?.('th') || []);
                 const thText = thElements.map(th => th.textContent || '').join(' ').toLowerCase();
@@ -1032,9 +1040,9 @@ class SUAP {
                     rows.forEach(tr => {
                         // Strategy A: Look for link to professor profile /rh/servidor/<siape>/
                         const profileLink = tr.querySelector?.('a[href*="/rh/servidor/"]');
-                        if (profileLink) {
+                        if (profileLink && !isHeaderUserLink(profileLink)) {
                             const href = profileLink.getAttribute?.('href') || '';
-                            const match = href.match(/\/rh\/servidor\/([^/]+)/);
+                            const match = href.match(/\/rh\/servidor\/(\d+)/);
                             const siapeFromUrl = match ? match[1] : null;
                             const linkText = (profileLink.textContent || '').trim();
 
@@ -1047,7 +1055,7 @@ class SUAP {
                                 name = (cells[2]?.textContent || cells[1]?.textContent || linkText).trim();
                             }
 
-                            if (siape && name) {
+                            if (siape && name && /^\d+$/.test(siape)) {
                                 addProfessor(siape, name);
                                 return;
                             }
@@ -1074,7 +1082,7 @@ class SUAP {
                             if (cells.length >= 3) {
                                 const siape = (cells[1]?.textContent || '').trim();
                                 const name = (cells[2]?.textContent || '').trim();
-                                if (siape && name) {
+                                if (siape && name && /^\d+$/.test(siape)) {
                                     addProfessor(siape, name);
                                 }
                             }
@@ -1091,12 +1099,14 @@ class SUAP {
             if (professors.length === 0) {
                 const allProfileLinks = document.querySelectorAll('a[href*="/rh/servidor/"]');
                 allProfileLinks.forEach(link => {
+                    if (isHeaderUserLink(link)) return;
+
                     const href = link.getAttribute?.('href') || '';
-                    const match = href.match(/\/rh\/servidor\/([^/]+)/);
+                    const match = href.match(/\/rh\/servidor\/(\d+)/);
                     if (match && match[1]) {
                         const siape = match[1];
                         const name = (link.textContent || '').trim();
-                        if (siape && name && !/^\d+$/.test(name)) {
+                        if (siape && name && /^\d+$/.test(siape) && !/^\d+$/.test(name)) {
                             addProfessor(siape, name);
                         }
                     }

@@ -138,6 +138,29 @@ describe('Moodle Model', () => {
             expect(result).toContain('_G2');
         });
 
+        it('should replace spaces in subject shortnames with underscores', async () => {
+            const classesWithSpacesInShort = [{
+                id: "1",
+                name: "ECA-6AN",
+                subjects: [
+                    {
+                        subject: { name: "ECA - Laboratório de Controle", short: "ECA - Lab Cont" },
+                        groupnames: [],
+                        classids: ["1"]
+                    }
+                ]
+            }];
+
+            mockTimeTables.mockImplementation(() => ({
+                getClasses: jest.fn().mockResolvedValue(classesWithSpacesInShort)
+            }));
+
+            const moodle = new Moodle();
+            const result = await moodle.generateCourseCSV({ year: 2025, semester: 1 });
+
+            expect(result).toContain('CH_ECA_6AN_Lab_Cont_2025.1');
+        });
+
         it('should handle multi-class subjects', async () => {
             const multiClassSubjects = [
                 {
