@@ -164,12 +164,33 @@ class MoodleUploader {
             wsfunction: 'core_user_get_users',
             moodlewsrestformat: 'json',
             'criteria[0][key]': 'username',
-            'criteria[0][value]': username,
+            'criteria[0][value]': String(username || '').trim(),
         }).toString();
 
         const response = await new Request({ url: this.baseUrl }).get(this.webserviceUrl, params);
-        
-        if (response.users && response.users.length > 0) {
+        if (response?.users && response.users.length > 0) {
+            return response.users[0].id;
+        }
+        return null;
+    }
+
+    /**
+     * Get user ID by email
+     * @param {string} email - Email to look up
+     * @returns {Promise<number|null>} User ID or null if not found
+     */
+    async getUserByEmail(email) {
+        if (!email) return null;
+        const params = new URLSearchParams({
+            wstoken: this.token,
+            wsfunction: 'core_user_get_users',
+            moodlewsrestformat: 'json',
+            'criteria[0][key]': 'email',
+            'criteria[0][value]': String(email).trim(),
+        }).toString();
+
+        const response = await new Request({ url: this.baseUrl }).get(this.webserviceUrl, params);
+        if (response?.users && response.users.length > 0) {
             return response.users[0].id;
         }
         return null;
@@ -266,8 +287,11 @@ class MoodleUploader {
      * @returns {Promise<{id: number|null, created: boolean}>} User ID and whether it was created
      */
     async getOrCreateUser(user) {
-        // First try to find existing user
-        let userId = await this.getUserByUsername(user.username);
+        // First try to find existing user by username, then by email
+        let userId = await this.getUserByUsername(user?.username);
+        if (!userId && user?.email) {
+            userId = await this.getUserByEmail(user?.email);
+        }
         
         if (userId) {
             return { id: userId, created: false };
@@ -304,7 +328,7 @@ class MoodleUploader {
         // Student role ID in Moodle is typically 5
         const STUDENT_ROLE_ID = 5;
 
-        const PREP_WINDOW_SIZE = 10;
+        const PREP_WINDOW_SIZE = 3;
         const prepWindow = new RequestWindow(PREP_WINDOW_SIZE, { timeoutMs: 60000 });
         const prepared = new Array(students.length);
         const prepTasks = students.map((student, i) => async () => {
@@ -439,8 +463,8 @@ class MoodleUploader {
         // Editing teacher role ID in Moodle is typically 3
         const TEACHER_ROLE_ID = 3;
 
-        const PREP_WINDOW_SIZE = 10;
-        const prepWindow = new RequestWindow(PREP_WINDOW_SIZE);
+        const PREP_WINDOW_SIZE = 3;
+        const prepWindow = new RequestWindow(PREP_WINDOW_SIZE, { timeoutMs: 60000 });
         const prepared = new Array(professors.length);
         const prepTasks = professors.map((professor, i) => async () => {
             if (progressCallback && i % 10 === 0) {
@@ -550,8 +574,9 @@ class MoodleUploader {
             
             if (enrollResult.errors.length > 0) {
                 results.errors.push(...enrollResult.errors);
-            } else {
-                results.success = enrollments;
+            }
+            if (enrollResult.success.length > 0) {
+                results.success.push(...enrollResult.success);
             }
         }
 

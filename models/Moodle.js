@@ -58,7 +58,7 @@ class Moodle {
                 // "[2025.2] TSI-4AN|ECA-8AN - Gestão e Empreendedorismo", CH_TSI_4AN_ECA_8AN_GE_2025.2, 120
                 // "[2025.2] INF-2AT-G1 - Banco de Dados", CH_INF_2AT_BD_2025.2_G1, 115
                 const fullName = `[${year}.${semester}] ${className}${group.replace('_', '-')} - ${subjectObj.name.split('-').slice(1).join('-').trim()}`;
-                const shortName = `CH_${className.replace(/[-,\|]/g, '_')}_${subjectObj.short.split(/\s*-\s*/)?.slice(1).join('').replace(/\s+/g, '_')}_${year}.${semester}${group}`;
+                const shortName = `CH_${className.replace(/[-,\|]/g, '_')}_${subjectObj.short.split(/\s*-\s*/)?.slice(1).join('').replace(/[\s\/]+/g, '_')}_${year}.${semester}${group}`;
                 const category = moodleConfig.categories[c.name.split('-')[0]];
 
                 if (!moodleSubjects.map(ms => ms[0]).includes(fullName) && category) {
@@ -717,9 +717,9 @@ class Moodle {
                 if (!professor) continue;
 
                 const professorId = this.#getProfessorId(professor);
-                const professorName = professor.name || '';
+                const professorName = (professor.name || '').replace(/\s*\(\d+\)/g, '').trim();
                 const professorEmail = professor.email || '';
-                const nameParts = professorName.trim().split(/\s+/);
+                const nameParts = professorName.split(/\s+/);
                 const firstName = nameParts[0] || '';
                 const lastName = nameParts.slice(1).join(' ') || '';
 

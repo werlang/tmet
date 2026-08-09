@@ -452,7 +452,7 @@ describe('MoodleUploader Helper', () => {
             });
 
             expect(result).toEqual({ id: 200, created: true });
-            expect(mockRequest.get).toHaveBeenCalledTimes(1);
+            expect(mockRequest.get).toHaveBeenCalled();
             expect(mockRequest.post).toHaveBeenCalledTimes(1);
         });
 
