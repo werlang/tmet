@@ -30,6 +30,8 @@ Use these examples as implementation baselines. Paths are relative to mounted ba
   - Stores a manual enrollment entry inside `suap_students.json`.
 - `POST /api/suap/manual-student/remove`
   - Removes one queued manual student by enrollment.
+- `POST /api/suap/manual-students/from-subject`
+  - Queues a job that scrapes one SUAP subject and stores all valid enrolled students in the manual queue.
 
 ## Async job-start route pattern (`routes/moodle.js`, `routes/suap.js`, `routes/ai.js`)
 
@@ -56,6 +58,7 @@ Examples:
 - `POST /api/suap/extract`
 - `POST /api/suap/extract-students`
 - `POST /api/suap/extract-professors`
+- `POST /api/suap/manual-students/from-subject`
 - `POST /api/ai/match`
 
 ## Job polling (`routes/jobs.js`)

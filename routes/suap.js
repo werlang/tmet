@@ -148,6 +148,64 @@ router.post('/manual-student/remove', async (req, res) => {
 });
 
 /**
+ * POST /suap/manual-students/from-subject
+ * Scrape a SUAP subject and queue all of its students for Moodle enrollment.
+ */
+router.post('/manual-students/from-subject', async (req, res) => {
+    try {
+        const subjectId = String(req.body.subjectId || req.body.suapId || '').trim();
+        const password = String(req.body.password || '').trim();
+        const courseIds = Array.from(new Set(
+            (Array.isArray(req.body.courseIds)
+                ? req.body.courseIds
+                : String(req.body.courseIds || req.body.courses || '').split(','))
+                .map(courseId => String(courseId || '').trim())
+                .filter(Boolean)
+        ));
+
+        if (!subjectId) {
+            return res.status(400).json({
+                success: false,
+                error: 'SUAP subject ID is required'
+            });
+        }
+
+        if (!password) {
+            return res.status(400).json({
+                success: false,
+                error: 'Password is required'
+            });
+        }
+
+        if (courseIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: 'At least one Moodle course ID is required'
+            });
+        }
+
+        const params = { subjectId, password, courseIds };
+        const jobQueue = req.app.locals.jobQueue;
+        const jobId = jobQueue.queue(async (queuedJobId, updateProgress) => {
+            return await processManualStudentsFromSubject(queuedJobId, params, updateProgress);
+        });
+
+        res.status(202).json({
+            success: true,
+            jobId,
+            message: 'Manual students from SUAP course job started',
+            statusUrl: `/api/jobs/${jobId}`
+        });
+    } catch (error) {
+        console.error('Manual students from SUAP course error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+/**
  * POST /suap/extract
  * Extract SUAP subjects (long-running operation, returns job ID)
  */
@@ -640,6 +698,32 @@ async function processExtractProfessors(jobId, subjectIds, updateProgress) {
         message: `Professor extraction completed: ${completed}/${subjectIds.length} subjects processed`,
         results,
         file: 'files/suap_professors.json'
+    };
+}
+
+/**
+ * Process a queued course-based manual student enrollment job.
+ * @param {string} jobId - Queue job ID used in progress logs.
+ * @param {Object} params - Subject ID, Moodle password, and course IDs.
+ * @param {Function} updateProgress - Queue progress callback.
+ * @returns {Promise<Object>} Job result with enrollment counts and artifact path.
+ */
+async function processManualStudentsFromSubject(jobId, params, updateProgress) {
+    updateProgress({
+        message: `Finding students for SUAP course ${params.subjectId}`,
+    });
+
+    console.log(`[${jobId}] Starting manual student queue from SUAP course ${params.subjectId}`);
+
+    const suap = new SUAP();
+    const result = await suap.addManualStudentsFromSubject(params, (message) => {
+        updateProgress({ message });
+    });
+
+    return {
+        ...result,
+        message: `Queued ${result.queuedStudents} students from SUAP course ${result.subjectId}`,
+        file: 'files/suap_students.json',
     };
 }
 

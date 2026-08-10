@@ -84,6 +84,13 @@ class StudentsSection {
         
         // CSV generation
         this.#elements.addManualStudentBtn.addEventListener('click', () => this.#addManualStudent());
+        this.#elements.linkManualStudentCourseBtn.addEventListener('click', () => this.#addManualStudentsFromCourse());
+        this.#elements.manualStudentSuapCourseSelect.addEventListener('change', (event) => {
+            const selectedOption = event.target.selectedOptions[0];
+            if (selectedOption?.dataset.courseId) {
+                this.#elements.manualStudentCourseIdsInput.value = selectedOption.dataset.courseId;
+            }
+        });
         this.#elements.generateManualStudentsCsvBtn.addEventListener('click', () => this.#generateManualStudentsCSV());
         this.#elements.generateStudentsCsvBtn.addEventListener('click', () => this.#generateStudentsCSV());
         this.#elements.generateProfessorsCsvBtn.addEventListener('click', () => this.#generateProfessorsCSV());
@@ -120,6 +127,7 @@ class StudentsSection {
      */
     updateUI() {
         this.#renderStudentsSubjectList();
+        this.#renderManualStudentCourseOptions();
         this.#renderManualStudentsSummary();
         this.#updateExtractStudentsButton();
     }
@@ -144,6 +152,66 @@ class StudentsSection {
                 .map(enrollment => enrollment.trim())
                 .filter(Boolean)
         ));
+    }
+
+    /**
+     * Build the available SUAP-to-Moodle links from the current subject matches.
+     * @returns {Array<Object>} Course links with one Moodle shortname per option.
+     */
+    #getManualStudentCourseLinks() {
+        const suapSubjects = new Map(
+            this.#suap.getMatchedSubjects().map(subject => [String(subject.id), subject])
+        );
+
+        return this.#moodle.getMatchedSubjects().flatMap(moodleSubject => {
+            const suapIds = Array.isArray(moodleSubject.suapId)
+                ? moodleSubject.suapId
+                : [moodleSubject.suapId];
+
+            return suapIds
+                .map(subjectId => {
+                    const suapSubject = suapSubjects.get(String(subjectId));
+                    if (!suapSubject || !moodleSubject.shortname) {
+                        return null;
+                    }
+
+                    return {
+                        subjectId: String(subjectId),
+                        subjectName: suapSubject.fullname || suapSubject.name || String(subjectId),
+                        moodleFullname: moodleSubject.fullname || moodleSubject.shortname,
+                        courseId: moodleSubject.shortname,
+                    };
+                })
+                .filter(Boolean);
+        });
+    }
+
+    /**
+     * Render matched SUAP courses that can feed the manual student queue.
+     */
+    #renderManualStudentCourseOptions() {
+        const select = this.#elements.manualStudentSuapCourseSelect;
+        if (!select) {
+            return;
+        }
+
+        const selectedSubjectId = select.value;
+        select.innerHTML = '<option value="">Select a matched SUAP course</option>';
+
+        this.#getManualStudentCourseLinks()
+            .sort((left, right) => left.subjectName.localeCompare(right.subjectName))
+            .forEach(link => {
+                const option = document.createElement('option');
+                option.value = link.subjectId;
+                option.textContent = `${link.subjectName} → ${link.courseId}`;
+                option.dataset.courseId = link.courseId;
+                option.title = link.moodleFullname;
+                select.appendChild(option);
+            });
+
+        if ([...select.options].some(option => option.value === selectedSubjectId)) {
+            select.value = selectedSubjectId;
+        }
     }
 
     #renderManualStudentsSummary() {
@@ -641,6 +709,78 @@ class StudentsSection {
             Toast.error(error.message || 'Failed to extract data');
         } finally {
             this.#updateButton(config.button, false, config.buttonLabel);
+        }
+    }
+
+    /**
+     * Queue every student enrolled in the selected SUAP course.
+     * Moodle course IDs are populated from the selected match and can still be edited before submission.
+     */
+    async #addManualStudentsFromCourse() {
+        const subjectId = this.#elements.manualStudentSuapCourseSelect.value.trim();
+        const password = this.#elements.manualStudentPasswordInput.value.trim();
+        const courseIds = this.#parseCourseIds(this.#elements.manualStudentCourseIdsInput.value);
+        const selectedOption = this.#elements.manualStudentSuapCourseSelect.selectedOptions[0];
+
+        if (!subjectId) {
+            Toast.error('Select a matched SUAP course');
+            return;
+        }
+
+        if (!password) {
+            Toast.error('Password is required');
+            return;
+        }
+
+        if (courseIds.length === 0) {
+            Toast.error('Provide at least one Moodle course ID');
+            return;
+        }
+
+        this.#updateButton(
+            this.#elements.linkManualStudentCourseBtn,
+            true,
+            'Finding Students...'
+        );
+        this.#progressModal.show({
+            title: 'Adding Students from SUAP Course',
+            message: `Finding students in ${selectedOption?.textContent || subjectId}`
+        });
+
+        try {
+            const result = await this.#suap.addManualStudentsFromSubject({
+                subjectId,
+                password,
+                courseIds,
+            }, (status) => {
+                const message = typeof status === 'string'
+                    ? status
+                    : status?.message || 'Processing...';
+                this.#progressModal.updateStatus(message);
+            });
+
+            this.#progressModal.hide();
+            await this.#onDataChange();
+
+            this.#elements.manualStudentSuapCourseSelect.value = '';
+            this.#elements.manualStudentPasswordInput.value = '';
+            this.#elements.manualStudentCourseIdsInput.value = '';
+
+            const queuedStudents = result?.queuedStudents || 0;
+            const skippedStudents = result?.skippedStudents || 0;
+            const skippedMessage = skippedStudents > 0
+                ? ` ${skippedStudents} student${skippedStudents === 1 ? '' : 's'} skipped because profile data was incomplete.`
+                : '';
+            Toast.success(`${queuedStudents} student${queuedStudents === 1 ? '' : 's'} queued from the SUAP course.${skippedMessage}`);
+        } catch (error) {
+            this.#progressModal.hide();
+            console.error('Course-based manual student error:', error);
+        } finally {
+            this.#updateButton(
+                this.#elements.linkManualStudentCourseBtn,
+                false,
+                'Add Students from SUAP Course'
+            );
         }
     }
 

@@ -37,6 +37,7 @@
   - `GET /api/suap/professors`
   - `POST /api/suap/manual-student`
   - `POST /api/suap/manual-student/remove`
+  - `POST /api/suap/manual-students/from-subject`
 - Model: `models/SUAP.js`
 - Outputs:
   - `files/suap_students.json`

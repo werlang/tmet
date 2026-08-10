@@ -93,6 +93,33 @@ class SUAP {
         }
     }
 
+    /**
+     * Add every student found in a SUAP course to the manual Moodle queue.
+     * @param {Object} params - Subject ID, Moodle password, and course IDs.
+     * @param {Function} progressCallback - Optional callback for job progress.
+     * @returns {Promise<Object>} Completed job result.
+     */
+    async addManualStudentsFromSubject(params, progressCallback) {
+        try {
+            const result = await new Request().post('/api/suap/manual-students/from-subject', params);
+
+            if (!result.jobId) {
+                throw new Error('No job ID returned from server');
+            }
+
+            return await this.#pollJobStatus(
+                result.jobId,
+                '/api/jobs',
+                'Manual students from SUAP course',
+                progressCallback
+            );
+        } catch (error) {
+            console.error('Add manual students from SUAP course error:', error);
+            Toast.error('Error adding students from SUAP course: ' + error.message);
+            throw error;
+        }
+    }
+
     async removeManualStudent(params) {
         try {
             return await new Request().post('/api/suap/manual-student/remove', params);

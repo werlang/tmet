@@ -222,16 +222,22 @@
         <div class="pipeline-section">
             <h2>Manual Student Queue</h2>
             <div class="pipeline-content">
-                <p class="section-description">Fetch one or more students from SUAP by matrícula, build a dedicated manual CSV, and keep these enrollments separate from the main student export.</p>
+                <p class="section-description">Queue individual students by matrícula or link a SUAP course to add all of its students to a dedicated manual CSV.</p>
                 <div class="manual-student-panel">
                     <div class="manual-student-header">
                         <h3>Manual Student Entry</h3>
-                        <p class="section-description">Fetch students from SUAP by matrícula and queue one CSV row per Moodle course ID. Separate multiple matrículas with commas.</p>
+                        <p class="section-description">Use the first action for specific matrículas. Use the SUAP course action to find all enrolled matrículas automatically.</p>
                     </div>
                     <div class="pipeline-inputs manual-student-inputs">
                         <div class="input-group">
                             <label for="manual-student-matricula-input">SUAP matrícula(s)</label>
                             <input type="text" id="manual-student-matricula-input" placeholder="202X1CH.COURSE000, 202X1CH.COURSE001" autocomplete="off">
+                        </div>
+                        <div class="input-group full-width">
+                            <label for="manual-student-suap-course-select">SUAP course link</label>
+                            <select id="manual-student-suap-course-select" class="manual-course-select">
+                                <option value="">Select a matched SUAP course</option>
+                            </select>
                         </div>
                         <div class="input-group">
                             <label for="manual-student-password-input">Password</label>
@@ -244,6 +250,7 @@
                     </div>
                     <div class="button-row">
                         <button id="add-manual-student-btn" class="pipeline-btn secondary">Add Manual Student</button>
+                        <button id="link-manual-student-course-btn" class="pipeline-btn secondary">Add Students from SUAP Course</button>
                         <button id="generate-manual-students-csv-btn" class="pipeline-btn secondary">Generate Manual Students CSV</button>
                     </div>
                     <div id="manual-students-summary" class="manual-students-summary"></div>

@@ -760,6 +760,97 @@ class SUAP {
         };
     }
 
+    /**
+     * Scrape a SUAP subject and add every valid student to the manual Moodle queue.
+     * Existing manual course links are preserved and merged with the new course IDs.
+     * @param {Object} options - Course-based manual enrollment options.
+     * @param {string} options.subjectId - SUAP diário/subject ID to scrape.
+     * @param {string} options.password - Moodle password to use for CSV rows.
+     * @param {string[]} options.courseIds - Moodle course shortnames/IDs.
+     * @param {Function} progressCallback - Optional callback for progress updates.
+     * @returns {Promise<Object>} Counts for discovered, queued, and skipped students.
+     */
+    async addManualStudentsFromSubject({ subjectId, password, courseIds }, progressCallback = null) {
+        const normalizedSubjectId = String(subjectId || '').trim();
+        const normalizedPassword = String(password || '').trim();
+        const normalizedCourseIds = Array.from(new Set(
+            (Array.isArray(courseIds) ? courseIds : [])
+                .map(courseId => String(courseId || '').trim())
+                .filter(Boolean)
+        ));
+
+        if (!normalizedSubjectId) {
+            throw new Error('SUAP subject ID is required');
+        }
+
+        if (!normalizedPassword) {
+            throw new Error('Password is required');
+        }
+
+        if (normalizedCourseIds.length === 0) {
+            throw new Error('At least one course ID is required');
+        }
+
+        if (progressCallback) progressCallback('Finding students enrolled in SUAP course');
+
+        const scrapedStudents = await this.scrapeStudentsOnly(
+            normalizedSubjectId,
+            progressCallback
+        );
+        const studentsData = this.#loadStudentsData();
+        const seenEnrollments = new Set();
+        let queuedStudents = 0;
+        let skippedStudents = 0;
+
+        // Keep the scraped subject list as the source of truth, but only queue
+        // records that have the identity fields required by the Moodle CSV.
+        for (const scrapedStudent of scrapedStudents) {
+            const enrollment = String(scrapedStudent?.enrollment || '').trim();
+            if (!enrollment || seenEnrollments.has(enrollment)) {
+                continue;
+            }
+
+            seenEnrollments.add(enrollment);
+            const existingStudent = studentsData.students?.[enrollment] || {};
+            const name = String(scrapedStudent?.name || existingStudent.name || '').trim();
+            const email = String(scrapedStudent?.email || existingStudent.email || '').trim();
+
+            if (!name || !email) {
+                skippedStudents++;
+                continue;
+            }
+
+            const existingManualEnrollment = this.#normalizeManualEnrollment(
+                studentsData.manualEnrollments?.[enrollment]
+            );
+            const mergedCourseIds = Array.from(new Set([
+                ...existingManualEnrollment.courseIds,
+                ...normalizedCourseIds,
+            ]));
+
+            studentsData.students[enrollment] = { name, email };
+            studentsData.manualEnrollments[enrollment] = {
+                password: normalizedPassword,
+                courseIds: mergedCourseIds,
+            };
+            queuedStudents++;
+        }
+
+        fs.writeFileSync(this.#studentsPath, JSON.stringify(studentsData, null, 2));
+
+        if (progressCallback) {
+            progressCallback(`Queued ${queuedStudents} students from SUAP course ${normalizedSubjectId}`);
+        }
+
+        return {
+            subjectId: normalizedSubjectId,
+            foundStudents: scrapedStudents.length,
+            queuedStudents,
+            skippedStudents,
+            courseIds: normalizedCourseIds,
+        };
+    }
+
     async removeManualStudent(enrollment) {
         const normalizedEnrollment = String(enrollment || '').trim();
 

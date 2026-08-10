@@ -48,6 +48,16 @@ const mockSuapInstance = {
     extractSubjectsByIds: jest.fn().mockImplementation(async (subjectIds, progressCallback) => {
         if (progressCallback) progressCallback('Extracting matched subjects...');
         return undefined;
+    }),
+    addManualStudentsFromSubject: jest.fn().mockImplementation(async (params, progressCallback) => {
+        if (progressCallback) progressCallback('Queueing students...');
+        return {
+            subjectId: params.subjectId,
+            foundStudents: 3,
+            queuedStudents: 3,
+            skippedStudents: 0,
+            courseIds: params.courseIds,
+        };
     })
 };
 const mockSUAP = jest.fn().mockImplementation(() => mockSuapInstance);
@@ -89,6 +99,76 @@ describe('SUAP Route', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+    });
+
+    describe('POST /manual-students/from-subject', () => {
+        it('should reject incomplete course-link requests', async () => {
+            const handler = getRouteHandler('post', '/manual-students/from-subject');
+            const req = createMockRequest({ body: {} });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(400);
+            expect(res._data.error).toBe('SUAP subject ID is required');
+        });
+
+        it('should reject a course link without a password or Moodle course ID', async () => {
+            const handler = getRouteHandler('post', '/manual-students/from-subject');
+
+            const passwordResponse = createMockResponse();
+            await handler(createMockRequest({
+                body: { subjectId: '77108', courseIds: ['CH_PED_2AN_Infa_2026.2'] }
+            }), passwordResponse);
+            expect(passwordResponse.statusCode).toBe(400);
+            expect(passwordResponse._data.error).toBe('Password is required');
+
+            const courseResponse = createMockResponse();
+            await handler(createMockRequest({
+                body: { subjectId: '77108', password: 'temporary-password' }
+            }), courseResponse);
+            expect(courseResponse.statusCode).toBe(400);
+            expect(courseResponse._data.error).toBe('At least one Moodle course ID is required');
+        });
+
+        it('should queue a job to add all students from a SUAP subject', async () => {
+            const mockJobQueue = {
+                queue: jest.fn().mockReturnValue('manual-subject-job-123')
+            };
+            const handler = getRouteHandler('post', '/manual-students/from-subject');
+            const req = createMockRequest({
+                body: {
+                    subjectId: '77108',
+                    password: 'temporary-password',
+                    courseIds: ['CH_PED_2AN_Infa_2026.2']
+                },
+                app: { locals: { jobQueue: mockJobQueue } }
+            });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(202);
+            expect(res._data).toMatchObject({
+                success: true,
+                jobId: 'manual-subject-job-123',
+                statusUrl: '/api/jobs/manual-subject-job-123'
+            });
+            expect(mockJobQueue.queue).toHaveBeenCalledTimes(1);
+
+            const processJob = mockJobQueue.queue.mock.calls[0][0];
+            const result = await processJob('manual-subject-job-123', jest.fn());
+
+            expect(mockSuapInstance.addManualStudentsFromSubject).toHaveBeenCalledWith(
+                {
+                    subjectId: '77108',
+                    password: 'temporary-password',
+                    courseIds: ['CH_PED_2AN_Infa_2026.2']
+                },
+                expect.any(Function)
+            );
+            expect(result.queuedStudents).toBe(3);
+        });
     });
 
     describe('GET /students', () => {
@@ -783,4 +863,3 @@ describe('SUAP Route', () => {
         });
     });
 });
-

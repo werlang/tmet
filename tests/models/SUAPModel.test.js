@@ -133,6 +133,86 @@ describe('SUAP Model', () => {
         });
     });
 
+    describe('addManualStudentsFromSubject()', () => {
+        it('should scrape a SUAP subject and queue all students for one Moodle course', async () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(JSON.stringify({
+                subjects: {},
+                students: {},
+                manualEnrollments: {}
+            }));
+
+            const suap = new SUAP();
+            jest.spyOn(suap, 'scrapeStudentsOnly').mockResolvedValue([
+                {
+                    enrollment: '20261CH.PROFEPT0005',
+                    name: 'Ana Elisa de Souza',
+                    email: 'anasouza.ch005@academico.ifsul.edu.br'
+                },
+                {
+                    enrollment: '20261CH.PROFEPT0006',
+                    name: 'Bruno Lima',
+                    email: 'brunolima.ch006@academico.ifsul.edu.br'
+                },
+                {
+                    enrollment: '20261CH.PROFEPT0007',
+                    name: 'Carla Mendes',
+                    email: ''
+                }
+            ]);
+
+            const result = await suap.addManualStudentsFromSubject({
+                subjectId: '77108',
+                password: 'temporary-password',
+                courseIds: ['CH_PED_2AN_Infa_2026.2']
+            });
+
+            expect(result).toEqual({
+                subjectId: '77108',
+                foundStudents: 3,
+                queuedStudents: 2,
+                skippedStudents: 1,
+                courseIds: ['CH_PED_2AN_Infa_2026.2']
+            });
+
+            const studentWriteCall = mockFs.writeFileSync.mock.calls.find(call =>
+                call[0].includes('suap_students.json')
+            );
+            const savedData = JSON.parse(studentWriteCall[1]);
+
+            expect(savedData.manualEnrollments).toEqual({
+                '20261CH.PROFEPT0005': {
+                    password: 'temporary-password',
+                    courseIds: ['CH_PED_2AN_Infa_2026.2']
+                },
+                '20261CH.PROFEPT0006': {
+                    password: 'temporary-password',
+                    courseIds: ['CH_PED_2AN_Infa_2026.2']
+                }
+            });
+        });
+
+        it('should validate course-based manual enrollment inputs', async () => {
+            const suap = new SUAP();
+
+            await expect(suap.addManualStudentsFromSubject({
+                subjectId: '',
+                password: 'temporary-password',
+                courseIds: ['CH_INF_1AT_BD_2026.2']
+            })).rejects.toThrow('SUAP subject ID is required');
+            await expect(suap.addManualStudentsFromSubject({
+                subjectId: '77108',
+                password: '',
+                courseIds: ['CH_INF_1AT_BD_2026.2']
+            })).rejects.toThrow('Password is required');
+            await expect(suap.addManualStudentsFromSubject({
+                subjectId: '77108',
+                password: 'temporary-password',
+                courseIds: []
+            })).rejects.toThrow('At least one course ID is required');
+        });
+    });
+
     describe('extractSubjects()', () => {
         it('should initialize scraper and extract subjects', async () => {
             mockSUAPScraper.evaluate.mockResolvedValue([
