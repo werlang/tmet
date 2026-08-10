@@ -192,7 +192,7 @@ describe('SUAP Model', () => {
             });
         });
 
-        it('should validate course-based manual enrollment inputs', async () => {
+        it('should validate diário-based manual enrollment inputs', async () => {
             const suap = new SUAP();
 
             await expect(suap.addManualStudentsFromSubject({

@@ -763,7 +763,7 @@ class SUAP {
     /**
      * Scrape a SUAP subject and add every valid student to the manual Moodle queue.
      * Existing manual course links are preserved and merged with the new course IDs.
-     * @param {Object} options - Course-based manual enrollment options.
+     * @param {Object} options - Diário-based manual enrollment options.
      * @param {string} options.subjectId - SUAP diário/subject ID to scrape.
      * @param {string} options.password - Moodle password to use for CSV rows.
      * @param {string[]} options.courseIds - Moodle course shortnames/IDs.
@@ -791,7 +791,7 @@ class SUAP {
             throw new Error('At least one course ID is required');
         }
 
-        if (progressCallback) progressCallback('Finding students enrolled in SUAP course');
+        if (progressCallback) progressCallback('Finding students enrolled in SUAP diário');
 
         const scrapedStudents = await this.scrapeStudentsOnly(
             normalizedSubjectId,
@@ -839,7 +839,7 @@ class SUAP {
         fs.writeFileSync(this.#studentsPath, JSON.stringify(studentsData, null, 2));
 
         if (progressCallback) {
-            progressCallback(`Queued ${queuedStudents} students from SUAP course ${normalizedSubjectId}`);
+            progressCallback(`Queued ${queuedStudents} students from SUAP diário ${normalizedSubjectId}`);
         }
 
         return {

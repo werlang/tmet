@@ -149,7 +149,7 @@ router.post('/manual-student/remove', async (req, res) => {
 
 /**
  * POST /suap/manual-students/from-subject
- * Scrape a SUAP subject and queue all of its students for Moodle enrollment.
+ * Scrape a SUAP diário by ID and queue all of its students for Moodle enrollment.
  */
 router.post('/manual-students/from-subject', async (req, res) => {
     try {
@@ -193,11 +193,11 @@ router.post('/manual-students/from-subject', async (req, res) => {
         res.status(202).json({
             success: true,
             jobId,
-            message: 'Manual students from SUAP course job started',
+            message: 'Manual students from SUAP diário job started',
             statusUrl: `/api/jobs/${jobId}`
         });
     } catch (error) {
-        console.error('Manual students from SUAP course error:', error);
+        console.error('Manual students from SUAP diário error:', error);
         res.status(500).json({
             success: false,
             error: error.message,
@@ -702,7 +702,7 @@ async function processExtractProfessors(jobId, subjectIds, updateProgress) {
 }
 
 /**
- * Process a queued course-based manual student enrollment job.
+ * Process a queued manual student enrollment job for one SUAP diário.
  * @param {string} jobId - Queue job ID used in progress logs.
  * @param {Object} params - Subject ID, Moodle password, and course IDs.
  * @param {Function} updateProgress - Queue progress callback.
@@ -710,10 +710,10 @@ async function processExtractProfessors(jobId, subjectIds, updateProgress) {
  */
 async function processManualStudentsFromSubject(jobId, params, updateProgress) {
     updateProgress({
-        message: `Finding students for SUAP course ${params.subjectId}`,
+        message: `Finding students for SUAP diário ${params.subjectId}`,
     });
 
-    console.log(`[${jobId}] Starting manual student queue from SUAP course ${params.subjectId}`);
+    console.log(`[${jobId}] Starting manual student queue from SUAP diário ${params.subjectId}`);
 
     const suap = new SUAP();
     const result = await suap.addManualStudentsFromSubject(params, (message) => {
@@ -722,7 +722,7 @@ async function processManualStudentsFromSubject(jobId, params, updateProgress) {
 
     return {
         ...result,
-        message: `Queued ${result.queuedStudents} students from SUAP course ${result.subjectId}`,
+        message: `Queued ${result.queuedStudents} students from SUAP diário ${result.subjectId}`,
         file: 'files/suap_students.json',
     };
 }

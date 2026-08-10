@@ -102,7 +102,7 @@ describe('SUAP Route', () => {
     });
 
     describe('POST /manual-students/from-subject', () => {
-        it('should reject incomplete course-link requests', async () => {
+        it('should reject incomplete diário requests', async () => {
             const handler = getRouteHandler('post', '/manual-students/from-subject');
             const req = createMockRequest({ body: {} });
             const res = createMockResponse();
@@ -113,7 +113,7 @@ describe('SUAP Route', () => {
             expect(res._data.error).toBe('SUAP subject ID is required');
         });
 
-        it('should reject a course link without a password or Moodle course ID', async () => {
+        it('should reject a diário request without a password or Moodle course ID', async () => {
             const handler = getRouteHandler('post', '/manual-students/from-subject');
 
             const passwordResponse = createMockResponse();

@@ -94,7 +94,7 @@ class SUAP {
     }
 
     /**
-     * Add every student found in a SUAP course to the manual Moodle queue.
+     * Add every student found in a SUAP diário to the manual Moodle queue.
      * @param {Object} params - Subject ID, Moodle password, and course IDs.
      * @param {Function} progressCallback - Optional callback for job progress.
      * @returns {Promise<Object>} Completed job result.
@@ -110,12 +110,12 @@ class SUAP {
             return await this.#pollJobStatus(
                 result.jobId,
                 '/api/jobs',
-                'Manual students from SUAP course',
+                'Manual students from SUAP diário',
                 progressCallback
             );
         } catch (error) {
-            console.error('Add manual students from SUAP course error:', error);
-            Toast.error('Error adding students from SUAP course: ' + error.message);
+            console.error('Add manual students from SUAP diário error:', error);
+            Toast.error('Error adding students from SUAP diário: ' + error.message);
             throw error;
         }
     }

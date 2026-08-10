@@ -222,11 +222,11 @@
         <div class="pipeline-section">
             <h2>Manual Student Queue</h2>
             <div class="pipeline-content">
-                <p class="section-description">Queue individual students by matrícula or link a SUAP course to add all of its students to a dedicated manual CSV.</p>
+                <p class="section-description">Queue individual students by matrícula or use a SUAP diário code to add all of its students to a dedicated manual CSV.</p>
                 <div class="manual-student-panel">
                     <div class="manual-student-header">
                         <h3>Manual Student Entry</h3>
-                        <p class="section-description">Use the first action for specific matrículas. Use the SUAP course action to find all enrolled matrículas automatically.</p>
+                        <p class="section-description">Use the first action for specific matrículas. Use the SUAP diário code action to find all enrolled matrículas automatically.</p>
                     </div>
                     <div class="pipeline-inputs manual-student-inputs">
                         <div class="input-group">
@@ -234,10 +234,8 @@
                             <input type="text" id="manual-student-matricula-input" placeholder="202X1CH.COURSE000, 202X1CH.COURSE001" autocomplete="off">
                         </div>
                         <div class="input-group full-width">
-                            <label for="manual-student-suap-course-select">SUAP course link</label>
-                            <select id="manual-student-suap-course-select" class="manual-course-select">
-                                <option value="">Select a matched SUAP course</option>
-                            </select>
+                            <label for="manual-student-suap-subject-id-input">SUAP diário code</label>
+                            <input type="text" id="manual-student-suap-subject-id-input" placeholder="77108" inputmode="numeric" autocomplete="off">
                         </div>
                         <div class="input-group">
                             <label for="manual-student-password-input">Password</label>
@@ -250,7 +248,7 @@
                     </div>
                     <div class="button-row">
                         <button id="add-manual-student-btn" class="pipeline-btn secondary">Add Manual Student</button>
-                        <button id="link-manual-student-course-btn" class="pipeline-btn secondary">Add Students from SUAP Course</button>
+                        <button id="add-manual-students-from-diario-btn" class="pipeline-btn secondary">Add Students from SUAP Diário</button>
                         <button id="generate-manual-students-csv-btn" class="pipeline-btn secondary">Generate Manual Students CSV</button>
                     </div>
                     <div id="manual-students-summary" class="manual-students-summary"></div>
