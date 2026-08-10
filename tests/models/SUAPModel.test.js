@@ -1286,5 +1286,73 @@ describe('SUAP Model', () => {
                 siape: '7654321'
             });
         });
+
+        it('should ignore logged-in user profile links in user-tools/header when extracting professors', async () => {
+            let evaluateCall = 0;
+
+            mockSUAPScraper.evaluate.mockImplementation((callback, config) => {
+                evaluateCall += 1;
+                if (evaluateCall === 1) {
+                    const mockHeaderUserLink = {
+                        getAttribute: () => '/rh/servidor/1878950/',
+                        textContent: 'Pablo Werlang',
+                        closest: (selector) => selector.includes('#user-tools') ? {} : null,
+                        parentElement: { id: 'user-tools' }
+                    };
+
+                    const mockValidProfLink = {
+                        getAttribute: () => '/rh/servidor/9988776/',
+                        textContent: 'Prof. Maria Souza',
+                        closest: () => null,
+                        parentElement: null
+                    };
+
+                    const mockProfRow = {
+                        querySelector: jest.fn((selector) => {
+                            if (selector === 'a[href*="/rh/servidor/"]') return mockValidProfLink;
+                            return null;
+                        }),
+                        querySelectorAll: jest.fn(() => [
+                            { textContent: 'Ações' },
+                            { textContent: '9988776' },
+                            { textContent: 'Prof. Maria Souza' }
+                        ]),
+                        closest: () => null
+                    };
+
+                    const mockProfBox = {
+                        querySelector: jest.fn(() => ({ textContent: 'Professores do Diário' })),
+                        querySelectorAll: jest.fn((selector) => {
+                            if (selector === 'tr') return [mockProfRow];
+                            return [];
+                        }),
+                        closest: () => null,
+                        parentElement: { tagName: 'DIV' }
+                    };
+
+                    global.document = {
+                        querySelectorAll: jest.fn((selector) => {
+                            if (selector.includes('.box')) return [mockProfBox];
+                            if (selector.includes('a[href*="/rh/servidor/"]')) return [mockHeaderUserLink, mockValidProfLink];
+                            return [];
+                        }),
+                        body: {}
+                    };
+
+                    return Promise.resolve(callback(config));
+                }
+
+                return Promise.resolve('maria.souza@ifsul.edu.br');
+            });
+
+            mockFs.existsSync.mockReturnValue(false);
+
+            const suap = new SUAP();
+            const professors = await suap.scrapeProfessors('99101');
+
+            expect(professors).toHaveLength(1);
+            expect(professors[0].siape).toBe('9988776');
+            expect(professors[0].name).toBe('Prof. Maria Souza');
+        });
     });
 });

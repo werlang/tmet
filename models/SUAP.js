@@ -989,10 +989,56 @@ class SUAP {
             const professors = [];
             const addedSiapes = new Set();
 
+            /**
+             * Checks if an element belongs to the top header, navigation sidebar, mobile menu, or user profile tools.
+             * @param {Element} el - DOM element to check.
+             * @returns {boolean} True if element is part of header/nav/sidebar/user profile.
+             */
             const isHeaderUserLink = (el) => {
-                return !!el?.closest?.('#user-tools, #user-profile, .user-profile, #header, nav, .navbar, .top-bar, .user-menu, .user-info');
+                if (!el) return true;
+
+                const navSelectors = [
+                    '#user-tools', '#user-profile', '.user-profile', '#header', 'header', 'nav',
+                    '.navbar', '.top-bar', '#top-bar', '.user-menu', '#user-menu', '.user-info',
+                    '#user-info', '.header-user', '#header-user', '.user-details', '#user-details',
+                    '.profile-link', '.header-profile', '#header-profile', '.profile-info',
+                    '#profile-info', '#usermenu', '.usermenu', '.user_tools', '.user_profile',
+                    '.user_info', '.user-tools', '#user_info', '#user_profile', '#user_tools',
+                    '.breadcrumb', '#breadcrumb', '.breadcrumbs', '#mobilemenu', '.mobilemenu',
+                    '#mainmenu', '.mainmenu', 'aside', '.nav', '.sidebar', '#sidebar', 'aside.nav'
+                ];
+
+                if (el.closest && el.closest(navSelectors.join(', '))) {
+                    return true;
+                }
+
+                // Traverse up the tree to check id or class names containing user tool or navigation keywords
+                let curr = el;
+                while (curr && curr !== document.body && curr !== document.documentElement) {
+                    const id = (curr.id || '').toLowerCase();
+                    const className = (typeof curr.className === 'string' ? curr.className : '').toLowerCase();
+                    const tagName = (curr.tagName || '').toLowerCase();
+
+                    if (tagName === 'aside' || tagName === 'header' || tagName === 'nav' ||
+                        id.includes('user-tool') || id.includes('user-info') || id.includes('user-profile') || 
+                        id.includes('user-menu') || id.includes('user_tools') || id.includes('user_info') ||
+                        id.includes('mobilemenu') || id.includes('mainmenu') || id.includes('sidebar') ||
+                        className.includes('user-tool') || className.includes('user-info') || className.includes('user-profile') || 
+                        className.includes('user-menu') || className.includes('user_tools') || className.includes('user_info') ||
+                        className.includes('mobilemenu') || className.includes('mainmenu') || className.includes('sidebar')) {
+                        return true;
+                    }
+                    curr = curr.parentElement;
+                }
+
+                return false;
             };
 
+            /**
+             * Safely adds a professor to the results list.
+             * @param {string} siape - SIAPE identification number.
+             * @param {string} name - Professor full name.
+             */
             const addProfessor = (siape, name) => {
                 const cleanSiape = (siape || '').trim();
                 const cleanName = (name || '').trim();
@@ -1002,31 +1048,57 @@ class SUAP {
                 }
             };
 
-            // 1. Search for boxes/containers with headings containing "professor" or "professores"
-            const containers = document.querySelectorAll('.box, fieldset, section, .panel, .tab-content, div');
+            // Limit search strictly to main page content area
+            const mainContent = document.querySelector('#content-main, #content, main, .content-wrapper') || document.body;
+
+            /**
+             * Checks if a container is a top-level page wrapper.
+             * @param {Element} el - Container element.
+             * @returns {boolean} True if element is a top-level container.
+             */
+            const isTopLevelWrapper = (el) => {
+                if (!el) return true;
+                if (el === document.body || el === document.documentElement || el === mainContent) return true;
+
+                const id = (el.id || '').toLowerCase();
+                const className = (typeof el.className === 'string' ? el.className : '').toLowerCase();
+                const pageWrapperTokens = ['content-main', 'content', 'container', 'wrapper', 'main-container', 'page-wrapper', 'main', 'holder'];
+
+                return pageWrapperTokens.some(token => id === token || className === token || id === `main-${token}` || className === `main-${token}`);
+            };
+
+            // 1. Search for specific boxes/containers with headings containing "professor" or "professores" or "docente"
+            const candidateContainers = mainContent.querySelectorAll('.box, fieldset, section, .panel, .tab-content, .card, table, div');
             const professorBoxes = [];
 
-            for (const container of containers) {
+            for (const container of candidateContainers) {
                 if (isHeaderUserLink(container)) continue;
+                if (container.tagName === 'DIV' && isTopLevelWrapper(container)) continue;
 
                 const header = container.querySelector?.('h1, h2, h3, h4, h5, legend, caption, .box-header, .title, header');
                 if (header) {
+                    // Ensure the header directly belongs to this container or its immediate parent
+                    const headerParent = header.parentElement;
+                    if (headerParent !== container && headerParent?.parentElement !== container && !['FIELDSET', 'SECTION', 'TABLE'].includes(container.tagName)) {
+                        continue;
+                    }
+
                     const text = (header.textContent || '').trim().toLowerCase();
-                    if (text.includes('professor') || text.includes('professores')) {
+                    if (text.includes('professor') || text.includes('professores') || text.includes('docente') || text.includes('docentes')) {
                         professorBoxes.push(container);
                     }
                 }
             }
 
             // Also search table elements directly if caption/headers mention professor or siape
-            const tables = document.querySelectorAll('table');
+            const tables = mainContent.querySelectorAll('table');
             for (const table of tables) {
                 if (isHeaderUserLink(table)) continue;
 
                 const caption = table.querySelector?.('caption')?.textContent?.toLowerCase() || '';
                 const thElements = Array.from(table.querySelectorAll?.('th') || []);
                 const thText = thElements.map(th => th.textContent || '').join(' ').toLowerCase();
-                if (caption.includes('professor') || thText.includes('professor') || thText.includes('siape')) {
+                if (caption.includes('professor') || caption.includes('docente') || thText.includes('professor') || thText.includes('docente') || thText.includes('siape')) {
                     if (!professorBoxes.includes(table)) {
                         professorBoxes.push(table);
                     }
@@ -1038,6 +1110,8 @@ class SUAP {
                 elements.forEach(element => {
                     const rows = element.querySelectorAll?.('tr') || [];
                     rows.forEach(tr => {
+                        if (isHeaderUserLink(tr)) return;
+
                         // Strategy A: Look for link to professor profile /rh/servidor/<siape>/
                         const profileLink = tr.querySelector?.('a[href*="/rh/servidor/"]');
                         if (profileLink && !isHeaderUserLink(profileLink)) {
@@ -1095,10 +1169,10 @@ class SUAP {
                 processElements(professorBoxes);
             }
 
-            // Global fallback: if no professors found in boxes, search ALL links with /rh/servidor/ on page
+            // Global fallback: if no professors found in boxes, search links with /rh/servidor/ strictly inside main content
             if (professors.length === 0) {
-                const allProfileLinks = document.querySelectorAll('a[href*="/rh/servidor/"]');
-                allProfileLinks.forEach(link => {
+                const contentProfileLinks = mainContent.querySelectorAll('a[href*="/rh/servidor/"]');
+                contentProfileLinks.forEach(link => {
                     if (isHeaderUserLink(link)) return;
 
                     const href = link.getAttribute?.('href') || '';
