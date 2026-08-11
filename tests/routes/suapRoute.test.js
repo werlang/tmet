@@ -58,7 +58,8 @@ const mockSuapInstance = {
             skippedStudents: 0,
             courseIds: params.courseIds,
         };
-    })
+    }),
+    clearManualStudents: jest.fn().mockReturnValue({ clearedStudents: 2, removedStudents: 2 })
 };
 const mockSUAP = jest.fn().mockImplementation(() => mockSuapInstance);
 
@@ -168,6 +169,25 @@ describe('SUAP Route', () => {
                 expect.any(Function)
             );
             expect(result.queuedStudents).toBe(3);
+        });
+    });
+
+    describe('POST /manual-students/clear', () => {
+        it('should clear the local manual student queue', async () => {
+            const handler = getRouteHandler('post', '/manual-students/clear');
+            const req = createMockRequest({ body: {} });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(200);
+            expect(mockSuapInstance.clearManualStudents).toHaveBeenCalledTimes(1);
+            expect(res._data).toEqual({
+                success: true,
+                message: 'Manual student queue cleared',
+                clearedStudents: 2,
+                removedStudents: 2,
+            });
         });
     });
 

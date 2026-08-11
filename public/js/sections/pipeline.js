@@ -46,6 +46,7 @@ class PipelineSection {
         this.#elements.uploadCoursesBtn.addEventListener('click', () => this.#uploadCourses());
         this.#elements.addManualCourseBtn?.addEventListener('click', () => this.#createManualCourse());
         this.#elements.generateManualCoursesCsvBtn?.addEventListener('click', () => this.#generateManualCoursesCSV());
+        this.#elements.clearManualCoursesBtn?.addEventListener('click', () => this.#clearManualCourses());
     }
 
     async #loadManualCourseCategories() {
@@ -430,6 +431,28 @@ class PipelineSection {
             Toast.success(result.message || `Manual Moodle course removed: ${fullname}`);
         } catch (error) {
             // Error already handled in Moodle model
+        }
+    }
+
+    /**
+     * Clear all locally queued manual Moodle courses after confirmation.
+     */
+    async #clearManualCourses() {
+        if (!window.confirm('Clear all manual Moodle course rows from the queue?')) {
+            return;
+        }
+
+        this.#updateButton(this.#elements.clearManualCoursesBtn, true, 'Clearing...');
+
+        try {
+            const result = await this.#moodle.clearManualCourses();
+            await this.#onDataChange();
+            await this.#loadManualCoursesSummary();
+            Toast.success(result.message || 'Manual Moodle course queue cleared');
+        } catch (error) {
+            // Error already handled in Moodle model
+        } finally {
+            this.#updateButton(this.#elements.clearManualCoursesBtn, false, 'Clear Manual Courses');
         }
     }
 

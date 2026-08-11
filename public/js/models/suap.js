@@ -131,6 +131,20 @@ class SUAP {
     }
 
     /**
+     * Clear the locally queued manual student enrollments.
+     * @returns {Promise<Object>} Clear result from the API.
+     */
+    async clearManualStudents() {
+        try {
+            return await new Request().post('/api/suap/manual-students/clear');
+        } catch (error) {
+            console.error('Clear manual students error:', error);
+            Toast.error('Error clearing manual students: ' + error.message);
+            throw error;
+        }
+    }
+
+    /**
      * Poll job status until completion
      * @param {string} jobId - Job ID to poll
      * @param {string} endpoint - Status endpoint path

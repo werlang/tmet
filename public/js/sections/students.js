@@ -86,6 +86,7 @@ class StudentsSection {
         this.#elements.addManualStudentBtn.addEventListener('click', () => this.#addManualStudent());
         this.#elements.addManualStudentsFromDiarioBtn.addEventListener('click', () => this.#addManualStudentsFromDiario());
         this.#elements.generateManualStudentsCsvBtn.addEventListener('click', () => this.#generateManualStudentsCSV());
+        this.#elements.clearManualStudentsBtn.addEventListener('click', () => this.#clearManualStudents());
         this.#elements.generateStudentsCsvBtn.addEventListener('click', () => this.#generateStudentsCSV());
         this.#elements.generateProfessorsCsvBtn.addEventListener('click', () => this.#generateProfessorsCSV());
         
@@ -841,6 +842,27 @@ class StudentsSection {
             Toast.success(result.message || `Manual student removed for ${enrollment}`);
         } catch (error) {
             // Toast handled in SUAP model
+        }
+    }
+
+    /**
+     * Clear all locally queued manual students after confirmation.
+     */
+    async #clearManualStudents() {
+        if (!window.confirm('Clear all manual student rows from the queue?')) {
+            return;
+        }
+
+        this.#updateButton(this.#elements.clearManualStudentsBtn, true, 'Clearing...');
+
+        try {
+            const result = await this.#suap.clearManualStudents();
+            await this.#onDataChange();
+            Toast.success(result.message || 'Manual student queue cleared');
+        } catch (error) {
+            // Error already handled in SUAP model
+        } finally {
+            this.#updateButton(this.#elements.clearManualStudentsBtn, false, 'Clear Manual Students');
         }
     }
 

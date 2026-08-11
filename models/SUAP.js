@@ -883,6 +883,40 @@ class SUAP {
     }
 
     /**
+     * Clear locally queued manual student enrollments.
+     *
+     * Students still referenced by an extracted SUAP subject remain in the
+     * shared student index. This only clears manual queue rows and does not
+     * remove anyone from Moodle.
+     *
+     * @returns {{clearedStudents: number, removedStudents: number}}
+     */
+    clearManualStudents() {
+        const studentsData = this.#loadStudentsData();
+        const manualEnrollments = Object.keys(studentsData.manualEnrollments || {});
+        let removedStudents = 0;
+
+        manualEnrollments.forEach((enrollment) => {
+            delete studentsData.manualEnrollments[enrollment];
+
+            const isStillReferencedBySubject = Object.values(studentsData.subjects || {})
+                .some(enrollments => Array.isArray(enrollments) && enrollments.includes(enrollment));
+
+            if (!isStillReferencedBySubject && studentsData.students?.[enrollment]) {
+                delete studentsData.students[enrollment];
+                removedStudents += 1;
+            }
+        });
+
+        fs.writeFileSync(this.#studentsPath, JSON.stringify(studentsData, null, 2));
+
+        return {
+            clearedStudents: manualEnrollments.length,
+            removedStudents,
+        };
+    }
+
+    /**
      * Fetch a student's email from their profile page
      * @param {string} enrollment - Student enrollment ID
      * @returns {Promise<string|null>} Student email or null if not found

@@ -91,6 +91,7 @@ class SubjectMatcherApp {
             addManualStudentBtn: document.getElementById('add-manual-student-btn'),
             addManualStudentsFromDiarioBtn: document.getElementById('add-manual-students-from-diario-btn'),
             generateManualStudentsCsvBtn: document.getElementById('generate-manual-students-csv-btn'),
+            clearManualStudentsBtn: document.getElementById('clear-manual-students-btn'),
             manualStudentsSummary: document.getElementById('manual-students-summary'),
             
             // Professors section
@@ -102,6 +103,7 @@ class SubjectMatcherApp {
             manualCourseCategorySelect: document.getElementById('manual-course-category-select'),
             addManualCourseBtn: document.getElementById('add-manual-course-btn'),
             generateManualCoursesCsvBtn: document.getElementById('generate-manual-courses-csv-btn'),
+            clearManualCoursesBtn: document.getElementById('clear-manual-courses-btn'),
             manualCoursesSummary: document.getElementById('manual-courses-summary'),
         };
     }

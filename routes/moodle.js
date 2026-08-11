@@ -81,6 +81,29 @@ router.post('/manual-courses/remove', (req, res) => {
     }
 });
 
+/**
+ * POST /moodle/manual-courses/clear
+ * Clear the locally queued manual Moodle course rows.
+ */
+router.post('/manual-courses/clear', (req, res) => {
+    try {
+        const moodle = new Moodle();
+        const result = moodle.clearManualCourses();
+
+        res.json({
+            success: true,
+            message: 'Manual Moodle course queue cleared',
+            ...result,
+        });
+    } catch (error) {
+        console.error('Error clearing manual Moodle courses:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
 router.post('/manual-courses-csv', async (req, res) => {
     try {
         console.log('Starting manual courses CSV generation job...');

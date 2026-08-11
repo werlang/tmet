@@ -82,7 +82,8 @@ const mockMoodleInstance = {
     uploadProfessors: jest.fn().mockImplementation(async (progressCallback) => {
         if (progressCallback) progressCallback('Uploading professors...');
         return { success: [{ id: 1 }], errors: [] };
-    })
+    }),
+    clearManualCourses: jest.fn().mockReturnValue({ clearedCourses: 1, totalCourses: 0 })
 };
 const mockMoodle = jest.fn().mockImplementation(() => mockMoodleInstance);
 
@@ -315,6 +316,25 @@ describe('Moodle Route', () => {
             expect(res._data).toEqual({
                 success: true,
                 message: 'Manual Moodle course removed: [2026.1] INF-4AM - Segurança da Informação',
+                totalCourses: 0,
+            });
+        });
+    });
+
+    describe('POST /manual-courses/clear', () => {
+        it('should clear the local manual course queue', async () => {
+            const handler = getRouteHandler('post', '/manual-courses/clear');
+            const req = createMockRequest({ body: {} });
+            const res = createMockResponse();
+
+            await handler(req, res);
+
+            expect(res.statusCode).toBe(200);
+            expect(mockMoodleInstance.clearManualCourses).toHaveBeenCalledTimes(1);
+            expect(res._data).toEqual({
+                success: true,
+                message: 'Manual Moodle course queue cleared',
+                clearedCourses: 1,
                 totalCourses: 0,
             });
         });

@@ -131,6 +131,48 @@ describe('SUAP Model', () => {
             expect(savedData.manualEnrollments['20261CH.PROFEPT0005']).toBeUndefined();
             expect(savedData.students['20261CH.PROFEPT0005']).toBeUndefined();
         });
+
+        it('should clear manual enrollments while preserving students from extracted subjects', () => {
+            mockFs.existsSync.mockReturnValue(true);
+            mockFs.readFileSync.mockReturnValue(JSON.stringify({
+                subjects: {
+                    '77108': ['20261CH.PROFEPT0005']
+                },
+                students: {
+                    '20261CH.PROFEPT0005': {
+                        name: 'Ana Elisa de Souza',
+                        email: 'ana@example.com'
+                    },
+                    '20261CH.PROFEPT0006': {
+                        name: 'Bruno Lima',
+                        email: 'bruno@example.com'
+                    }
+                },
+                manualEnrollments: {
+                    '20261CH.PROFEPT0005': {
+                        password: 'password-1',
+                        courseIds: ['CH_INF_2026.1']
+                    },
+                    '20261CH.PROFEPT0006': {
+                        password: 'password-2',
+                        courseIds: ['CH_INF_2026.1']
+                    }
+                }
+            }));
+
+            const suap = new SUAP();
+            const result = suap.clearManualStudents();
+
+            expect(result).toEqual({ clearedStudents: 2, removedStudents: 1 });
+
+            const studentWriteCall = mockFs.writeFileSync.mock.calls.find(call =>
+                call[0].includes('suap_students.json')
+            );
+            const savedData = JSON.parse(studentWriteCall[1]);
+            expect(savedData.manualEnrollments).toEqual({});
+            expect(savedData.students['20261CH.PROFEPT0005']).toBeDefined();
+            expect(savedData.students['20261CH.PROFEPT0006']).toBeUndefined();
+        });
     });
 
     describe('addManualStudentsFromSubject()', () => {

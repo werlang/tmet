@@ -37,6 +37,7 @@
   - `GET /api/suap/professors`
   - `POST /api/suap/manual-student`
   - `POST /api/suap/manual-student/remove`
+  - `POST /api/suap/manual-students/clear`
   - `POST /api/suap/manual-students/from-subject`
 - Model: `models/SUAP.js`
 - Outputs:
@@ -48,6 +49,7 @@
   - `GET /api/moodle/manual-courses`
   - `POST /api/moodle/manual-courses`
   - `POST /api/moodle/manual-courses/remove`
+  - `POST /api/moodle/manual-courses/clear`
   - `POST /api/moodle/manual-courses-csv`
 - Model: `models/Moodle.js`
 - Output:

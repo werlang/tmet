@@ -87,6 +87,20 @@ class Moodle {
         }
     }
 
+    /**
+     * Clear the locally queued manual Moodle courses.
+     * @returns {Promise<Object>} Clear result from the API.
+     */
+    async clearManualCourses() {
+        try {
+            return await new Request().post('/api/moodle/manual-courses/clear');
+        } catch (error) {
+            console.error('Clear manual courses error:', error);
+            Toast.error('Error clearing manual courses: ' + error.message);
+            throw error;
+        }
+    }
+
     async generateManualCoursesCSV(progressCallback) {
         try {
             const result = await new Request().post('/api/moodle/manual-courses-csv');

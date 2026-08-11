@@ -117,6 +117,26 @@ class Moodle {
         };
     }
 
+    /**
+     * Clear the locally queued manual Moodle courses.
+     *
+     * This only removes TMET's local queue rows. It does not call Moodle or
+     * delete any course that already exists in Moodle.
+     *
+     * @returns {{clearedCourses: number, totalCourses: number}}
+     */
+    clearManualCourses() {
+        const manualCourses = this.#loadManualCourseEntries();
+
+        this.#saveManualCourseEntries([]);
+        this.#writeCourseCsv(this.#manualCoursesCsvPath, []);
+
+        return {
+            clearedCourses: manualCourses.length,
+            totalCourses: 0,
+        };
+    }
+
     addManualCourse({ fullname, categoryKey }) {
         const normalizedFullname = String(fullname || '').trim();
         const normalizedCategoryKey = String(categoryKey || '').trim().toUpperCase();

@@ -26,10 +26,14 @@ Use these examples as implementation baselines. Paths are relative to mounted ba
   - Creates one manual Moodle course entry that later feeds `moodle_manual_classes.csv`.
 - `POST /api/moodle/manual-courses/remove`
   - Removes one queued manual course by `fullname`.
+- `POST /api/moodle/manual-courses/clear`
+  - Clears the local manual course queue without calling Moodle.
 - `POST /api/suap/manual-student`
   - Stores a manual enrollment entry inside `suap_students.json`.
 - `POST /api/suap/manual-student/remove`
   - Removes one queued manual student by enrollment.
+- `POST /api/suap/manual-students/clear`
+  - Clears the local manual student queue without calling Moodle.
 - `POST /api/suap/manual-students/from-subject`
   - Queues a job that scrapes one SUAP diário by ID and stores all valid enrolled students in the manual queue.
 

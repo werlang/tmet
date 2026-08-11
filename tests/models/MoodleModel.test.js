@@ -369,6 +369,37 @@ describe('Moodle Model', () => {
                 ], null, 2)
             );
         });
+
+        it('should clear the local manual course queue without touching Moodle', () => {
+            mockFs.existsSync.mockImplementation((path) => path.includes('moodle_manual_classes.json'));
+            mockFs.readFileSync.mockImplementation((path) => {
+                if (path.includes('moodle_manual_classes.json')) {
+                    return JSON.stringify([
+                        {
+                            fullname: '[2026.1] INF-4AM - Segurança da Informação',
+                            shortname: 'CH_INF_4AM_SeguInfo_2026.1',
+                            category: 115,
+                            categoryKey: 'INF'
+                        }
+                    ]);
+                }
+
+                return '';
+            });
+
+            const moodle = new Moodle();
+            const result = moodle.clearManualCourses();
+
+            expect(result).toEqual({ clearedCourses: 1, totalCourses: 0 });
+            expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+                expect.stringContaining('moodle_manual_classes.json'),
+                '[]'
+            );
+            expect(mockFs.writeFileSync).toHaveBeenCalledWith(
+                expect.stringContaining('moodle_manual_classes.csv'),
+                'fullname, shortname, category'
+            );
+        });
     });
 
     describe('generateManualCourseCSV()', () => {

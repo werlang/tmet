@@ -148,6 +148,29 @@ router.post('/manual-student/remove', async (req, res) => {
 });
 
 /**
+ * POST /suap/manual-students/clear
+ * Clear the locally queued manual student rows.
+ */
+router.post('/manual-students/clear', async (req, res) => {
+    try {
+        const suap = new SUAP();
+        const result = suap.clearManualStudents();
+
+        res.json({
+            success: true,
+            message: 'Manual student queue cleared',
+            ...result,
+        });
+    } catch (error) {
+        console.error('Manual student queue clear error:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+        });
+    }
+});
+
+/**
  * POST /suap/manual-students/from-subject
  * Scrape a SUAP diário by ID and queue all of its students for Moodle enrollment.
  */
